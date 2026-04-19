@@ -1,0 +1,11 @@
+# Do not type <APP_ROOT> — that was a placeholder. Use your real folder path.
+
+# Example (this project):
+cd E:\GFASORCL\APPTEST
+
+.\setup-new-client-tunnel.ps1 -ClientKey "RBRL"
+
+# This will create both DNS routes:
+# - rbrl.fasaccountingsoftware.in
+# - rbrl-api.fasaccountingsoftware.in
+# Check them under Cloudflare -> DNS records (not the Tunnel "Routes" card).

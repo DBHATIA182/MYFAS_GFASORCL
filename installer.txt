@@ -1,0 +1,11 @@
+Client setup folder:
+
+<APP_ROOT>
+
+Install command (PowerShell as Administrator):
+
+powershell -ExecutionPolicy Bypass -File .\setup-client.ps1 -ClientKey marutioverseas -OracleConnectString "192.168.1.20:1521/XE" -OraclePrimaryUser GRAINFAS -OraclePrimaryPassword GRAINFAS -OracleGrainUser GRAIN -OracleGrainPassword GRAIN -AutoStartMode task
+
+Guide:
+
+See CLIENT_SETUP.md

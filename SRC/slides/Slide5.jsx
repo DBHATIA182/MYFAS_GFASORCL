@@ -1,0 +1,559 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import axios from 'axios';
+import ReportTable from '../components/ReportTable';
+import SaleBillPrintModal from '../components/SaleBillPrintModal';
+import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
+import { downloadExcelRows } from '../utils/excelExport';
+import { toInputDateString, toOracleDate, toDisplayDate, formatCurBal, getCurBal } from '../utils/dateFormat';
+import { formatLedgerVoucherApiError } from '../utils/apiLabel';
+
+function highlightMatch(text, q) {
+  if (text == null) return null;
+  const s = String(text);
+  const query = q.trim();
+  if (!query) return s;
+  const lower = s.toLowerCase();
+  const qi = lower.indexOf(query.toLowerCase());
+  if (qi === -1) return s;
+  return (
+    <>
+      {s.slice(0, qi)}
+      <mark className="search-highlight">{s.slice(qi, qi + query.length)}</mark>
+      {s.slice(qi + query.length)}
+    </>
+  );
+}
+
+export default function Slide5({ apiBase, onPrev, onReset, formData }) {
+  const [accounts, setAccounts] = useState([]);
+  const [selectedAccount, setSelectedAccount] = useState('');
+  const [accountSearch, setAccountSearch] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [reportData, setReportData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const startDateInputRef = useRef(null);
+  const accountSearchInputRef = useRef(null);
+  const [listHighlight, setListHighlight] = useState(0);
+  const [voucherRows, setVoucherRows] = useState(null);
+  const [voucherTitle, setVoucherTitle] = useState('');
+  const [billPrintOpen, setBillPrintOpen] = useState(false);
+  const [billPrintParams, setBillPrintParams] = useState(null);
+
+  // Period from compdet (passed via Slide2 → App as comp_s_dt / comp_e_dt)
+  useEffect(() => {
+    const sRaw = formData.comp_s_dt ?? formData.COMP_S_DT;
+    const eRaw = formData.comp_e_dt ?? formData.COMP_E_DT;
+    const s = toInputDateString(sRaw);
+    const e = toInputDateString(eRaw);
+    if (s) setStartDate(s);
+    if (e) setEndDate(e);
+  }, [
+    formData.comp_s_dt,
+    formData.comp_e_dt,
+    formData.COMP_S_DT,
+    formData.COMP_E_DT,
+  ]);
+
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      const code = formData.comp_code || formData.COMP_CODE;
+      const uid = formData.comp_uid || formData.COMP_UID;
+      if (!code || !uid) return;
+      try {
+        const response = await axios.get(`${apiBase}/api/accounts`, {
+          params: { comp_code: code, comp_uid: uid },
+        });
+        setAccounts(response.data || []);
+      } catch (err) {
+        console.error('Failed to load accounts:', err);
+      }
+    };
+    fetchAccounts();
+  }, [apiBase, formData]);
+
+  const filteredAccounts = useMemo(() => {
+    const q = accountSearch.trim().toLowerCase();
+    if (!q) return accounts.slice(0, 120);
+    return accounts.filter((a) => {
+      const code = String(a.CODE ?? '').toLowerCase();
+      const name = String(a.NAME ?? '').toLowerCase();
+      const city = String(a.CITY ?? '').toLowerCase();
+      const bal = String(getCurBal(a) ?? '').toLowerCase();
+      return code.includes(q) || name.includes(q) || city.includes(q) || bal.includes(q);
+    });
+  }, [accounts, accountSearch]);
+
+  useEffect(() => {
+    setListHighlight(0);
+  }, [accountSearch]);
+
+  const accountListMaxIdx = Math.max(0, filteredAccounts.length - 1);
+  const safeHighlight = Math.min(listHighlight, accountListMaxIdx);
+
+  const focusStartDate = () => {
+    setTimeout(() => {
+      const el = startDateInputRef.current;
+      if (el) {
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        el.focus({ preventScroll: true });
+      }
+    }, 0);
+  };
+
+  const selectAccount = (account) => {
+    setSelectedAccount(String(account.CODE));
+    setAccountSearch('');
+    focusStartDate();
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedAccount) {
+      alert('Please select an account');
+      return;
+    }
+    if (!startDate || !endDate) {
+      alert('Please select both start and end dates');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const sDate = toOracleDate(startDate);
+      const eDate = toOracleDate(endDate);
+      
+      const response = await axios.get(`${apiBase}/api/ledger`, {
+        params: {
+          comp_code: formData.comp_code || formData.COMP_CODE,
+          code: selectedAccount,
+          s_date: sDate,
+          e_date: eDate,
+          comp_uid: formData.comp_uid || formData.COMP_UID,
+        },
+        withCredentials: true,
+        timeout: 30000
+      });
+      
+      if (response.data && response.data.length > 0) {
+        setReportData(response.data);
+        setShowReport(true);
+      } else {
+        alert('No transactions found for this account');
+      }
+    } catch (error) {
+      alert('Error: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Sale bill: SALE.TYPE = LEDGER.VR_TYPE, SALE.BILL_NO = LEDGER.VR_NO, SALE.B_TYPE = LEDGER.TYPE, date = VR_DATE.
+   * (Sale list screen uses SALE.TYPE / BILL_NO / BILL_DATE / B_TYPE from list rows — different column names.)
+   */
+  const openLedgerSaleBill = (row) => {
+    const vrType = row.VR_TYPE ?? row.vr_type;
+    const ledgerLineType = row.TYPE ?? row.type;
+    const billNo = row.VR_NO ?? row.vr_no;
+    const billDt = row.VR_DATE ?? row.vr_date;
+    const ymd = toInputDateString(billDt);
+    const oracleDt = toOracleDate(ymd);
+    const saleType = vrType != null && String(vrType).trim() !== '' ? String(vrType).trim() : '';
+    if (!saleType) {
+      alert('Cannot open sale bill: missing vr_type (maps to sale.type).');
+      return;
+    }
+    if (billNo == null || String(billNo).trim() === '' || !oracleDt) {
+      alert('Cannot open sale bill: missing vr_no or vr_Date.');
+      return;
+    }
+    const bTypeFromLedger = ledgerLineType != null && String(ledgerLineType).trim() !== '' ? String(ledgerLineType).trim() : ' ';
+    setBillPrintParams({
+      type: saleType,
+      billNo: String(billNo).trim(),
+      bType: bTypeFromLedger,
+      oracleDt,
+      label: `Sale bill — sale.type=${saleType} · bill_no=${String(billNo)} · b_type=${bTypeFromLedger.trim() || ' '} · ${toDisplayDate(ymd)}`,
+    });
+    setBillPrintOpen(true);
+  };
+
+  const runLedgerVoucher = async (row) => {
+    const vrType = row.VR_TYPE ?? row.vr_type;
+    const vrNo = row.VR_NO ?? row.vr_no;
+    const vrDate = row.VR_DATE ?? row.vr_date;
+    if (!vrType || String(vrType).toUpperCase() === 'OP') return;
+    const n = Number(vrNo);
+    if (!Number.isFinite(n) || n <= 0) return;
+    const ymd = toInputDateString(vrDate);
+    if (!ymd) {
+      alert('Could not read voucher date on this line.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axios.get(`${apiBase}/api/ledger-voucher`, {
+        params: {
+          comp_code: formData.comp_code || formData.COMP_CODE,
+          vr_type: String(vrType),
+          vr_date: toOracleDate(ymd),
+          vr_no: n,
+          comp_uid: formData.comp_uid || formData.COMP_UID,
+        },
+        withCredentials: true,
+        timeout: 30000,
+      });
+      const rows = Array.isArray(response.data) ? response.data : [];
+      if (rows.length === 0) {
+        alert('No voucher lines found for this voucher.');
+        return;
+      }
+      setVoucherRows(rows);
+      setVoucherTitle(`${String(vrType)} ${n} · ${toDisplayDate(ymd)}`);
+    } catch (error) {
+      alert('Error: ' + formatLedgerVoucherApiError(error, apiBase));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadPDF = async () => {
+    const account = accounts.find((a) => String(a.CODE) === String(selectedAccount));
+    await generatePDF('ledger', reportData, {
+      companyName: formData.comp_name,
+      year: formData.comp_year,
+      accountName: account?.NAME ?? '',
+      accountCode: String(account?.CODE ?? selectedAccount),
+      endDate: `${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`,
+    });
+  };
+
+  const shareWhatsApp = async () => {
+    const account = accounts.find((a) => String(a.CODE) === String(selectedAccount));
+    const shareText = [
+      `Ledger Report — ${formData.comp_name}`,
+      `${formData.comp_year} | ${account?.NAME ?? 'Account'} (${String(account?.CODE ?? selectedAccount)})`,
+      `${toDisplayDate(startDate)} → ${toDisplayDate(endDate)}`,
+    ].join('\n');
+    await sharePdfWithWhatsApp(
+      'ledger',
+      reportData,
+      {
+        companyName: formData.comp_name,
+        year: formData.comp_year,
+        accountName: account?.NAME ?? '',
+        accountCode: String(account?.CODE ?? selectedAccount),
+        endDate: `${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`,
+      },
+      shareText
+    );
+  };
+
+  if (showReport && reportData.length > 0) {
+    const account = accounts.find((a) => String(a.CODE) === String(selectedAccount));
+    const closeReport = () => {
+      setVoucherRows(null);
+      setVoucherTitle('');
+      setShowReport(false);
+      setBillPrintOpen(false);
+      setBillPrintParams(null);
+    };
+
+    const saleBillModal = (
+      <SaleBillPrintModal
+        open={billPrintOpen}
+        onClose={() => {
+          setBillPrintOpen(false);
+          setBillPrintParams(null);
+        }}
+        apiBase={apiBase}
+        compCode={formData.comp_code ?? formData.COMP_CODE}
+        compUid={formData.comp_uid ?? formData.COMP_UID}
+        billParams={billPrintParams}
+        companyName={formData.comp_name ?? formData.COMP_NAME ?? ''}
+      />
+    );
+
+    if (voucherRows != null) {
+      return (
+        <div className="slide slide-report">
+          <div className="report-toolbar">
+            <h2>Voucher entries</h2>
+            <div className="toolbar-actions">
+              <button type="button" className="btn btn-toolbar-back" onClick={() => setVoucherRows(null)}>
+                ← Back to ledger
+              </button>
+              <button
+                type="button"
+                className="btn btn-excel"
+                onClick={() => {
+                  try {
+                    const tag = String(voucherTitle || 'voucher').replace(/\s+/g, '_');
+                    downloadExcelRows(voucherRows, 'Voucher', `${formData.comp_name ?? 'Company'}_${tag}`);
+                  } catch (e) {
+                    alert(String(e?.message || e));
+                  }
+                }}
+              >
+                📊 Excel
+              </button>
+            </div>
+          </div>
+
+          <div className="report-info">
+            <p>
+              {account ? (
+                <>
+                  <strong>{account.NAME}</strong> ({account.CODE})
+                </>
+              ) : (
+                <span>Account code: {selectedAccount}</span>
+              )}
+            </p>
+            <p>
+              Voucher: <strong>{voucherTitle}</strong>
+            </p>
+            <p>{formData.comp_name} | {formData.comp_year}</p>
+          </div>
+
+          <div className="report-display">
+            <ReportTable data={voucherRows} type="ledger-voucher" />
+          </div>
+
+          <div className="button-group">
+            <button type="button" onClick={() => setVoucherRows(null)} className="btn btn-secondary">
+              ← Back to ledger
+            </button>
+            <button type="button" onClick={closeReport} className="btn btn-secondary">
+              ← Modify
+            </button>
+            <button type="button" onClick={onReset} className="btn btn-primary">
+              🏠 Start Over
+            </button>
+          </div>
+          {saleBillModal}
+        </div>
+      );
+    }
+
+    return (
+      <div className="slide slide-report">
+        <div className="report-toolbar">
+          <h2>Ledger Report</h2>
+          <div className="toolbar-actions">
+            <button type="button" className="btn btn-toolbar-back" onClick={closeReport}>
+              ← Back
+            </button>
+            <button type="button" onClick={() => downloadPDF().catch((e) => alert(e?.message || String(e)))} className="btn btn-export">
+              📥 Download PDF
+            </button>
+            <button
+              type="button"
+              className="btn btn-excel"
+              onClick={() => {
+                try {
+                  const code = String(selectedAccount || 'account');
+                  downloadExcelRows(reportData, 'Ledger', `${formData.comp_name ?? 'Company'}_Ledger_${code}`);
+                } catch (e) {
+                  alert(String(e?.message || e));
+                }
+              }}
+            >
+              📊 Excel
+            </button>
+            <button type="button" onClick={() => shareWhatsApp().catch((e) => alert(e?.message || String(e)))} className="btn btn-whatsapp">
+              💬 WhatsApp
+            </button>
+          </div>
+        </div>
+
+        <div className="report-info">
+          <p>
+            {account ? (
+              <>
+                <strong>{account.NAME}</strong> ({account.CODE})
+              </>
+            ) : (
+              <span>Account code: {selectedAccount}</span>
+            )}
+          </p>
+          <p>{formData.comp_name} | {formData.comp_year}</p>
+          <p className="compdet-date-hint">
+            Rows with vr_type SL, SE, or CN: tap to open sale bill print (uses type, vr_no, vr_Date). Other rows (except
+            opening): tap for full voucher detail.
+          </p>
+        </div>
+
+        <div className="report-display">
+          <ReportTable
+            data={reportData}
+            type="ledger"
+            onVoucherClick={runLedgerVoucher}
+            onLedgerSaleBillClick={openLedgerSaleBill}
+          />
+        </div>
+
+        <div className="button-group">
+          <button onClick={closeReport} className="btn btn-secondary">
+            ← Modify
+          </button>
+          <button onClick={onReset} className="btn btn-primary">
+            🏠 Start Over
+          </button>
+        </div>
+        {saleBillModal}
+      </div>
+    );
+  }
+
+  return (
+    <div className="slide slide-5">
+      <h2>Ledger Report Parameters</h2>
+      
+      <p className="company-info">
+        {formData.comp_name} | {formData.comp_year}
+        <br />
+        <span className="compdet-date-hint">
+          Dates below are comp_s_dt / comp_e_dt for this year (FY may span two calendar years).
+        </span>
+      </p>
+
+      <form onSubmit={handleSubmit} className="report-form">
+        <div className="form-group account-search-group">
+          <label htmlFor="account-search">Search account:</label>
+          <input
+            id="account-search"
+            ref={accountSearchInputRef}
+            type="search"
+            autoComplete="off"
+            placeholder="Type code, name, or city… (↑↓ Enter)"
+            value={accountSearch}
+            onChange={(e) => setAccountSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (selectedAccount) return;
+              const max = Math.max(0, filteredAccounts.length - 1);
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (filteredAccounts.length === 0) return;
+                setListHighlight((h) => Math.min(max, h + 1));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setListHighlight((h) => Math.max(0, h - 1));
+              } else if (e.key === 'Enter') {
+                const acc = filteredAccounts[safeHighlight];
+                if (acc) {
+                  e.preventDefault();
+                  selectAccount(acc);
+                }
+              }
+            }}
+            className="form-input"
+          />
+          {selectedAccount ? (
+            <p className="account-selected-hint">
+              Selected: <strong>{accounts.find((a) => String(a.CODE) === String(selectedAccount))?.NAME ?? '—'}</strong>
+              {' '}(<code>{selectedAccount}</code>)
+              <button
+                type="button"
+                className="btn-text-clear"
+                onClick={() => {
+                  setSelectedAccount('');
+                  setAccountSearch('');
+                  setListHighlight(0);
+                  setTimeout(() => accountSearchInputRef.current?.focus(), 0);
+                }}
+              >
+                Clear
+              </button>
+            </p>
+          ) : null}
+          {!selectedAccount ? (
+            <div className="account-search-results" role="listbox" aria-label="Matching accounts">
+              <div className="account-search-header" aria-hidden="true">
+                <span>Code</span>
+                <span>Name</span>
+                <span>City</span>
+                <span className="account-search-bal-h">Bal</span>
+              </div>
+              {filteredAccounts.length === 0 ? (
+                <div className="account-search-empty">No accounts match your search.</div>
+              ) : (
+                filteredAccounts.map((account, index) => {
+                  const bal = getCurBal(account);
+                  const n = Number(bal);
+                  const dc =
+                    bal != null && bal !== '' && !Number.isNaN(n)
+                      ? n < 0
+                        ? 'Cr'
+                        : 'Dr'
+                      : '';
+                  const rowHi = safeHighlight === index;
+                  return (
+                    <button
+                      key={account.CODE}
+                      type="button"
+                      role="option"
+                      aria-selected={rowHi}
+                      className={`account-search-row${String(selectedAccount) === String(account.CODE) ? ' is-active' : ''}${rowHi ? ' is-highlight' : ''}`}
+                      onMouseEnter={() => setListHighlight(index)}
+                      onClick={() => selectAccount(account)}
+                    >
+                      <span className="account-search-code">{highlightMatch(account.CODE, accountSearch)}</span>
+                      <span className="account-search-name" title={account.NAME}>
+                        {highlightMatch(account.NAME, accountSearch)}
+                      </span>
+                      <span className="account-search-city" title={account.CITY || ''}>
+                        {account.CITY || '—'}
+                      </span>
+                      <span
+                        className={`account-search-bal ${dc === 'Cr' ? 'is-cr' : dc === 'Dr' ? 'is-dr' : ''}`}
+                      >
+                        {formatCurBal(bal)}
+                        {dc ? <span className="account-search-bal-dc">{dc}</span> : null}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="start-date">Starting date (financial year from compdet)</label>
+          <input
+            id="start-date"
+            ref={startDateInputRef}
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="form-input"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="end-date">Ending date (financial year from compdet)</label>
+          <input
+            id="end-date"
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="form-input"
+          />
+        </div>
+
+        <div className="button-group">
+          <button type="button" onClick={onPrev} className="btn btn-secondary">
+            ← Back
+          </button>
+          <button type="submit" disabled={loading} className="btn btn-primary">
+            {loading ? '⏳ Generating...' : '📊 Generate Report'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

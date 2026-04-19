@@ -1,0 +1,2097 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: #f0f2f5;
+  color: #1a202c;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #4c51bf 0%, #667eea 100%);
+}
+
+.app--selector .app-main {
+  align-items: center;
+}
+
+.startup-mode-card {
+  max-width: 520px;
+  text-align: center;
+}
+
+.startup-mode-subtitle {
+  margin: 0 0 1rem;
+  color: #4a5568;
+}
+
+.startup-mode-shortcut-hint {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.startup-mode-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* HEADER */
+.app-header {
+  background: white;
+  padding: 1rem 1.2rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.app-header h1 {
+  font-size: 1.3rem;
+  color: #2d3748;
+}
+
+.app-main {
+  flex: 1;
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.app-loading {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #2d3748;
+}
+
+.app-loading h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.app-loading-client-host {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  color: #4a5568;
+  word-break: break-all;
+}
+
+/* SLIDE CONTAINERS */
+.slide {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  width: 100%;
+  max-width: 800px;
+  min-width: 0; /* flex: allow inner horizontal scroll instead of growing past viewport */
+}
+
+.slide-report {
+  max-width: min(1200px, calc(100vw - 2rem)) !important;
+  width: 100%;
+  min-width: 0;
+  padding: 1rem !important;
+  box-sizing: border-box;
+}
+
+.slide-report .report-display {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.report-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.report-toolbar h2 {
+  margin: 0;
+  border-left: none;
+  padding-left: 0;
+}
+
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.toolbar-actions .btn {
+  white-space: nowrap;
+}
+
+.btn-toolbar-back {
+  background: #edf2f7 !important;
+  color: #2d3748 !important;
+  border: 1px solid #cbd5e1 !important;
+  flex: 0 1 auto;
+  min-width: 5rem;
+  padding: 0.42rem 0.62rem !important;
+  font-size: 0.74rem !important;
+  border-radius: 7px !important;
+  line-height: 1.2;
+}
+
+.btn-toolbar-back:hover {
+  background: #e2e8f0 !important;
+}
+
+.btn-export {
+  background: #2b6cb0 !important;
+  color: #fff !important;
+  flex: 0 1 auto;
+  min-width: 7.4rem;
+  padding: 0.42rem 0.62rem !important;
+  font-size: 0.74rem !important;
+  border-radius: 7px !important;
+  line-height: 1.2;
+}
+
+.btn-excel {
+  background: #217346 !important;
+  color: #fff !important;
+  flex: 0 1 auto;
+  min-width: 6.5rem;
+  padding: 0.42rem 0.62rem !important;
+  font-size: 0.74rem !important;
+  border-radius: 7px !important;
+  line-height: 1.2;
+}
+
+.btn-excel:hover {
+  filter: brightness(1.08);
+}
+
+.btn-whatsapp {
+  background: #25d366 !important;
+  color: #fff !important;
+  flex: 0 1 auto;
+  min-width: 5.2rem;
+  padding: 0.42rem 0.62rem !important;
+  font-size: 0.74rem !important;
+  border-radius: 7px !important;
+  line-height: 1.2;
+}
+
+.slide h2 {
+  color: #1a202c;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  border-left: 5px solid #4c51bf;
+  padding-left: 10px;
+}
+
+.company-info {
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.compdet-date-hint {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+/* Step 3 report list: compact so many report types fit */
+.slide-3 .report-options {
+  max-height: min(55vh, 520px);
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.slide-3 .report-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.3rem 0.45rem;
+  padding: 0.22rem 0;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.slide-3 .report-option:last-child {
+  border-bottom: none;
+}
+
+.slide-3 .report-option input[type='radio'] {
+  margin-top: 0.1rem;
+  transform: scale(0.9);
+}
+
+.slide-3 .report-option label h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.slide-3 .report-option label p {
+  margin: 0.08rem 0 0;
+  font-size: 0.62rem;
+  line-height: 1.22;
+  color: #4a5568;
+}
+
+/* TABLE STYLING */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  margin: 1rem 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: white;
+  -webkit-overflow-scrolling: touch;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 500px; /* Compact for mobile */
+}
+
+.report-table th {
+  background: #2d3748;
+  color: white;
+  padding: 12px 10px;
+  text-align: left;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.report-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #edf2f7;
+  vertical-align: middle;
+}
+
+.report-table tbody tr.clickable-row {
+  cursor: pointer;
+}
+
+.report-table tbody tr.clickable-row:hover {
+  background: #eff6ff;
+}
+
+/* STICKY ACCOUNT NAME COLUMN */
+.sticky-col {
+  position: sticky;
+  left: 0;
+  background: white !important;
+  z-index: 10;
+  min-width: 200px;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+}
+
+.report-table tr:nth-child(even) td {
+  background: #fcfcfc;
+}
+
+.report-table tr:nth-child(even) .sticky-col {
+  background: #fcfcfc !important;
+}
+
+/* ACCOUNT NAME INTERNALS */
+.name-text {
+  font-weight: 600;
+  color: #2d3748;
+  display: block;
+}
+
+.sch-badge {
+  background: #ebf4ff;
+  color: #4c51bf;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  margin-right: 8px;
+  display: inline-block;
+}
+
+.sub-text {
+  font-size: 0.75rem;
+  color: #718096;
+  margin-top: 2px;
+}
+
+/* BALANCE COLORS & LOGIC */
+.text-right {
+  text-align: right;
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+  white-space: nowrap;
+}
+
+.dr-amt { color: #2f855a !important; font-weight: 700; } /* Green */
+.cr-amt { color: #c53030 !important; font-weight: 700; } /* Red */
+
+.type-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  margin-left: 2px;
+}
+
+/* TOTAL ROWS */
+.total-row {
+  background-color: #f1f5f9 !important;
+}
+
+.total-row td {
+  border-top: 2px solid #475569;
+  border-bottom: 2px solid #475569;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+}
+
+.total-row .sticky-col {
+  background-color: #f1f5f9 !important;
+}
+
+/* —— Trial balance: full-width header, grid, horizontal scroll on phone —— */
+.table-responsive--trial {
+  border: 2px solid #1e293b;
+  border-radius: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1rem 0;
+  background: #fff;
+}
+
+.report-table--trial {
+  min-width: 720px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.report-table--trial thead th {
+  background: #1e293b;
+  color: #fff;
+  border: 1px solid #0f172a;
+  padding: 10px 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+}
+
+.report-table--trial tbody td {
+  border: 1px solid #94a3b8;
+  padding: 8px;
+  font-size: 0.8rem;
+  vertical-align: top;
+}
+
+.report-table--trial tbody tr:nth-child(odd) td {
+  background: #fff;
+}
+
+.report-table--trial tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.report-table--trial .trial-subtotal-row td {
+  background: #e0e7ff !important;
+  font-weight: 700;
+  color: #1e3a8a !important;
+  border-top: 2px solid #6366f1;
+}
+
+.report-table--trial .trial-grand-total td {
+  background: #1e3a5f !important;
+  color: #fff !important;
+  border: 1px solid #0f172a;
+  font-weight: 800;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  font-size: 0.85rem;
+}
+
+.report-table--trial .trial-grand-total .text-right {
+  color: #fff !important;
+}
+
+/* Ageing Cur. Bal: schedule 8.10 negative, or other schedules positive → show flipped / negative in red */
+.report-table--trial td.ageing-cur-bal-alert,
+.report-table--trial td.ageing-cur-bal-alert strong {
+  color: #c53030 !important;
+  font-weight: 700;
+}
+
+.report-table--trial .trial-grand-total td.ageing-cur-bal-alert,
+.report-table--trial .trial-grand-total td.ageing-cur-bal-alert strong {
+  color: #fecaca !important;
+}
+
+.report-table--trial .trial-sch,
+.report-table--trial .trial-code {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.report-table--trial .trial-city {
+  font-size: 0.78rem;
+  color: #4a5568;
+}
+
+/* —— Ledger + bill-wise ledger on-screen —— */
+.table-responsive--ledger,
+.table-responsive--bill-ledger,
+.table-responsive--broker-os {
+  border: 2px solid #1e293b;
+  border-radius: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.report-table--ledger {
+  min-width: 920px;
+}
+
+.report-table--ledger .col-ledger-type {
+  white-space: nowrap;
+  max-width: 4.5rem;
+}
+
+.report-table--ledger .col-ledger-line-type {
+  white-space: nowrap;
+  max-width: 3.5rem;
+}
+
+.report-table--ledger .ledger-detail {
+  min-width: 140px;
+  max-width: 260px;
+  word-break: break-word;
+}
+
+.report-table--bill-ledger {
+  min-width: 980px;
+}
+
+.report-table--broker-os {
+  min-width: 1080px;
+}
+
+.report-table--ledger,
+.report-table--bill-ledger,
+.report-table--broker-os {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.report-table--ledger thead th,
+.report-table--bill-ledger thead th,
+.report-table--broker-os thead th {
+  background: #1e293b;
+  color: #fff;
+  border: 1px solid #0f172a;
+  padding: 10px 8px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.report-table--ledger tbody td,
+.report-table--bill-ledger tbody td,
+.report-table--broker-os tbody td {
+  border: 1px solid #94a3b8;
+  padding: 8px;
+  font-size: 0.8rem;
+}
+
+.report-table--ledger tbody tr:nth-child(odd) td,
+.report-table--bill-ledger tbody tr:nth-child(odd) td,
+.report-table--broker-os tbody tr:nth-child(odd) td {
+  background: #fff;
+}
+
+.report-table--ledger tbody tr:nth-child(even) td,
+.report-table--bill-ledger tbody tr:nth-child(even) td,
+.report-table--broker-os tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.report-table--ledger tbody tr.opening-row td {
+  background: #e0f2fe !important;
+}
+
+.report-table--ledger tr.ledger-grand-total td,
+.report-table--bill-ledger tr.bill-ledger-grand-total td,
+.report-table--broker-os tr.bill-ledger-grand-total td {
+  background: #1e3a5f !important;
+  color: #fff !important;
+  border: 1px solid #0f172a;
+  font-weight: 800;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.report-table--ledger tr.ledger-grand-total .text-right,
+.report-table--bill-ledger tr.bill-ledger-grand-total .text-right,
+.report-table--broker-os tr.bill-ledger-grand-total .text-right {
+  color: #fff !important;
+}
+
+.report-table--bill-ledger .bill-ledger-grand-note {
+  font-weight: 500;
+  font-size: 0.68rem;
+  opacity: 0.88;
+  margin-left: 0.2rem;
+}
+
+.report-table--bill-ledger tr.bill-ledger-bill-total td {
+  background: #e0f2fe !important;
+  color: #0f172a !important;
+  font-weight: 700;
+  border-top: 1px solid #93c5fd;
+  border-bottom: 1px solid #bfdbfe;
+}
+
+.report-table--broker-os tr.broker-os-party-total td {
+  background: #e0e7ff !important;
+  color: #1e3a8a !important;
+  font-weight: 700;
+  border-top: 1px solid #a5b4fc;
+  border-bottom: 1px solid #c7d2fe;
+}
+
+.report-table--broker-os tr.broker-os-bill-total td {
+  background: #ecfeff !important;
+  color: #0f172a !important;
+  font-weight: 700;
+  border-top: 1px solid #99f6e4;
+  border-bottom: 1px solid #ccfbf1;
+}
+
+.report-table--broker-os tr.broker-os-broker-total td {
+  background: #3730a3 !important;
+  color: #eef2ff !important;
+  font-weight: 800;
+  border-top: 2px solid #4f46e5;
+}
+
+.report-table--broker-os tr.broker-os-party-total .text-right,
+.report-table--broker-os tr.broker-os-broker-total .text-right {
+  color: inherit !important;
+}
+
+.report-table--broker-os tr.broker-os-party-total .dr-amt,
+.report-table--broker-os tr.broker-os-party-total .cr-amt {
+  color: #1e3a8a !important;
+}
+
+.report-table--broker-os tr.broker-os-broker-total .dr-amt,
+.report-table--broker-os tr.broker-os-broker-total .cr-amt {
+  color: #eef2ff !important;
+}
+
+/* Report toolbar: stack on narrow screens */
+@media (max-width: 640px) {
+  .report-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .report-toolbar h2 {
+    font-size: 1.1rem;
+    padding-left: 0;
+    border-left: none;
+    border-bottom: 3px solid #4c51bf;
+    padding-bottom: 0.5rem;
+  }
+
+  .toolbar-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .toolbar-actions .btn-toolbar-back {
+    grid-column: 1 / -1;
+  }
+
+  .toolbar-actions .btn {
+    min-width: 0 !important;
+    padding: 0.75rem 0.5rem;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+}
+
+/* FORM ELEMENTS */
+.form-group {
+  margin-bottom: 1.2rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+  color: #4a5568;
+  font-size: 0.9rem;
+}
+
+.form-input, .form-select {
+  width: 100%;
+  padding: 0.8rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  border-color: #4c51bf;
+}
+
+.account-search-group .account-selected-hint {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #4a5568;
+}
+
+.account-search-group .btn-text-clear {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  color: #4c51bf;
+}
+
+.account-search-group .btn-text-clear:hover {
+  background: #edf2f7;
+}
+
+.account-search-results {
+  margin-top: 0.5rem;
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.account-search-header {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr) 6.5rem 5.25rem;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  background: #e2e8f0;
+  border-bottom: 1px solid #cbd5e1;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.account-search-header .account-search-bal-h {
+  text-align: right;
+}
+
+.account-search-empty {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  color: #718096;
+}
+
+.account-search-row {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr) 6.5rem 5.25rem;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid #edf2f7;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.account-search-row:last-child {
+  border-bottom: none;
+}
+
+.account-search-row:hover {
+  background: #ebf4ff;
+}
+
+.account-search-row.is-active {
+  background: #e0e7ff;
+  font-weight: 600;
+}
+
+.account-search-code {
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+  font-size: 0.78rem;
+  color: #4c51bf;
+  white-space: nowrap;
+}
+
+.account-search-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1a202c;
+}
+
+.account-search-city {
+  font-size: 0.78rem;
+  color: #4a5568;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-search-bal {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  color: #1a202c;
+  white-space: nowrap;
+}
+
+.account-search-bal.is-dr {
+  color: #276749;
+}
+
+.account-search-bal.is-cr {
+  color: #c53030;
+}
+
+.account-search-bal-dc {
+  margin-left: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.account-search-row.is-highlight {
+  outline: 2px solid #4c51bf;
+  outline-offset: -2px;
+  background: #eef2ff;
+}
+
+/* Narrow screens: avoid squeezing NAME into ellipsis — stack row so full name wraps */
+@media (max-width: 640px) {
+  .account-search-header {
+    display: none;
+  }
+
+  .account-search-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.35rem 0.65rem;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .account-search-code {
+    flex: 0 0 auto;
+    order: 1;
+  }
+
+  .account-search-bal {
+    flex: 0 0 auto;
+    margin-left: auto;
+    text-align: right;
+    order: 2;
+  }
+
+  .account-search-name {
+    flex: 1 1 100%;
+    order: 4;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    word-break: break-word;
+    line-height: 1.35;
+    font-size: 0.9rem;
+  }
+
+  .account-search-city {
+    flex: 1 1 auto;
+    order: 5;
+    min-width: 0;
+    font-size: 0.82rem;
+  }
+
+  .account-search-results {
+    max-height: 50vh;
+  }
+}
+
+.party-search-header,
+.party-search-row {
+  grid-template-columns: 4.75rem minmax(0, 1fr) 7rem;
+}
+
+.broker-search-header,
+.broker-search-row {
+  grid-template-columns: 4.75rem minmax(0, 1fr);
+}
+
+.form-label-block {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #2d3748;
+  margin-bottom: 0.35rem;
+}
+
+.radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: center;
+}
+
+.radio-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #2d3748;
+}
+
+.form-api-error {
+  margin: 0.75rem 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #f56565;
+  background: #fff5f5;
+  color: #742a2a;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.form-api-error strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #9b2c2c;
+}
+
+.slide-login .login-hint {
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  color: #4a5568;
+  line-height: 1.45;
+}
+
+.login-form {
+  max-width: 22rem;
+}
+
+.login-form .form-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0 1rem;
+  font-size: 0.9rem;
+  color: #4a5568;
+}
+
+.login-form .form-checkbox-row input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #4c51bf;
+  cursor: pointer;
+}
+
+.login-form .form-checkbox-row label {
+  cursor: pointer;
+  user-select: none;
+}
+
+.form-row-broker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-row-ageing-meta {
+  margin-bottom: 0.5rem;
+}
+
+.button-group--form-top {
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+}
+
+.slide-ageing-form {
+  max-width: 860px;
+}
+
+.report-form--ageing {
+  padding: 1rem 1.1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.ageing-range-card-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.ageing-range-card {
+  padding: 0.9rem 1rem;
+  border: 1px solid #dbe4ff;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(76, 81, 191, 0.06);
+}
+
+@media (max-width: 560px) {
+  .form-row-broker {
+    grid-template-columns: 1fr;
+  }
+
+  .button-group--form-top {
+    margin-bottom: 1rem;
+  }
+}
+
+mark.search-highlight {
+  background: #fde047;
+  color: #1a202c;
+  padding: 0 0.1em;
+  border-radius: 2px;
+  font-weight: 700;
+}
+
+/* BUTTONS */
+.button-group {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 1.5rem;
+}
+
+.button-group--with-exit .btn-exit {
+  flex: 0 1 auto;
+  min-width: 5.5rem;
+}
+
+.button-group--with-exit .btn-primary {
+  flex: 1;
+}
+
+.btn {
+  flex: 1;
+  padding: 0.9rem;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.btn:active { transform: scale(0.98); }
+.btn-primary { background: #4c51bf; color: white; }
+.btn-secondary { background: #edf2f7; color: #2d3748; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Sale list */
+.sale-list-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.88rem;
+  color: #475569;
+}
+
+.table-responsive--sale-list {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  /* Prefer a persistent track on desktop (Windows overlay bars are easy to miss). */
+  overflow-x: scroll;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  padding-bottom: 14px;
+  margin-bottom: 0.25rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+/* Easier to see horizontal scroll on sale list (Windows / WebKit) */
+.table-responsive--sale-list::-webkit-scrollbar {
+  height: 14px;
+}
+
+.table-responsive--sale-list::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+
+.table-responsive--sale-list::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 6px;
+}
+
+.table-responsive--sale-list::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.report-table--sale-list {
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.82rem;
+}
+
+tr.sale-list-row-clickable {
+  cursor: pointer;
+}
+
+tr.sale-list-row-clickable:hover {
+  background: #eef2ff !important;
+}
+
+tr.sale-list-row-clickable:focus {
+  outline: 2px solid #4c51bf;
+  outline-offset: -2px;
+}
+
+/* Credit note (TYPE = CN) — distinct from SL/SE sale lines */
+tr.sale-list-row-cn td {
+  background: #fff7ed;
+  color: #7c2d12;
+  border-color: #fdba74;
+}
+
+tr.sale-list-row-cn td:first-child {
+  font-weight: 800;
+  color: #c2410c;
+}
+
+tr.sale-list-row-cn.sale-list-row-clickable:hover td {
+  background: #ffedd5 !important;
+}
+
+tr.sale-list-day-banner td {
+  background: #e0e7ff;
+  color: #1e3a8a;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.65rem !important;
+  border-top: 2px solid #6366f1;
+}
+
+tr.sale-list-day-total td,
+tr.sale-list-grand-total td {
+  background: #f1f5f9;
+  font-weight: 700;
+  border-top: 1px solid #94a3b8;
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+tr.sale-list-grand-total td {
+  background: #dbeafe;
+  border-top: 2px solid #2563eb;
+}
+
+tr.sale-list-section-label td {
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.65rem !important;
+  border-top: 1px solid #e2e8f0;
+}
+
+tr.sale-list-grand-item td {
+  background: #f0fdf4;
+  font-size: 0.82rem;
+}
+
+.sale-list-item-summary-label {
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+  font-weight: 600;
+  color: #4c51bf;
+}
+
+.sale-list-item-code-suffix {
+  font-weight: 500;
+  color: #64748b;
+  font-size: 0.88em;
+}
+
+tr.sale-list-item-col-head th {
+  background: #e2e8f0;
+  color: #1e293b;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.5rem !important;
+  border-bottom: 2px solid #94a3b8;
+}
+
+tr.sale-list-item-col-head .sale-list-item-col-head-muted {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+tr.sale-list-item-col-head .sale-list-item-col-head-label {
+  border-bottom: 2px solid #94a3b8;
+  background: #f8fafc;
+}
+
+tr.sale-list-item-summary-head th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+tr.sale-list-item-summary-head th.bill-code,
+tr.sale-list-item-summary-head th.ledger-detail {
+  font-size: 0.78rem;
+}
+
+td.sale-list-item-summary-filler,
+th.sale-list-item-summary-filler {
+  background: #f8fafc;
+  border-bottom: 2px solid #94a3b8;
+}
+
+td.sale-list-item-summary-filler--trail {
+  color: #cbd5e1;
+  font-size: 0.75rem;
+}
+
+td.sale-list-total-pad {
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 0.35rem 0.25rem !important;
+}
+
+/* Sale bill modal */
+.sale-bill-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+}
+
+.sale-bill-modal {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  max-width: min(1100px, 100%);
+  width: 100%;
+  margin: auto;
+  max-height: calc(100vh - 3rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.sale-bill-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 2px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.sale-bill-modal-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #1e3a5f;
+}
+
+.sale-bill-modal-close {
+  border: none;
+  background: #f1f5f9;
+  color: #334155;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sale-bill-modal-close:hover {
+  background: #e2e8f0;
+}
+
+.sale-bill-modal-body {
+  padding: 1rem;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.sale-bill-modal-loading {
+  margin: 0;
+  color: #64748b;
+}
+
+.table-responsive--sale-bill-modal {
+  overflow-x: auto;
+}
+
+/* Printable sale bill (modal + @media print) */
+.sale-bill-print-modal {
+  max-width: min(1200px, 100%);
+}
+
+.sale-bill-print-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Compact toolbar so PDF / WhatsApp fit on narrow screens */
+.sale-bill-print-modal .sale-bill-modal-head {
+  flex-wrap: wrap;
+  gap: 0.45rem 0.5rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.sale-bill-print-modal .sale-bill-modal-head h3 {
+  min-width: 0;
+  flex: 1 1 10rem;
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+
+.sale-bill-print-modal .sale-bill-print-actions {
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.sale-bill-print-modal .sale-bill-print-actions .btn {
+  flex: 0 1 auto;
+  padding: 0.42rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  min-width: 0;
+  border-radius: 6px;
+}
+
+.sale-bill-print-modal .sale-bill-print-actions .btn-excel {
+  flex-shrink: 0;
+}
+
+.sale-bill-print-modal .sale-bill-print-actions .btn-export,
+.sale-bill-print-modal .sale-bill-print-actions .btn-whatsapp {
+  min-width: unset !important;
+}
+
+.sale-bill-print-modal .sale-bill-modal-close {
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+  .sale-bill-modal-backdrop.sale-bill-print-backdrop {
+    padding: 0.45rem 0.35rem;
+    align-items: stretch;
+  }
+
+  .sale-bill-print-modal {
+    max-height: calc(100vh - 0.9rem);
+  }
+
+  .sale-bill-print-modal .sale-bill-modal-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'title close'
+      'actions actions';
+    align-items: center;
+    column-gap: 0.4rem;
+    row-gap: 0.4rem;
+  }
+
+  .sale-bill-print-modal .sale-bill-modal-head h3 {
+    grid-area: title;
+    font-size: 0.82rem;
+    flex: none;
+  }
+
+  .sale-bill-print-modal .sale-bill-modal-close {
+    grid-area: close;
+    width: 1.85rem;
+    height: 1.85rem;
+    font-size: 1.1rem;
+  }
+
+  .sale-bill-print-modal .sale-bill-print-actions {
+    grid-area: actions;
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .sale-bill-print-modal .sale-bill-print-actions .btn {
+    flex: 1 1 calc(50% - 0.2rem);
+    min-width: 0;
+    padding: 0.38rem 0.3rem;
+    font-size: 0.65rem;
+  }
+}
+
+.sale-bill-print-body {
+  background: #f8fafc;
+}
+
+.sale-bill-mobile-pdf-preview {
+  width: 100%;
+  min-height: min(78vh, 980px);
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.sale-bill-print-doc {
+  background: #fff;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #0f172a;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.sale-bill-print-doc--bill-of-supply {
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.sale-bill-print-doc-banner {
+  display: grid;
+  grid-template-columns: 152px 1fr 152px;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 2px solid #1e3a5f;
+}
+
+.sale-bill-print-banner-text {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  min-width: 0;
+  text-align: center;
+}
+
+.sale-bill-print-qr {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.sale-bill-print-right-top {
+  flex-shrink: 0;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.sale-bill-print-right-top--empty {
+  min-height: 152px;
+}
+
+.sale-bill-print-logo {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.sale-bill-print-logo--empty {
+  min-height: 152px;
+}
+
+.sale-bill-print-logo img {
+  display: block;
+  width: 152px;
+  height: 152px;
+  object-fit: contain;
+}
+
+.sale-bill-print-qr img {
+  display: block;
+  width: 152px;
+  height: 152px;
+  object-fit: contain;
+}
+
+.sale-bill-print-doc-title {
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
+}
+
+.sale-bill-print-company {
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.sale-bill-print-comp-name {
+  font-weight: 700;
+  font-size: 1.9rem;
+  color: #0047ab;
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  display: block;
+  width: 100%;
+}
+
+.sale-bill-print-comp-meta {
+  margin: 0.2rem 0;
+}
+
+.sale-bill-print-inv-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.88rem;
+}
+
+.sale-bill-print-inv-cn .sale-bill-print-inv-cn-ref {
+  margin-top: 0.35rem;
+  padding-top: 0.45rem;
+  border-top: 1px dashed #94a3b8;
+}
+
+.sale-bill-print-irn {
+  font-size: 0.75rem;
+  color: #334155;
+  margin-bottom: 0.75rem;
+  word-break: break-all;
+}
+
+.sale-bill-print-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid #cbd5e1;
+  padding: 0.65rem 0.75rem;
+  border-radius: 6px;
+}
+
+.sale-bill-print-three-col {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.sale-bill-print-col-h {
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  color: #1e3a5f;
+}
+
+.sale-bill-party-name {
+  font-weight: 700;
+}
+
+.sale-bill-print-broker {
+  margin-bottom: 0.65rem;
+  font-size: 0.85rem;
+}
+
+.sale-bill-print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+  margin-bottom: 1rem;
+}
+
+.sale-bill-print-doc--bill-of-supply .sale-bill-print-doc-title {
+  font-size: 1.05rem;
+}
+
+.sale-bill-print-doc--bill-of-supply .sale-bill-print-company {
+  font-size: 0.92rem;
+}
+
+.sale-bill-print-doc--bill-of-supply .sale-bill-print-comp-name {
+  font-size: 2.1rem;
+  color: #0047ab;
+}
+
+.sale-bill-print-doc--bill-of-supply .sale-bill-print-table {
+  font-size: 0.84rem;
+}
+
+.sale-bill-print-doc--bill-of-supply .sale-bill-print-table th,
+.sale-bill-print-doc--bill-of-supply .sale-bill-print-table td {
+  padding: 0.34rem 0.44rem;
+}
+
+.sale-bill-print-doc--bill-of-supply .sale-bill-print-totals {
+  font-size: 0.9rem;
+}
+
+.sale-bill-print-doc--bill-of-supply .sale-bill-print-net-words-row {
+  font-size: 0.88rem;
+}
+
+.sale-bill-print-table th,
+.sale-bill-print-table td {
+  border: 1px solid #94a3b8;
+  padding: 0.25rem 0.35rem;
+  vertical-align: top;
+}
+
+.sale-bill-print-table th {
+  background: #e2e8f0;
+  font-weight: 600;
+}
+
+.sale-bill-print-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sale-bill-print-sum-block {
+  width: 100%;
+  max-width: 320px;
+  margin: 0;
+  margin-bottom: 0;
+}
+
+.sale-bill-print-sum-section {
+  display: grid;
+  grid-template-columns: 152px minmax(280px, 320px);
+  justify-content: end;
+  align-items: start;
+  gap: 0.65rem;
+}
+
+.sale-bill-print-sum-side {
+  min-height: 152px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.sale-bill-print-sum-side--empty {
+  min-height: 152px;
+}
+
+.sale-bill-print-logo2 img {
+  display: block;
+  width: 152px;
+  height: 152px;
+  object-fit: contain;
+}
+
+.sale-bill-print-totals {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin-bottom: 0;
+}
+
+.sale-bill-print-totals td {
+  border: 1px solid #94a3b8;
+  padding: 0.3rem 0.5rem;
+}
+
+.sale-bill-print-totals .num {
+  text-align: right;
+}
+
+.sale-bill-print-net-words-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.35rem 0.5rem;
+  background: #f1f5f9;
+  border: 1px solid #94a3b8;
+  border-top: none;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+.sale-bill-print-words-inline {
+  flex: 1;
+  min-width: 0;
+}
+
+.sale-bill-print-net-amount {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.sale-bill-print-net-figure {
+  margin-top: 0.15rem;
+}
+
+.sale-bill-print-footer-rule {
+  border: none;
+  border-top: 1px solid #64748b;
+  margin: 0.65rem 0 0.55rem;
+}
+
+.sale-bill-print-bank {
+  margin-bottom: 0.65rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.sale-bill-print-transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #334155;
+}
+
+.sale-bill-print-transport-item {
+  white-space: nowrap;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.voice-command-btn {
+  border: none;
+  border-radius: 999px;
+  background: #1e3a5f;
+  color: #fff;
+  padding: 0.42rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.voice-command-btn--listening {
+  background: #c53030;
+}
+
+.view-settings {
+  position: relative;
+}
+
+.view-settings-btn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #1e3a5f;
+  border-radius: 999px;
+  padding: 0.38rem 0.72rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.view-settings-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  min-width: 10rem;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.15);
+  padding: 0.25rem;
+  z-index: 110;
+}
+
+.view-settings-option {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: #1e293b;
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.view-settings-option:hover {
+  background: #eff6ff;
+}
+
+.view-settings-option.is-active {
+  background: #e0e7ff;
+  color: #312e81;
+  font-weight: 700;
+}
+
+.sale-bill-print-terms {
+  margin-bottom: 0.8rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.sale-bill-print-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: start;
+}
+
+.sale-bill-print-sign {
+  text-align: right;
+  margin-top: 0;
+}
+
+.sale-bill-print-signature {
+  margin-top: 0.7rem;
+}
+
+.sale-bill-print-signature img {
+  max-width: 150px;
+  max-height: 70px;
+  object-fit: contain;
+}
+
+.sale-bill-print-auth {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+/* Stock sum (Slide9) */
+.stock-sum-table {
+  font-size: 0.78rem;
+}
+
+.stock-lot-table {
+  font-size: 0.74rem;
+}
+
+.purchase-list-table {
+  font-size: 0.72rem;
+}
+
+.purchase-list-row-clickable {
+  cursor: pointer;
+}
+
+.purchase-list-row-clickable:hover,
+.purchase-list-row-clickable:focus {
+  background: #e0e7ff;
+  outline: none;
+}
+
+.purchase-bill-print-table {
+  font-size: 0.68rem;
+}
+
+.stock-sum-row-clickable {
+  cursor: pointer;
+}
+
+.stock-sum-row-clickable:hover,
+.stock-sum-row-clickable:focus {
+  background: #e0e7ff;
+  outline: none;
+}
+
+.stock-sum-empty {
+  margin: 0.75rem 0;
+  color: #64748b;
+}
+
+.stock-sum-detail-modal {
+  max-width: min(1400px, 100%);
+  width: 100%;
+}
+
+.stock-sum-detail-body {
+  max-height: min(70vh, 720px);
+  overflow: auto;
+}
+
+.stock-sum-detail-table {
+  font-size: 0.72rem;
+}
+
+.stock-sum-run {
+  font-weight: 600;
+  color: #0f766e;
+  background: #f0fdfa;
+}
+
+.stock-sum-grand td {
+  background: #1e3a5f;
+  color: #fff;
+  font-weight: 700;
+  border-top: 2px solid #0f172a;
+}
+
+.stock-sum-grand .text-right {
+  color: #fff;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #sale-bill-print-area,
+  #sale-bill-print-area *,
+  #purchase-bill-print-area,
+  #purchase-bill-print-area * {
+    visibility: visible;
+  }
+
+  #sale-bill-print-area,
+  #purchase-bill-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0.5rem;
+    border: none;
+    background: #fff;
+  }
+
+  .no-print,
+  .no-print * {
+    visibility: hidden !important;
+    display: none !important;
+  }
+
+  #sale-bill-print-area .sale-bill-print-table {
+    font-size: 9pt;
+  }
+
+  #sale-bill-print-area.sale-bill-print-doc--bill-of-supply .sale-bill-print-table {
+    font-size: 11pt;
+  }
+
+  #sale-bill-print-area .sale-bill-print-doc-title {
+    font-size: 14pt;
+  }
+
+  #sale-bill-print-area.sale-bill-print-doc--bill-of-supply .sale-bill-print-doc-title {
+    font-size: 16pt;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .app-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .sale-bill-print-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .sale-bill-print-bottom-row {
+    grid-template-columns: 1fr;
+  }
+
+  .sale-bill-print-doc {
+    padding: 0.7rem 0.75rem;
+  }
+
+  .sale-bill-print-doc-banner {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+    align-items: center;
+    justify-items: center;
+  }
+
+  .sale-bill-print-logo,
+  .sale-bill-print-right-top,
+  .sale-bill-print-sum-side {
+    align-self: center;
+    justify-self: center;
+  }
+
+  .sale-bill-print-logo img,
+  .sale-bill-print-qr img,
+  .sale-bill-print-logo2 img {
+    width: 88px;
+    height: 88px;
+  }
+
+  .sale-bill-print-logo--empty,
+  .sale-bill-print-right-top--empty {
+    display: none;
+  }
+
+  .sale-bill-print-banner-text {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .sale-bill-print-comp-name {
+    font-size: 1.02rem !important;
+    max-width: 100%;
+  }
+
+  .sale-bill-print-doc--bill-of-supply .sale-bill-print-comp-name {
+    font-size: 1.08rem !important;
+  }
+
+  .sale-bill-print-doc-title {
+    font-size: 0.82rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .sale-bill-print-company {
+    font-size: 0.73rem;
+    line-height: 1.22;
+    width: 100%;
+  }
+
+  .sale-bill-print-inv-row {
+    font-size: 0.76rem;
+    gap: 0.35rem 0.8rem;
+  }
+
+  .sale-bill-print-irn {
+    font-size: 0.68rem;
+  }
+
+  .sale-bill-print-col {
+    font-size: 0.74rem;
+    overflow-wrap: anywhere;
+  }
+
+  .sale-bill-print-table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 0.62rem;
+  }
+
+  .sale-bill-print-table th,
+  .sale-bill-print-table td {
+    padding: 0.2rem 0.22rem;
+  }
+
+  .sale-bill-print-table tbody,
+  .sale-bill-print-table thead,
+  .sale-bill-print-table tr {
+    white-space: nowrap;
+  }
+
+  .sale-bill-print-table td:nth-child(2),
+  .sale-bill-print-table th:nth-child(2) {
+    white-space: normal;
+    min-width: 140px;
+  }
+
+  .sale-bill-print-sum-block {
+    max-width: 100%;
+  }
+
+  .sale-bill-print-sum-section {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .sale-bill-print-sum-side {
+    min-height: 0;
+  }
+
+  .sale-bill-print-sum-side--empty {
+    display: none;
+  }
+
+  .sale-bill-print-totals,
+  .sale-bill-print-net-words-row,
+  .sale-bill-print-bank,
+  .sale-bill-print-transport,
+  .sale-bill-print-terms {
+    font-size: 0.74rem;
+  }
+}
+
+/* MOBILE OPTIMIZATION */
+@media (max-width: 600px) {
+  .app-header { padding: 0.8rem 1rem; }
+  .app-main { padding: 0.5rem; }
+  .slide { border-radius: 0; min-height: calc(100vh - 60px); }
+  .sticky-col { min-width: 150px; }
+  .report-table td, .report-table th { padding: 10px 6px; font-size: 0.85rem; }
+  .voice-command-btn { padding: 0.36rem 0.68rem; font-size: 0.74rem; }
+}
+
+/* Force desktop layout even on narrow devices when user picks Desktop mode */
+body.force-desktop-view {
+  overflow-x: auto;
+}
+
+body.force-desktop-view .app--desktop {
+  min-width: 1100px;
+}

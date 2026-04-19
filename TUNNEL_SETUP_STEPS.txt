@@ -1,0 +1,122 @@
+================================================================================
+NEW CLOUDFLARE TUNNEL (example: marutiagro) — client PC step-by-step
+================================================================================
+Prerequisites
+  - Windows PC with the GFASORCL\APPTEST folder (Node + app already set up).
+  - cloudflared installed (run: cloudflared --version).
+  - Cloudflare account with DNS zone: fasaccountingsoftware.in (or change BaseDomain in script).
+  - You can log in to that Cloudflare account in a browser on this PC.
+
+--------------------------------------------------------------------------------
+STEP 1 — Open PowerShell as Administrator
+--------------------------------------------------------------------------------
+  cd E:\GFASORCL\APPTEST
+
+--------------------------------------------------------------------------------
+STEP 2 — Log in to Cloudflare (once per PC / account)
+--------------------------------------------------------------------------------
+  cloudflared tunnel login
+
+  - A browser opens; pick the Cloudflare account that owns fasaccountingsoftware.in
+  - Allow access. This creates cert data under your user profile for cloudflared.
+
+--------------------------------------------------------------------------------
+STEP 3 — Create tunnel + DNS + config.yml (automated)
+--------------------------------------------------------------------------------
+  powershell -ExecutionPolicy Bypass -File .\setup-new-client-tunnel.ps1 -ClientKey marutiagro -SkipClientSetup
+
+  -SkipClientSetup  = skip full setup-client.ps1 (use if you already ran setup before).
+  Omit -SkipClientSetup on a brand-new folder if you want npm install + build + task again.
+
+  The script will:
+    - Create tunnel named "marutiagro" (or reuse if name exists)
+    - Write credentials under C:\Users\<YOU>\.cloudflared\<UUID>.json
+    - Copy that JSON into APPTEST as <UUID>.json (next to config.yml)
+    - Create DNS CNAMEs: marutiagro.fasaccountingsoftware.in and marutiagro-api.fasaccountingsoftware.in
+    - Write E:\GFASORCL\APPTEST\config.yml with tunnel id and ./<UUID>.json
+
+  If "tunnel create" says already exists: script reuses it; DNS routes are re-applied.
+
+--------------------------------------------------------------------------------
+STEP 4 — Confirm files in APPTEST
+--------------------------------------------------------------------------------
+  dir E:\GFASORCL\APPTEST\config.yml
+  dir E:\GFASORCL\APPTEST\*.json
+
+  You must see config.yml and one file named <tunnel-uuid>.json (same uuid as inside config.yml).
+
+--------------------------------------------------------------------------------
+STEP 5 — connection.config.json (app already uses marutiagro)
+--------------------------------------------------------------------------------
+  clientName / defaultClientKey should be: marutiagro
+  (setup-client.ps1 sets this; match if you edit by hand.)
+
+--------------------------------------------------------------------------------
+STEP 6 — Run API + frontend + tunnel (three terminals), or use run-all-services.cmd
+--------------------------------------------------------------------------------
+  Terminal A:  npm.cmd run server
+  Terminal B:  npm.cmd run dev -- --host 0.0.0.0 --port 5173
+  Terminal C:  cloudflared tunnel --config .\config.yml run
+
+  Or one shot (from APPTEST):
+    .\run-all-services.cmd
+
+--------------------------------------------------------------------------------
+STEP 7 — Test from phone browser
+--------------------------------------------------------------------------------
+  https://marutiagro.fasaccountingsoftware.in
+  https://marutiagro-api.fasaccountingsoftware.in/api/companies
+
+  If DNS not ready yet, wait 1–5 minutes and retry.
+
+--------------------------------------------------------------------------------
+Troubleshooting
+--------------------------------------------------------------------------------
+  cloudflared not found:
+    $env:Path += ";$env:ProgramFiles\Cloudflared;$env:ProgramFiles\cloudflared"
+
+  "credentials file doesn't exist":
+    Re-run setup-new-client-tunnel.ps1 or copy the <UUID>.json from another machine’s APPTEST folder.
+
+  Wrong Cloudflare account / zone:
+    tunnel login must use the account where fasaccountingsoftware.in lives.
+
+  Delete old tunnel in Cloudflare dashboard first if you are reusing the name "marutiagro" and hit conflicts.
+
+================================================================================
+RUN THE SAME TUNNEL ON ANOTHER PC (e.g. client "Server" — no DineshBhatia folder needed)
+================================================================================
+You already created the tunnel on YOUR PC. The client does NOT need C:\Users\Server\.cloudflared
+if you copy the tunnel token into APPTEST (see setup-new-client-tunnel.ps1 — credentials-file: ./<UUID>.json).
+
+ON YOUR PC (where tunnel was created)
+  1) Open: E:\GFASORCL\APPTEST
+  2) Confirm these exist:
+       - config.yml   (first line: tunnel: <uuid>)
+       - <same-uuid>.json   (same name as in credentials-file inside config.yml)
+  3) Copy BOTH files to USB / network share / UltraViewer file transfer.
+
+ON THE CLIENT PC (user can be "Server" or any name)
+  1) Paste into the SAME folder as the app, e.g.:
+       E:\GFASORCL\APPTEST\config.yml
+       E:\GFASORCL\APPTEST\<uuid>.json
+     Do not change the uuid inside config.yml unless you create a NEW tunnel.
+
+  2) Install cloudflared on the client if missing:
+       winget install --id Cloudflare.cloudflared --exact --source winget
+     New PowerShell, then:  cloudflared --version
+
+  3) You do NOT need "cloudflared tunnel login" on the client just to RUN this tunnel,
+     if config.yml + <uuid>.json are correct (token is inside the JSON).
+
+  4) Start the tunnel from APPTEST:
+       cd E:\GFASORCL\APPTEST
+       cloudflared tunnel --config .\config.yml run
+
+  5) Also run API (5001) and Vite (5173) on that PC — same as STEP 6 above.
+
+NOTE — File Explorer hides dot-folders
+  .cloudflared under C:\Users\Server is HIDDEN. View → Show → Hidden items.
+  Again: with ./<uuid>.json next to config.yml, you normally never open .cloudflared on the client.
+
+================================================================================
