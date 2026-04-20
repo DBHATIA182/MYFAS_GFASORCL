@@ -32,6 +32,10 @@ function itemName(row) {
 function compareLines(a, b) {
   const da = dayKey(a).localeCompare(dayKey(b));
   if (da !== 0) return da;
+  const ta = String(a.TYPE ?? a.type ?? '').trim().toUpperCase();
+  const tb = String(b.TYPE ?? b.type ?? '').trim().toUpperCase();
+  const dt = ta.localeCompare(tb);
+  if (dt !== 0) return dt;
   const bn = String(a.BILL_NO ?? a.bill_no ?? '').localeCompare(String(b.BILL_NO ?? b.bill_no ?? ''), undefined, {
     numeric: true,
   });
@@ -80,9 +84,98 @@ export function buildSaleListDisplayRows(data) {
 
     displayRows.push({ kind: 'day-header', dateKey: dk, dateLabel });
 
-    for (const row of dayRows) {
+    let bQ = 0;
+    let bW = 0;
+    let bA = 0;
+    let bTax = 0;
+    let bCgst = 0;
+    let bSgst = 0;
+    let bIgst = 0;
+    let bBill = 0;
+    let bDis = 0;
+    let bOth = 0;
+    let billType = '';
+    let billNo = '';
+    let billBType = '';
+    let billDateLabel = '';
+    let hasBillGroup = false;
+    const flushBillGroup = () => {
+      if (!hasBillGroup) return;
+      displayRows.push({
+        kind: 'bill-total',
+        type: billType || '—',
+        billNo: billNo || '—',
+        bType: billBType || '—',
+        billDateLabel: billDateLabel || '—',
+        qnty: bQ,
+        weight: bW,
+        amount: bA,
+        taxable: bTax,
+        cgstAmt: bCgst,
+        sgstAmt: bSgst,
+        igstAmt: bIgst,
+        billAmt: bBill,
+        disAmt: bDis,
+        othExp5: bOth,
+      });
+      bQ = 0;
+      bW = 0;
+      bA = 0;
+      bTax = 0;
+      bCgst = 0;
+      bSgst = 0;
+      bIgst = 0;
+      bBill = 0;
+      bDis = 0;
+      bOth = 0;
+      hasBillGroup = false;
+    };
+    const billKeyOf = (row) =>
+      [
+        String(row.TYPE ?? row.type ?? '').trim().toUpperCase(),
+        toInputDateString(row.BILL_DATE ?? row.bill_date) || '_nodate',
+        String(row.BILL_NO ?? row.bill_no ?? '').trim(),
+        String(row.B_TYPE ?? row.b_type ?? '').trim(),
+      ].join('__');
+
+    for (let i = 0; i < dayRows.length; i += 1) {
+      const row = dayRows[i];
+      const currentBillKey = billKeyOf(row);
+      const prevBillKey = i > 0 ? billKeyOf(dayRows[i - 1]) : '';
+      if (i === 0 || currentBillKey !== prevBillKey) {
+        flushBillGroup();
+        billType = String(row.TYPE ?? row.type ?? '').trim().toUpperCase();
+        billNo = String(row.BILL_NO ?? row.bill_no ?? '').trim();
+        billBType = String(row.B_TYPE ?? row.b_type ?? '').trim();
+        billDateLabel = toDisplayDate(toInputDateString(row.BILL_DATE ?? row.bill_date));
+        hasBillGroup = true;
+      }
+
       displayRows.push({ kind: 'detail', row });
+
+      const q = saleListMeas(row, 'QNTY', 'qnty');
+      const w = saleListMeas(row, 'WEIGHT', 'weight');
+      const a = saleListMeas(row, 'AMOUNT', 'amount');
+      const tax = saleListMeas(row, 'TAXABLE', 'taxable');
+      const cgst = saleListMeas(row, 'CGST_AMT', 'cgst_amt');
+      const sgst = saleListMeas(row, 'SGST_AMT', 'sgst_amt');
+      const igst = saleListMeas(row, 'IGST_AMT', 'igst_amt');
+      const b = saleListMeas(row, 'BILL_AMT', 'bill_amt');
+      const dis = n(row, 'DIS_AMT', 'dis_amt');
+      const oth = n(row, 'OTH_EXP5', 'oth_exp5');
+
+      bQ += q;
+      bW += w;
+      bA += a;
+      bTax += tax;
+      bCgst += cgst;
+      bSgst += sgst;
+      bIgst += igst;
+      bBill += b;
+      bDis += dis;
+      bOth += oth;
     }
+    flushBillGroup();
 
     let dQ = 0;
     let dW = 0;

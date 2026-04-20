@@ -375,6 +375,15 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
       ) : null}
 
       <form onSubmit={handleSubmit} className="report-form">
+        <div className="button-group button-group--form-top">
+          <button type="button" className="btn btn-secondary" onClick={onPrev}>
+            ← Back
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            {loading ? '⏳ Loading…' : '📊 Run report'}
+          </button>
+        </div>
+
         <div className="form-group">
           <label htmlFor="sl-start">Starting date</label>
           <input
@@ -643,7 +652,7 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
             ← Back
           </button>
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? '⏳ Loading…' : '📊 Generate report'}
+            {loading ? '⏳ Loading…' : '📊 Run report'}
           </button>
         </div>
       </form>

@@ -167,8 +167,14 @@ git clone https://github.com/DBHATIA182/MYFAS_GFASORCL.git APPTEST
 cd APPTEST
 npm ci
 npm run build
+copy connection.config.json to \gfasorcl\apptest
+.\start-apptest-services.ps1
+
 After setup, future update command:
 
 cd E:\GFASORCL\APPTEST
 .\update-from-git.ps1 -Branch main
-If you paste your real repo URL, I’ll give you the exact final commands without placeholders.
+.\start-apptest-services.ps1
+
+
+

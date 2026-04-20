@@ -1,0 +1,2 @@
+cd E:\GFASORCL\APPTEST
+.\push-all-to-git.ps1 -CommitMessage "your message here"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { downloadExcelRows } from '../utils/excelExport';
@@ -43,6 +43,11 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showReport, setShowReport] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [detailRows, setDetailRows] = useState([]);
+  const [detailLot, setDetailLot] = useState(null);
 
   const compCode = formData.comp_code ?? formData.COMP_CODE;
   const compUid = formData.comp_uid ?? formData.COMP_UID;
@@ -179,6 +184,80 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
       ['Stock lot', compName, `As on ${pdfMeta.endDate}`, `${pdfMeta.coLabel}`].join('\n')
     ).catch((err) => alert(String(err?.message || err)));
 
+  const openDetail = useCallback(
+    async (summaryRow) => {
+      const selectedItem = String(summaryRow.ITEM_CODE ?? summaryRow.item_code ?? '').trim();
+      const selectedLot = String(summaryRow.LOT ?? summaryRow.lot ?? '').trim();
+      if (!selectedItem || !selectedLot) {
+        alert('Cannot open lot detail: missing item code or lot.');
+        return;
+      }
+      const oracle = toOracleDate(endDate);
+      if (!oracle) return;
+
+      const selectedBNo = String(summaryRow.B_NO ?? summaryRow.b_no ?? '').trim();
+      const selectedSup = String(summaryRow.SUP_CODE ?? summaryRow.sup_code ?? '').trim();
+      const selectedGod = String(summaryRow.GOD_CODE ?? summaryRow.god_code ?? '').trim();
+      const selectedCost = String(summaryRow.COST_CODE ?? summaryRow.cost_code ?? '').trim();
+
+      setDetailLot({
+        itemCode: selectedItem,
+        itemName: String(summaryRow.ITEM_NAME ?? summaryRow.item_name ?? '').trim(),
+        lot: selectedLot,
+        bNo: selectedBNo,
+        supCode: selectedSup,
+        godCode: selectedGod,
+        costCode: selectedCost,
+      });
+      setDetailOpen(true);
+      setDetailLoading(true);
+      setDetailError('');
+      setDetailRows([]);
+      try {
+        const { data } = await axios.get(`${apiBase}/api/stock-lot-detail`, {
+          params: {
+            comp_code: compCode,
+            comp_uid: compUid,
+            e_date: oracle,
+            item_code: selectedItem,
+            lot: selectedLot,
+            b_no: selectedBNo,
+            sup_code: selectedSup,
+            god_code: selectedGod,
+            cost_code: selectedCost,
+          },
+          withCredentials: true,
+          timeout: 120000,
+        });
+        setDetailRows(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setDetailError(err.response?.data?.error || err.message || 'Failed to load lot detail');
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [apiBase, compCode, compUid, endDate]
+  );
+
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setDetailRows([]);
+    setDetailError('');
+    setDetailLot(null);
+  };
+
+  const runningDetail = useMemo(() => {
+    let runQ = 0;
+    let runW = 0;
+    let runG = 0;
+    return detailRows.map((r) => {
+      runQ += n(r, 'R_QNTY', 'r_qnty') - n(r, 'S_QNTY', 's_qnty');
+      runW += n(r, 'R_WEIGHT', 'r_weight') - n(r, 'S_WEIGHT', 's_weight');
+      runG += n(r, 'R_G_WEIGHT', 'r_g_weight') - n(r, 'SG_WEIGHT', 'sg_weight');
+      return { row: r, runQ, runW, runG };
+    });
+  }, [detailRows]);
+
   if (showReport) {
     return (
       <div className="slide slide-report slide-10">
@@ -217,6 +296,8 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
             <strong>Godown</strong> {godLabel} · <strong>Item</strong> {itemLabel} · <strong>Supplier</strong> {supLabel}
             <br />
             <strong>Bikri no</strong> {bNo || 'All'} · <strong>Lot</strong> {lot || 'All'} · <strong>Cost</strong> {costLabel}
+            <br />
+            Click a row to open date-wise transaction entries for that selected lot.
           </p>
         </div>
         <div className="report-display table-responsive">
@@ -245,7 +326,19 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={`${r.ITEM_CODE ?? r.item_code}-${r.LOT ?? r.lot}-${i}`}>
+                <tr
+                  key={`${r.ITEM_CODE ?? r.item_code}-${r.LOT ?? r.lot}-${i}`}
+                  className="stock-sum-row-clickable"
+                  onClick={() => openDetail(r)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openDetail(r);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                >
                   <td className="bill-code">{r.ITEM_CODE ?? r.item_code ?? '—'}</td>
                   <td className="ledger-detail">{r.ITEM_NAME ?? r.item_name ?? '—'}</td>
                   <td>{r.LOT ?? r.lot ?? '—'}</td>
@@ -301,6 +394,106 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
             🏠 Start Over
           </button>
         </div>
+
+        {detailOpen ? (
+          <div className="sale-bill-modal-backdrop stock-sum-detail-backdrop" role="presentation" onClick={closeDetail}>
+            <div
+              className="sale-bill-modal stock-sum-detail-modal"
+              role="dialog"
+              aria-labelledby="stock-lot-detail-title"
+              onClick={(ev) => ev.stopPropagation()}
+            >
+              <div className="sale-bill-modal-head no-print">
+                <h3 id="stock-lot-detail-title">
+                  Lot detail — {detailLot?.itemCode || '—'} / {detailLot?.lot || '—'}
+                  {detailLot?.itemName ? ` — ${detailLot.itemName}` : ''}
+                </h3>
+                <div className="sale-bill-print-actions">
+                  <button type="button" className="sale-bill-modal-close" onClick={closeDetail} aria-label="Close">
+                    ×
+                  </button>
+                </div>
+              </div>
+              <div className="sale-bill-modal-body stock-sum-detail-body">
+                {detailLoading ? <p>Loading…</p> : null}
+                {detailError ? (
+                  <p className="form-api-error" role="alert">
+                    {detailError}
+                  </p>
+                ) : null}
+                {!detailLoading && !detailError ? (
+                  <div className="table-responsive">
+                    <table className="report-table stock-sum-detail-table">
+                      <thead>
+                        <tr>
+                          <th>Vr date</th>
+                          <th>Vr no</th>
+                          <th>Vr type</th>
+                          <th>Type</th>
+                          <th>Lot</th>
+                          <th>St</th>
+                          <th>B no</th>
+                          <th>God</th>
+                          <th>Sup</th>
+                          <th>Cost</th>
+                          <th>Remarks</th>
+                          <th className="text-right">R qty</th>
+                          <th className="text-right">S qty</th>
+                          <th className="text-right">R wt</th>
+                          <th className="text-right">S wt</th>
+                          <th className="text-right">Run qty</th>
+                          <th className="text-right">Run wt</th>
+                          <th className="text-right">Run g wt</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {runningDetail.map(({ row: r, runQ, runW, runG }, idx) => (
+                          <tr key={`${idx}-${r.VR_NO ?? r.vr_no}-${r.LOT ?? r.lot}`}>
+                            <td style={{ whiteSpace: 'nowrap' }}>{formatLedgerDateDisplay(r.VR_DATE ?? r.vr_date)}</td>
+                            <td>{r.VR_NO ?? r.vr_no ?? '—'}</td>
+                            <td>{r.VR_TYPE ?? r.vr_type ?? '—'}</td>
+                            <td>{r.TYPE ?? r.type ?? '—'}</td>
+                            <td>{r.LOT ?? r.lot ?? '—'}</td>
+                            <td>{r.STATUS ?? r.status ?? '—'}</td>
+                            <td>{r.B_NO ?? r.b_no ?? '—'}</td>
+                            <td>{r.GOD_CODE ?? r.god_code ?? '—'}</td>
+                            <td>{r.SUP_CODE ?? r.sup_code ?? '—'}</td>
+                            <td>{r.COST_CODE ?? r.cost_code ?? '—'}</td>
+                            <td className="ledger-detail">{r.REMARKS ?? r.remarks ?? '—'}</td>
+                            <td className="text-right">{fmtQty(n(r, 'R_QNTY', 'r_qnty'))}</td>
+                            <td className="text-right">{fmtQty(n(r, 'S_QNTY', 's_qnty'))}</td>
+                            <td className="text-right">{fmtWt(n(r, 'R_WEIGHT', 'r_weight'))}</td>
+                            <td className="text-right">{fmtWt(n(r, 'S_WEIGHT', 's_weight'))}</td>
+                            <td className="text-right stock-sum-run">{fmtQty(runQ)}</td>
+                            <td className="text-right stock-sum-run">{fmtWt(runW)}</td>
+                            <td className="text-right stock-sum-run">{fmtWt(runG)}</td>
+                          </tr>
+                        ))}
+                        {runningDetail.length > 0 ? (
+                          <tr className="stock-sum-grand">
+                            <td colSpan={15}>
+                              <strong>Closing balance</strong>
+                            </td>
+                            <td className="text-right">
+                              <strong>{fmtQty(runningDetail[runningDetail.length - 1].runQ)}</strong>
+                            </td>
+                            <td className="text-right">
+                              <strong>{fmtWt(runningDetail[runningDetail.length - 1].runW)}</strong>
+                            </td>
+                            <td className="text-right">
+                              <strong>{fmtWt(runningDetail[runningDetail.length - 1].runG)}</strong>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                    {detailRows.length === 0 ? <p className="stock-sum-empty">No detail rows returned for selected lot.</p> : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   }

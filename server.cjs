@@ -2421,6 +2421,72 @@ app.get('/api/stock-lot', async (req, res) => {
   }
 });
 
+/** Stock lot date-wise detail for one selected lot row */
+app.get('/api/stock-lot-detail', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, e_date, item_code, lot, b_no, sup_code, god_code, cost_code } = req.query;
+    const item = String(item_code ?? '').trim();
+    const lotNo = String(lot ?? '').trim();
+    if (!item) return res.status(400).json({ error: 'item_code is required' });
+    if (!lotNo) return res.status(400).json({ error: 'lot is required' });
+    const bikri = String(b_no ?? '').trim();
+    const sup = String(sup_code ?? '').trim();
+    const god = String(god_code ?? '').trim();
+    const cost = String(cost_code ?? '').trim();
+
+    const sql = `
+      SELECT
+        A.VR_DATE,
+        A.VR_NO,
+        A.VR_TYPE,
+        A.TYPE,
+        A.ITEM_CODE,
+        A.LOT,
+        A.STATUS,
+        A.B_NO,
+        A.GOD_CODE,
+        A.SUP_CODE,
+        A.COST_CODE,
+        A.REMARKS,
+        CASE WHEN A.E_TYPE = 'R' THEN NVL(A.QNTY, 0) ELSE 0 END AS R_QNTY,
+        CASE WHEN NVL(A.E_TYPE, ' ') <> 'R' THEN NVL(A.QNTY, 0) ELSE 0 END AS S_QNTY,
+        CASE WHEN A.E_TYPE = 'R' THEN NVL(A.WEIGHT, 0) ELSE 0 END AS R_WEIGHT,
+        CASE WHEN NVL(A.E_TYPE, ' ') <> 'R' THEN NVL(A.WEIGHT, 0) ELSE 0 END AS S_WEIGHT,
+        CASE WHEN A.E_TYPE = 'R' THEN NVL(A.G_WEIGHT, 0) ELSE 0 END AS R_G_WEIGHT,
+        CASE WHEN NVL(A.E_TYPE, ' ') <> 'R' THEN NVL(A.G_WEIGHT, 0) ELSE 0 END AS SG_WEIGHT
+      FROM LOTSTOCK A
+      WHERE A.COMP_CODE = :comp_code
+        AND A.ITEM_CODE = :item_code
+        AND NVL(TRIM(A.LOT), '') = :lot
+        AND A.VR_DATE <= TRUNC(TO_DATE(:e_date, 'DD-MM-YYYY'))
+        AND (:bno_all = 1 OR TRIM(TO_CHAR(A.B_NO)) = :b_no)
+        AND (:sup_all = 1 OR NVL(A.SUP_CODE, '') = :sup_code)
+        AND (:god_all = 1 OR NVL(A.GOD_CODE, '') = :god_code)
+        AND (:cost_all = 1 OR NVL(TRIM(A.COST_CODE), '') = :cost_code)
+      ORDER BY A.VR_DATE, A.VR_NO`;
+
+    const binds = {
+      comp_code,
+      item_code: item,
+      lot: lotNo,
+      e_date,
+      bno_all: bikri === '' ? 1 : 0,
+      b_no: bikri,
+      sup_all: sup === '' ? 1 : 0,
+      sup_code: sup,
+      god_all: god === '' ? 1 : 0,
+      god_code: god,
+      cost_all: cost === '' ? 1 : 0,
+      cost_code: cost,
+    };
+    const rows = await runQuery(sql, binds, comp_uid);
+    res.json(rows || []);
+  } catch (err) {
+    console.error('❌ StockLot detail error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** Purchase list search helps */
 app.get('/api/purchaselist-suppliers', async (req, res) => {
   try {

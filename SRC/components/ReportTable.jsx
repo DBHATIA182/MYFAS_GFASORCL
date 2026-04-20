@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { formatLedgerDateDisplay } from '../utils/dateFormat';
 import { buildBrokerOsDisplayRows } from '../utils/brokerOsDisplay';
 import { buildSaleListDisplayRows, saleListMeas } from '../utils/saleListDisplay';
@@ -9,6 +9,60 @@ const LEDGER_SALE_VR_TYPES = new Set(['SL', 'SE', 'CN']);
 export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick, onVoucherClick, onLedgerSaleBillClick, meta }) {
   if (!data || data.length === 0) return <p className="no-data">No data available.</p>;
 
+  const saleListTopScrollRef = useRef(null);
+  const saleListTopInnerRef = useRef(null);
+  const saleListGridScrollRef = useRef(null);
+
+  useEffect(() => {
+    if (type !== 'sale-list') return;
+    const top = saleListTopScrollRef.current;
+    const topInner = saleListTopInnerRef.current;
+    const grid = saleListGridScrollRef.current;
+    if (!top || !topInner || !grid) return;
+
+    let syncingFromTop = false;
+    let syncingFromGrid = false;
+
+    const syncWidths = () => {
+      topInner.style.width = `${grid.scrollWidth}px`;
+      top.style.display = grid.scrollWidth > grid.clientWidth ? 'block' : 'none';
+    };
+
+    const onTopScroll = () => {
+      if (syncingFromGrid) return;
+      syncingFromTop = true;
+      grid.scrollLeft = top.scrollLeft;
+      syncingFromTop = false;
+    };
+
+    const onGridScroll = () => {
+      if (syncingFromTop) return;
+      syncingFromGrid = true;
+      top.scrollLeft = grid.scrollLeft;
+      syncingFromGrid = false;
+    };
+
+    syncWidths();
+    top.addEventListener('scroll', onTopScroll, { passive: true });
+    grid.addEventListener('scroll', onGridScroll, { passive: true });
+    window.addEventListener('resize', syncWidths);
+
+    let ro = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(syncWidths);
+      ro.observe(grid);
+      const tableEl = grid.querySelector('table');
+      if (tableEl) ro.observe(tableEl);
+    }
+
+    return () => {
+      top.removeEventListener('scroll', onTopScroll);
+      grid.removeEventListener('scroll', onGridScroll);
+      window.removeEventListener('resize', syncWidths);
+      if (ro) ro.disconnect();
+    };
+  }, [type, data]);
+
   // Indian Currency Formatter
   const fmt = (val) => {
     const num = parseFloat(val) || 0;
@@ -18,6 +72,12 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
   const fmtAlways = (val) => {
     const num = parseFloat(val) || 0;
     return num.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  };
+
+  const clampText = (value, maxLen = 25) => {
+    const s = String(value ?? '');
+    if (s.length <= maxLen) return s;
+    return `${s.slice(0, Math.max(0, maxLen - 1))}…`;
   };
 
   // --- TRIAL BALANCE VIEW (full grid + grand total; scrolls horizontally on small screens) ---
@@ -531,26 +591,24 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
   if (type === 'sale-list') {
     const { displayRows } = buildSaleListDisplayRows(data);
     const clickable = typeof onSaleBillClick === 'function';
-    const saleDashPad = Array.from({ length: 15 }, (_, j) => (
-      <td key={`sdp-${j}`} className="sale-list-total-pad">
-        —
-      </td>
-    ));
     return (
-      <div className="table-responsive table-responsive--sale-list">
+      <div className="table-responsive table-responsive--sale-list" ref={saleListGridScrollRef}>
         {onSaleBillClick ? (
           <p className="sale-list-hint">
-            Use the <strong>horizontal scrollbar</strong> below the grid (or trackpad / Shift+mouse wheel) to see all
-            columns. Click a detail row to open the full sale bill; subtotal rows are not clickable.
+            Use the <strong>horizontal scrollbar</strong> in this grid (or Shift+mouse wheel) to see all columns. Bill-wise
+            and day-wise totals are shown; click a detail row to open full sale bill.
           </p>
         ) : null}
+        <div className="sale-list-scroll-sync sale-list-scroll-sync--top" ref={saleListTopScrollRef}>
+          <div className="sale-list-scroll-sync-inner" ref={saleListTopInnerRef} />
+        </div>
         <table className="report-table report-table--sale-list">
           <thead>
             <tr>
-              <th scope="col">Type</th>
-              <th scope="col">Bill date</th>
-              <th scope="col">Bill no</th>
-              <th scope="col">B type</th>
+              <th scope="col">Tp</th>
+              <th scope="col">InvDate</th>
+              <th scope="col">InvNo</th>
+              <th scope="col">Bt</th>
               <th scope="col">Party</th>
               <th scope="col">Name</th>
               <th scope="col">City</th>
@@ -612,10 +670,29 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
               if (item.kind === 'day-total') {
                 return (
                   <tr key={`dt-${i}`} className="sale-list-day-total">
-                    <td>
+                    <td colSpan={16}>
                       <strong>Day total</strong> — {item.dateLabel}
                     </td>
-                    {saleDashPad}
+                    <td className="text-right">{fmtAlways(item.qnty)}</td>
+                    <td className="text-right">{fmtAlways(item.weight)}</td>
+                    <td className="text-right">—</td>
+                    <td className="text-right">{fmtAlways(item.amount)}</td>
+                    <td className="text-right">{fmtAlways(item.taxable)}</td>
+                    <td className="text-right">{fmtAlways(item.cgstAmt)}</td>
+                    <td className="text-right">{fmtAlways(item.sgstAmt)}</td>
+                    <td className="text-right">{fmtAlways(item.igstAmt)}</td>
+                    <td className="text-right">{fmtAlways(item.billAmt)}</td>
+                    <td className="text-right">{fmtAlways(item.disAmt)}</td>
+                    <td className="text-right">{fmtAlways(item.othExp5)}</td>
+                  </tr>
+                );
+              }
+              if (item.kind === 'bill-total') {
+                return (
+                  <tr key={`bt-${i}`} className="sale-list-bill-total">
+                    <td colSpan={16}>
+                      <strong>Bill total</strong> — {item.type} / {item.billDateLabel} / {item.billNo} / {item.bType}
+                    </td>
                     <td className="text-right">{fmtAlways(item.qnty)}</td>
                     <td className="text-right">{fmtAlways(item.weight)}</td>
                     <td className="text-right">—</td>
@@ -680,10 +757,9 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
               if (item.kind === 'grand-total') {
                 return (
                   <tr key={`gt-${i}`} className="sale-list-grand-total">
-                    <td>
+                    <td colSpan={16}>
                       <strong>Grand total</strong>
                     </td>
-                    {saleDashPad}
                     <td className="text-right">{fmtAlways(item.qnty)}</td>
                     <td className="text-right">{fmtAlways(item.weight)}</td>
                     <td className="text-right">—</td>
@@ -733,7 +809,9 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
                   <td>{row.PAN ?? row.pan ?? '—'}</td>
                   <td>{row.GST_NO ?? row.gst_no ?? '—'}</td>
                   <td className="bill-code">{row.BK_CODE ?? row.bk_code ?? '—'}</td>
-                  <td className="ledger-detail">{row.BK_NAME ?? row.bk_name ?? '—'}</td>
+                  <td className="ledger-detail" title={row.BK_NAME ?? row.bk_name ?? ''}>
+                    {clampText(row.BK_NAME ?? row.bk_name ?? '—', 25)}
+                  </td>
                   <td>{row.TRN_NO ?? row.trn_no ?? '—'}</td>
                   <td className="bill-code">{row.ITEM_CODE ?? row.item_code ?? '—'}</td>
                   <td className="ledger-detail">{row.ITEM_NAME ?? row.item_name ?? '—'}</td>

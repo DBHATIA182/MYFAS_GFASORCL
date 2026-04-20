@@ -1048,12 +1048,13 @@ mark.search-highlight {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  /* Prefer a persistent track on desktop (Windows overlay bars are easy to miss). */
-  overflow-x: scroll;
-  overflow-y: visible;
+  /* Keep both scrollbars inside the grid so desktop users can always reach them. */
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(64vh, 560px);
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
-  touch-action: pan-x;
+  touch-action: auto;
   padding-bottom: 14px;
   margin-bottom: 0.25rem;
   border: 1px solid #cbd5e1;
@@ -1062,6 +1063,40 @@ mark.search-highlight {
   scrollbar-gutter: stable;
   scrollbar-width: auto;
   scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.sale-list-scroll-sync {
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 14px;
+  margin-bottom: 0.2rem;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.sale-list-scroll-sync--top {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sale-list-scroll-sync-inner {
+  height: 1px;
+}
+
+.sale-list-scroll-sync::-webkit-scrollbar {
+  height: 12px;
+}
+
+.sale-list-scroll-sync::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.sale-list-scroll-sync::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 6px;
 }
 
 /* Easier to see horizontal scroll on sale list (Windows / WebKit) */
@@ -1086,7 +1121,112 @@ mark.search-highlight {
 .report-table--sale-list {
   width: max-content;
   min-width: 100%;
-  font-size: 0.82rem;
+  font-size: 0.68rem;
+  margin-left: 0 !important;
+}
+
+.report-table--sale-list th,
+.report-table--sale-list td {
+  padding: 0.11rem 0.16rem !important;
+  white-space: nowrap;
+  line-height: 1.05;
+}
+
+/* Keep compact headers readable; prevent overlap from inherited tracking/uppercase. */
+.report-table--sale-list th {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  font-size: 0.62rem;
+  overflow: hidden;
+}
+
+.report-table--sale-list th:nth-child(1),
+.report-table--sale-list td:nth-child(1) {
+  min-width: 0.7rem;
+  width: 0.7rem;
+  text-align: left;
+  padding-left: 0 !important;
+  padding-right: 0.01rem !important;
+}
+
+.report-table--sale-list th:nth-child(2),
+.report-table--sale-list td:nth-child(2) {
+  min-width: 2.7rem;
+  width: 2.7rem;
+  max-width: 2.7rem;
+  padding-left: 0 !important;
+  padding-right: 0.03rem !important;
+}
+
+.report-table--sale-list th:nth-child(3),
+.report-table--sale-list td:nth-child(3) {
+  min-width: 1.95rem;
+  width: 1.95rem;
+  max-width: 1.95rem;
+  text-align: right;
+  padding-left: 0.03rem !important;
+}
+
+.report-table--sale-list th:nth-child(4),
+.report-table--sale-list td:nth-child(4) {
+  min-width: 1.05rem;
+  width: 1.05rem;
+  text-align: center;
+  padding-right: 0.06rem !important;
+}
+
+.report-table--sale-list th:nth-child(5),
+.report-table--sale-list td:nth-child(5) {
+  min-width: 1.85rem;
+  width: 1.85rem;
+  padding-left: 0.06rem !important;
+  padding-right: 0.06rem !important;
+}
+
+.report-table--sale-list th:nth-child(6),
+.report-table--sale-list td:nth-child(6) {
+  min-width: 6.9rem;
+  width: 6.9rem;
+}
+
+.report-table--sale-list th:nth-child(-n+6),
+.report-table--sale-list td:nth-child(-n+6) {
+  padding-left: 0.02rem !important;
+  padding-right: 0.04rem !important;
+}
+
+.report-table--sale-list th:nth-child(11),
+.report-table--sale-list td:nth-child(11) {
+  min-width: 7.8rem;
+  width: 7.8rem;
+  max-width: 7.8rem;
+}
+
+.report-table--sale-list th:nth-child(12),
+.report-table--sale-list td:nth-child(12) {
+  min-width: 1.6rem;
+  width: 1.6rem;
+  max-width: 1.6rem;
+  text-align: right;
+}
+
+.report-table--sale-list td:nth-child(11),
+.report-table--sale-list td:nth-child(6) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 900px) {
+  .sale-list-scroll-sync--top {
+    display: none !important;
+  }
+
+  .table-responsive--sale-list {
+    max-height: none;
+    overflow-y: visible;
+    overscroll-behavior-x: auto;
+    touch-action: pan-x pan-y;
+  }
 }
 
 tr.sale-list-row-clickable {
@@ -1133,6 +1273,14 @@ tr.sale-list-grand-total td {
   border-top: 1px solid #94a3b8;
   padding-top: 0.5rem !important;
   padding-bottom: 0.5rem !important;
+}
+
+tr.sale-list-bill-total td {
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-weight: 700;
+  border-top: 1px solid #a5b4fc;
+  border-bottom: 1px solid #c7d2fe;
 }
 
 tr.sale-list-grand-total td {
