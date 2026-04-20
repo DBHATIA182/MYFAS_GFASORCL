@@ -394,11 +394,11 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
       <form onSubmit={handleSubmit} className="report-form">
         <div className="form-group">
           <label htmlFor="pl-sdate">Starting date</label>
-          <input id="pl-sdate" type="date" className="form-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+          <input id="pl-sdate" type="date" lang="en-GB" className="form-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
         </div>
         <div className="form-group">
           <label htmlFor="pl-edate">Ending date</label>
-          <input id="pl-edate" type="date" className="form-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
+          <input id="pl-edate" type="date" lang="en-GB" className="form-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
         </div>
         <div className="form-group">
           <label htmlFor="pl-sup">Specific supplier</label>

@@ -420,6 +420,7 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
         <input
           id="tb-end-date"
           type="date"
+          lang="en-GB"
           className="form-input"
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}

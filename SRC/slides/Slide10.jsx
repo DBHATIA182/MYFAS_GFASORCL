@@ -525,6 +525,7 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
           <input
             id="slt-end"
             type="date"
+            lang="en-GB"
             className="form-input"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}

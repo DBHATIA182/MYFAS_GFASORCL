@@ -108,6 +108,10 @@ function App() {
     setVoiceSupported(typeof SR === 'function');
   }, []);
 
+  useEffect(() => {
+    document.documentElement.lang = 'en-GB';
+  }, []);
+
   const [deployUpdateEnabled, setDeployUpdateEnabled] = useState(false);
   const [showDeployUpdateModal, setShowDeployUpdateModal] = useState(false);
   const [deployKeyInput, setDeployKeyInput] = useState('');

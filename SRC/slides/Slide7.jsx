@@ -574,6 +574,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
             id="bo-start"
             ref={dateStartRef}
             type="date"
+            lang="en-GB"
             className="form-input"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
@@ -582,7 +583,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
 
         <div className="form-group">
           <label htmlFor="bo-end">Ending date</label>
-          <input id="bo-end" type="date" className="form-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <input id="bo-end" type="date" lang="en-GB" className="form-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
 
         <div className="form-group">
@@ -590,6 +591,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
           <input
             id="bo-pedt"
             type="date"
+            lang="en-GB"
             className="form-input"
             value={payEndDate}
             onChange={(e) => setPayEndDate(e.target.value)}

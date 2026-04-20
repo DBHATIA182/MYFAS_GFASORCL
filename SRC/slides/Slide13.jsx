@@ -324,6 +324,7 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
             <input
               id="sbp-bill-date"
               type="date"
+              lang="en-GB"
               className="form-input"
               value={billDate}
               onChange={(e) => setBillDate(e.target.value)}

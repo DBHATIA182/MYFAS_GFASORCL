@@ -499,6 +499,7 @@ export default function Slide9({ apiBase, formData, onPrev, onReset }) {
           <input
             id="ss-end"
             type="date"
+            lang="en-GB"
             className="form-input"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}

@@ -528,6 +528,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
             id="start-date"
             ref={startDateInputRef}
             type="date"
+            lang="en-GB"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             className="form-input"
@@ -539,6 +540,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
           <input
             id="end-date"
             type="date"
+            lang="en-GB"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             className="form-input"

@@ -389,6 +389,7 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
           <input
             id="sl-start"
             type="date"
+            lang="en-GB"
             className="form-input"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
@@ -399,6 +400,7 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
           <input
             id="sl-end"
             type="date"
+            lang="en-GB"
             className="form-input"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}

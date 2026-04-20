@@ -350,7 +350,7 @@ export default function Slide12({ apiBase, onPrev, onReset, formData }) {
         <div className="form-row-broker form-row-ageing-meta">
           <div className="form-group">
             <label htmlFor="ageing-end-date">Ending Date</label>
-            <input id="ageing-end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            <input id="ageing-end-date" type="date" lang="en-GB" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
 
           <div className="form-group">

@@ -373,6 +373,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
             id="bill-start"
             ref={billStartInputRef}
             type="date"
+            lang="en-GB"
             className="form-input"
             value={billStart}
             onChange={(e) => setBillStart(e.target.value)}
@@ -384,6 +385,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
           <input
             id="bill-end"
             type="date"
+            lang="en-GB"
             className="form-input"
             value={billEnd}
             onChange={(e) => setBillEnd(e.target.value)}
@@ -395,6 +397,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
           <input
             id="pay-end"
             type="date"
+            lang="en-GB"
             className="form-input"
             value={payEndDate}
             onChange={(e) => setPayEndDate(e.target.value)}
