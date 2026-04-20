@@ -1,4 +1,5 @@
 import React, { useState, useLayoutEffect } from 'react';
+import { formatLedgerDateDisplay } from '../utils/dateFormat';
 
 function parseDateBoundary(value, endOfDay) {
   if (value == null || value === '') return null;
@@ -72,8 +73,10 @@ export default function Slide2({ years, formData, onPrev, onNext }) {
           {years.map((y) => (
             <option key={y.COMP_UID} value={y.COMP_UID}>
               {y.COMP_YEAR} 
-              {/* Added safety check for dates */}
-              {y.COMP_S_DT ? ` (${new Date(y.COMP_S_DT).toLocaleDateString()} to ${new Date(y.COMP_E_DT).toLocaleDateString()})` : ''}
+              {/* Force dd/mm/yyyy regardless of browser/OS locale */}
+              {y.COMP_S_DT
+                ? ` (${formatLedgerDateDisplay(y.COMP_S_DT)} to ${formatLedgerDateDisplay(y.COMP_E_DT)})`
+                : ''}
             </option>
           ))}
         </select>
