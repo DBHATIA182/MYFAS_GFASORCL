@@ -85,6 +85,23 @@ export default function Slide3({ onPrev, onNext, formData }) {
         </div>
 
         <div
+          className={`report-option ${reportType === 'sale-bill-printing' ? 'selected' : ''}`}
+          onClick={() => setReportType('sale-bill-printing')}
+        >
+          <input
+            type="radio"
+            name="reportType"
+            value="sale-bill-printing"
+            checked={reportType === 'sale-bill-printing'}
+            onChange={(e) => setReportType(e.target.value)}
+          />
+          <label>
+            <h3>Sale Bill Printing</h3>
+            <p>Find bills by TYPE/bill fields or party search, then click a row to open printable sale bill</p>
+          </label>
+        </div>
+
+        <div
           className={`report-option ${reportType === 'sale-list' ? 'selected' : ''}`}
           onClick={() => setReportType('sale-list')}
         >

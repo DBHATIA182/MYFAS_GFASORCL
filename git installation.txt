@@ -1,1 +1,104 @@
 https://git-scm.com/download/win
+cd\gfasorcl\apptest\git --version
+git config --global user.name "Dinesh Bhatia"
+git config --global user.email "dinesh_bhatia@hotmail.com"
+https://github.com
+cd E:\GFASORCL\APPTEST
+
+git init
+
+git add -A
+
+cd E:\GFASORCL\APPTEST
+git rm --cached config.yml "b10096b7-6534-4c4a-8102-6d5251a04ed3.json"
+git add .gitignore
+git status
+
+cd E:\gfasorcl\apptest
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/DBHATIA182/MYFAS_GFASORCL.git
+git push -u origin main
+
+DBHATIA182/MYFAS_GFASORCL
+https://github.com/DBHATIA182/MYFAS_GFASORCL
+
+
+when changes
+git add -a
+git commit -m "today changes 19042026"
+git push origin main
+*************************************************
+
+client machine
+A. One-time: software on the PC
+Node.js LTS (same major version as your dev PC if possible) — from https://nodejs.org
+Git for Windows — https://git-scm.com/download/win
+During setup: “Git from the command line and also from 3rd-party software”
+Default branch main (if the installer asks)
+Oracle Instant Client — same folder layout as before, for example:
+E:\GFASORCL\oracle_bridge\instantclient_23_0\
+cloudflared — already used at Marutiagro; keep it installed.
+Restart the PC once after installing Node + Git (or at least close and reopen PowerShell).
+
+B. One-time: move from “old copy” to “Git clone”
+Goal: E:\GFASORCL\APPTEST is a Git clone of your GitHub repo, not a USB copy.
+
+Stop the app on that PC: close the windows from start-apptest-services.ps1 (API, Vite, tunnel), or disable/stop the scheduled tasks that start them.
+
+Rename the old folder (backup, nothing deleted):
+
+If you have E:\GFASORCL\APPTEST
+Rename it to E:\GFASORCL\APPTEST_OLD
+Open PowerShell (Administrator):
+
+cd E:\GFASORCL
+git clone https://github.com/DBHATIA182/MYFAS_GFASORCL.git APPTEST
+If the repo is private, Git will open the browser or ask for login / Personal Access Token the first time — complete that.
+Copy these files from APPTEST_OLD into APPTEST (they are not in Git; each PC keeps its own):
+
+Copy from APPTEST_OLD	Into APPTEST
+connection.config.json
+same name
+config.yml
+same name
+b10096b7-6534-4c4a-8102-6d5251a04ed3.json (or whatever tunnel JSON that PC uses — name in config.yml credentials-file:)
+same name
+Install dependencies and build the UI:
+
+cd E:\GFASORCL\APPTEST
+npm ci
+npm run build
+Start the stack the same way you did before, for example:
+cd E:\GFASORCL\APPTEST
+.\start-apptest-services.ps1
+(or your Task Scheduler / NSSM jobs if you use those instead)
+
+Open https://marutiagro.fasaccountingsoftware.in in a browser and confirm login and reports work.
+
+When everything is OK, you can keep APPTEST_OLD as backup for a few days, then delete or zip it.
+
+C. Later: when you push updates from your dev PC
+On Marutiagro PC (PowerShell as Administrator):
+
+cd E:\GFASORCL\APPTEST
+.\update-from-git.ps1
+Then restart API + frontend + tunnel (close old windows and run start-apptest-services.ps1 again, or restart the scheduled tasks).
+
+D. Quick reference
+Where	What
+GitHub
+Source code (MYFAS_GFASORCL)
+Marutiagro APPTEST
+git clone once, then update-from-git.ps1
+Never in Git — copy per PC
+connection.config.json, config.yml, tunnel *.json
+Oracle
+E:\GFASORCL\oracle_bridge\... next to APPTEST
+E. If git clone says “folder already exists”
+Delete or rename the existing E:\GFASORCL\APPTEST first (after backup), then run git clone again.
+
+If Marutiagro uses a different path than E:\GFASORCL\APPTEST, say what path they use and the steps can be rewritten for that path only.
+
+node-v24.14.1-x64 this version already installed on marutiagro pc
+

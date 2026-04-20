@@ -11,6 +11,10 @@ dist/
 # Per-machine DB / client settings (copy from backup on each PC; do not push passwords)
 connection.config.json
 
+# One-line secret for in-app "Update to latest" (optional; or use env GFAS_DEPLOY_UPDATE_KEY)
+deploy-update-secret.txt
+deploy-update-secret.txt.txt
+
 # Cloudflare tunnel (machine-specific hostnames + secret credentials JSON)
 config.yml
 ????????-????-????-????-????????????.json

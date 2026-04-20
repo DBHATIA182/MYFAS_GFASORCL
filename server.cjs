@@ -1,5 +1,7 @@
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const { spawn } = require('child_process');
 const express = require('express');
 const oracledb = require('oracledb');
 const cors = require('cors');
@@ -79,6 +81,70 @@ function envTrim(name) {
   if (v === undefined || v === null) return '';
   const s = String(v).trim();
   return s;
+}
+
+/** First non-empty non-comment line from a secret file. */
+function readFirstSecretLine(filePath) {
+  const raw = fs.readFileSync(filePath, 'utf8');
+  return (
+    raw
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .find((l) => l && !l.startsWith('#')) || ''
+  );
+}
+
+/**
+ * In-app "Update to latest": env GFAS_DEPLOY_UPDATE_KEY or first line of a secret file (min 8 chars).
+ * Tries deploy-update-secret.txt, then deploy-update-secret.txt.txt (Notepad "double .txt" mistake).
+ */
+function getDeployUpdateSecret() {
+  const fromEnv = envTrim('GFAS_DEPLOY_UPDATE_KEY');
+  if (fromEnv) return fromEnv;
+  const candidates = ['deploy-update-secret.txt', 'deploy-update-secret.txt.txt'];
+  for (const name of candidates) {
+    try {
+      const p = path.join(__dirname, name);
+      if (fs.existsSync(p)) {
+        return readFirstSecretLine(p);
+      }
+    } catch (_) {}
+  }
+  return '';
+}
+
+const DEPLOY_UPDATE_SECRET = getDeployUpdateSecret();
+
+function deployKeyMatches(provided) {
+  if (!DEPLOY_UPDATE_SECRET || DEPLOY_UPDATE_SECRET.length < 8) return false;
+  const a = String(provided ?? '').trim();
+  if (!a) return false;
+  return (
+    crypto.createHash('sha256').update(DEPLOY_UPDATE_SECRET, 'utf8').digest('hex') ===
+    crypto.createHash('sha256').update(a, 'utf8').digest('hex')
+  );
+}
+
+let deployUpdateJobLock = false;
+
+function spawnDeployUpdateJob() {
+  const ps1 = path.join(__dirname, 'run-deploy-update.ps1');
+  if (!fs.existsSync(ps1)) {
+    throw new Error('run-deploy-update.ps1 is missing in the application folder.');
+  }
+  const logsDir = path.join(__dirname, 'logs');
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+  const child = spawn(
+    'powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1],
+    {
+      cwd: __dirname,
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    }
+  );
+  child.unref();
 }
 
 // --- 3. DATABASE CONFIG (Using "XE" alias from TNS) ---
@@ -1070,6 +1136,50 @@ async function drainOracleLobsInRows(rows) {
 
 // --- ENDPOINTS ---
 
+/** In-app update: enabled when server has a deploy secret (env or deploy-update-secret.txt). */
+app.get('/api/deploy-update/status', (req, res) => {
+  const enabled = Boolean(DEPLOY_UPDATE_SECRET && DEPLOY_UPDATE_SECRET.length >= 8);
+  res.json({ enabled });
+});
+
+/**
+ * Pull latest from Git, npm ci, npm run build, restart Node stack (run-autostart-stack.cmd).
+ * Body: { "deployKey": "<secret>" }. Requires Node process user to be allowed to run PowerShell + git.
+ */
+app.post('/api/deploy-update', (req, res) => {
+  try {
+    if (!DEPLOY_UPDATE_SECRET || DEPLOY_UPDATE_SECRET.length < 8) {
+      return res.status(503).json({
+        error:
+          'In-app update is not configured. Set environment variable GFAS_DEPLOY_UPDATE_KEY or create deploy-update-secret.txt (one line, at least 8 characters) in the app folder.',
+      });
+    }
+    if (deployUpdateJobLock) {
+      return res.status(429).json({
+        error: 'An update is already running. Wait several minutes and check logs\\deploy-update.log on the server.',
+      });
+    }
+    const key = String(req.body?.deployKey ?? req.body?.key ?? '').trim();
+    if (!deployKeyMatches(key)) {
+      return res.status(401).json({ error: 'Invalid deploy key.' });
+    }
+    deployUpdateJobLock = true;
+    setTimeout(() => {
+      deployUpdateJobLock = false;
+    }, 180000);
+    spawnDeployUpdateJob();
+    res.json({
+      ok: true,
+      message:
+        'Update and restart have been started in the background. Wait about 2–6 minutes, then refresh this page. If the site does not come back, check logs\\deploy-update.log on the server PC.',
+    });
+  } catch (err) {
+    deployUpdateJobLock = false;
+    console.error('deploy-update:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** App login: USERS.USER_NAME (or USERNAME), USERS.PW — hub is usually GRAIN; if startup stayed GRAINFAS, try GRAIN here and then adopt GRAIN as hub for companies/years. */
 app.post('/api/login', async (req, res) => {
   try {
@@ -1840,6 +1950,64 @@ app.get('/api/sale-list', async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('❌ Sale list error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Sale Bill Printing list (header-level rows) for one TYPE: SL / SE / CN.
+ * Optional filters: bill_no, b_type, bill_date, mcode (party code).
+ */
+app.get('/api/sale-bill-printing-list', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, type, bill_no, b_type, bill_date, mcode } = req.query;
+    const t = String(type ?? '').trim().toUpperCase();
+    if (!['SL', 'SE', 'CN'].includes(t)) {
+      return res.status(400).json({ error: "type is required and must be one of 'SL', 'SE', 'CN'." });
+    }
+    const bn = bill_no != null ? String(bill_no).trim() : '';
+    const bt = b_type != null ? String(b_type).trim() : '';
+    const bd = bill_date != null ? String(bill_date).trim() : '';
+    const m = mcode != null ? String(mcode).trim() : '';
+
+    const sql = `
+      SELECT
+        A.TYPE,
+        A.BILL_DATE,
+        A.BILL_NO,
+        A.B_TYPE,
+        A.CODE,
+        B.NAME,
+        B.CITY,
+        MAX(NVL(A.BILL_AMT, 0)) AS BILL_AMT
+      FROM SALE A
+      JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND TRIM(A.CODE) = TRIM(B.CODE)
+      WHERE A.COMP_CODE = :comp_code
+        AND UPPER(TRIM(A.TYPE)) = :type
+        ${bn ? 'AND TRIM(TO_CHAR(A.BILL_NO)) = TRIM(:bill_no)' : ''}
+        ${bt ? 'AND NVL(TRIM(A.B_TYPE), \' \') = NVL(TRIM(:b_type), \' \')' : ''}
+        ${bd ? "AND TRUNC(A.BILL_DATE) = TRUNC(TO_DATE(:bill_date, 'DD-MM-YYYY'))" : ''}
+        ${m ? 'AND TRIM(A.CODE) = TRIM(:mcode)' : ''}
+      GROUP BY
+        A.TYPE,
+        A.BILL_DATE,
+        A.BILL_NO,
+        A.B_TYPE,
+        A.CODE,
+        B.NAME,
+        B.CITY
+      ORDER BY A.BILL_DATE DESC, A.BILL_NO DESC, A.B_TYPE, A.CODE`;
+
+    const binds = { comp_code, type: t };
+    if (bn) binds.bill_no = bn;
+    if (bt) binds.b_type = bt;
+    if (bd) binds.bill_date = bd;
+    if (m) binds.mcode = m;
+
+    const rows = await runQuery(sql, binds, comp_uid);
+    res.json(rows || []);
+  } catch (err) {
+    console.error('❌ Sale bill printing list error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

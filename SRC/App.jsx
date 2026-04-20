@@ -14,6 +14,7 @@ import Slide9 from './slides/Slide9';
 import Slide10 from './slides/Slide10';
 import Slide11 from './slides/Slide11';
 import Slide12 from './slides/Slide12';
+import Slide13 from './slides/Slide13';
 import { exitApp, performExitWindow } from './utils/exitApp';
 import connectionConfig from '../connection.config.json';
 import './App.css';
@@ -68,7 +69,7 @@ const API_BASE = import.meta.env.DEV
   : isLocalHost
     ? connectionConfig.local?.apiBase || 'http://localhost:5001'
     : remoteApiBase;
-const TOTAL_STEPS = 12;
+const TOTAL_STEPS = 13;
 const VIEW_MODE_STORAGE_KEY = 'gfas_view_mode';
 
 if (import.meta.env.DEV && API_BASE === '') {
@@ -106,6 +107,48 @@ function App() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     setVoiceSupported(typeof SR === 'function');
   }, []);
+
+  const [deployUpdateEnabled, setDeployUpdateEnabled] = useState(false);
+  const [showDeployUpdateModal, setShowDeployUpdateModal] = useState(false);
+  const [deployKeyInput, setDeployKeyInput] = useState('');
+  const [deployBusy, setDeployBusy] = useState(false);
+  const [deployMessage, setDeployMessage] = useState('');
+  const [deployMessageIsError, setDeployMessageIsError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const base = API_BASE || '';
+        const r = await axios.get(`${base}/api/deploy-update/status`);
+        if (!cancelled && r.data?.enabled) setDeployUpdateEnabled(true);
+      } catch {
+        /* feature off or API unreachable */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleDeployUpdateSubmit = async (e) => {
+    e.preventDefault();
+    setDeployMessage('');
+    setDeployBusy(true);
+    try {
+      const base = API_BASE || '';
+      const r = await axios.post(`${base}/api/deploy-update`, { deployKey: deployKeyInput.trim() });
+      setDeployMessageIsError(false);
+      setDeployMessage(r.data?.message || 'Started.');
+      setDeployKeyInput('');
+    } catch (err) {
+      setDeployMessageIsError(true);
+      const msg = err.response?.data?.error || err.message || 'Request failed';
+      setDeployMessage(msg);
+    } finally {
+      setDeployBusy(false);
+    }
+  };
 
   const applyViewMode = (mode) => {
     if (mode !== 'desktop' && mode !== 'mobile') return;
@@ -213,6 +256,7 @@ function App() {
     else if (data.reportType === 'stock-lot') setCurrentSlide(10);
     else if (data.reportType === 'purchase-list') setCurrentSlide(11);
     else if (data.reportType === 'ageing') setCurrentSlide(12);
+    else if (data.reportType === 'sale-bill-printing') setCurrentSlide(13);
     else setCurrentSlide(4);
   };
 
@@ -293,13 +337,76 @@ function App() {
           >
             Mobile View
           </button>
+          {deployUpdateEnabled ? (
+            <button
+              type="button"
+              className="view-settings-option view-settings-option--deploy"
+              onClick={() => {
+                setShowViewSettings(false);
+                setDeployMessage('');
+                setDeployMessageIsError(false);
+                setShowDeployUpdateModal(true);
+              }}
+            >
+              Update to latest version
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
   );
 
+  const renderDeployUpdateModal = () =>
+    showDeployUpdateModal ? (
+      <div
+        className="deploy-update-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="deploy-update-title"
+        onClick={(ev) => {
+          if (deployBusy) return;
+          if (ev.target === ev.currentTarget) setShowDeployUpdateModal(false);
+        }}
+      >
+        <div className="deploy-update-dialog" onClick={(e) => e.stopPropagation()}>
+          <h2 id="deploy-update-title">Update to latest version</h2>
+          <p className="deploy-update-hint">
+            Pulls the latest code from Git, reinstalls dependencies, rebuilds the site, then restarts the app
+            windows on this server. You need the deploy secret configured on the server.
+          </p>
+          <form onSubmit={handleDeployUpdateSubmit}>
+            <label className="deploy-update-label" htmlFor="deploy-key-input">
+              Deploy key
+            </label>
+            <input
+              id="deploy-key-input"
+              type="password"
+              className="deploy-update-input"
+              autoComplete="off"
+              value={deployKeyInput}
+              onChange={(e) => setDeployKeyInput(e.target.value)}
+              placeholder="Enter deploy key"
+              disabled={deployBusy}
+            />
+            {deployMessage ? (
+              <p className={`deploy-update-msg${deployMessageIsError ? ' deploy-update-msg--err' : ''}`}>{deployMessage}</p>
+            ) : null}
+            <div className="deploy-update-actions">
+              <button type="button" className="btn btn-secondary" disabled={deployBusy} onClick={() => setShowDeployUpdateModal(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={deployBusy}>
+                {deployBusy ? 'Starting…' : 'Update & restart'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    ) : null;
+
   if (!viewMode) {
     return (
+      <>
       <div className="app app--selector">
         <main className="app-main">
           <section className="slide startup-mode-card">
@@ -319,6 +426,8 @@ function App() {
           </section>
         </main>
       </div>
+      {renderDeployUpdateModal()}
+      </>
     );
   }
 
@@ -326,6 +435,7 @@ function App() {
 
   if (!authenticated) {
     return (
+      <>
       <div className={appClassName}>
         <header className="app-header">
           <h1>GRAINFAS Accounting</h1>
@@ -338,11 +448,14 @@ function App() {
           <LoginSlide apiBase={API_BASE} onSuccess={() => setAuthenticated(true)} onExit={exitApp} />
         </main>
       </div>
+      {renderDeployUpdateModal()}
+      </>
     );
   }
 
   if (loading && currentSlide === 1) {
     return (
+      <>
       <div className={appClassName}>
         <header className="app-header">
           <h1>GRAINFAS Accounting</h1>
@@ -360,10 +473,13 @@ function App() {
           </div>
         </main>
       </div>
+      {renderDeployUpdateModal()}
+      </>
     );
   }
 
   return (
+    <>
     <div className={appClassName}>
       <header className="app-header">
         <h1>GRAINFAS Accounting</h1>
@@ -411,8 +527,13 @@ function App() {
         {currentSlide === 12 && (
           <Slide12 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
+        {currentSlide === 13 && (
+          <Slide13 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+        )}
       </main>
     </div>
+    {renderDeployUpdateModal()}
+    </>
   );
 }
 
