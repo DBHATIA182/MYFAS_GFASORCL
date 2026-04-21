@@ -113,6 +113,8 @@ function App() {
   }, []);
 
   const [deployUpdateEnabled, setDeployUpdateEnabled] = useState(false);
+  const [deployUpdateRequiresKey, setDeployUpdateRequiresKey] = useState(true);
+  const [deployUpdateServerBusy, setDeployUpdateServerBusy] = useState(false);
   const [showDeployUpdateModal, setShowDeployUpdateModal] = useState(false);
   const [deployKeyInput, setDeployKeyInput] = useState('');
   const [deployBusy, setDeployBusy] = useState(false);
@@ -125,7 +127,11 @@ function App() {
       try {
         const base = API_BASE || '';
         const r = await axios.get(`${base}/api/deploy-update/status`);
-        if (!cancelled && r.data?.enabled) setDeployUpdateEnabled(true);
+        if (!cancelled && r.data?.enabled) {
+          setDeployUpdateEnabled(true);
+          setDeployUpdateRequiresKey(r.data?.requiresDeployKey !== false);
+          setDeployUpdateServerBusy(r.data?.busy === true);
+        }
       } catch {
         /* feature off or API unreachable */
       }
@@ -141,7 +147,8 @@ function App() {
     setDeployBusy(true);
     try {
       const base = API_BASE || '';
-      const r = await axios.post(`${base}/api/deploy-update`, { deployKey: deployKeyInput.trim() });
+      const payload = deployUpdateRequiresKey ? { deployKey: deployKeyInput.trim() } : {};
+      const r = await axios.post(`${base}/api/deploy-update`, payload);
       setDeployMessageIsError(false);
       setDeployMessage(r.data?.message || 'Started.');
       setDeployKeyInput('');
@@ -149,6 +156,7 @@ function App() {
       setDeployMessageIsError(true);
       const msg = err.response?.data?.error || err.message || 'Request failed';
       setDeployMessage(msg);
+      if (err.response?.status === 429) setDeployUpdateServerBusy(true);
     } finally {
       setDeployBusy(false);
     }
@@ -253,7 +261,7 @@ function App() {
   const handleSlide3Next = (data) => {
     setFormData(prev => ({ ...prev, ...data }));
     if (data.reportType === 'ledger') setCurrentSlide(5);
-    else if (data.reportType === 'bill-ledger') setCurrentSlide(6);
+    else if (data.reportType === 'bill-ledger' || data.reportType === 'customer-ledger' || data.reportType === 'supplier-ledger') setCurrentSlide(6);
     else if (data.reportType === 'broker-os') setCurrentSlide(7);
     else if (data.reportType === 'sale-list') setCurrentSlide(8);
     else if (data.reportType === 'stock-sum') setCurrentSlide(9);
@@ -350,6 +358,16 @@ function App() {
                 setDeployMessage('');
                 setDeployMessageIsError(false);
                 setShowDeployUpdateModal(true);
+                const base = API_BASE || '';
+                void axios
+                  .get(`${base}/api/deploy-update/status`)
+                  .then((r) => {
+                    if (r.data?.enabled) {
+                      setDeployUpdateRequiresKey(r.data?.requiresDeployKey !== false);
+                      setDeployUpdateServerBusy(r.data?.busy === true);
+                    }
+                  })
+                  .catch(() => {});
               }}
             >
               Update to latest version
@@ -376,22 +394,35 @@ function App() {
           <h2 id="deploy-update-title">Update to latest version</h2>
           <p className="deploy-update-hint">
             Pulls the latest code from Git, reinstalls dependencies, rebuilds the site, then restarts the app
-            windows on this server. You need the deploy secret configured on the server.
+            windows on this server.
+            {deployUpdateRequiresKey
+              ? ' Enter the same deploy key as in deploy-update-secret.txt (first line) on the server PC.'
+              : ' This server is configured to start the update without a deploy key.'}
           </p>
+          {deployUpdateServerBusy ? (
+            <p className="deploy-update-msg deploy-update-msg--err">
+              An update is already running on this server. Wait for it to finish, then open this dialog again, or check
+              logs/deploy-update.log under the app folder. If nothing is running, restart the API once to clear a stuck lock.
+            </p>
+          ) : null}
           <form onSubmit={handleDeployUpdateSubmit}>
-            <label className="deploy-update-label" htmlFor="deploy-key-input">
-              Deploy key
-            </label>
-            <input
-              id="deploy-key-input"
-              type="password"
-              className="deploy-update-input"
-              autoComplete="off"
-              value={deployKeyInput}
-              onChange={(e) => setDeployKeyInput(e.target.value)}
-              placeholder="Enter deploy key"
-              disabled={deployBusy}
-            />
+            {deployUpdateRequiresKey ? (
+              <>
+                <label className="deploy-update-label" htmlFor="deploy-key-input">
+                  Deploy key
+                </label>
+                <input
+                  id="deploy-key-input"
+                  type="password"
+                  className="deploy-update-input"
+                  autoComplete="off"
+                  value={deployKeyInput}
+                  onChange={(e) => setDeployKeyInput(e.target.value)}
+                  placeholder="Enter deploy key"
+                  disabled={deployBusy || deployUpdateServerBusy}
+                />
+              </>
+            ) : null}
             {deployMessage ? (
               <p className={`deploy-update-msg${deployMessageIsError ? ' deploy-update-msg--err' : ''}`}>{deployMessage}</p>
             ) : null}
@@ -399,8 +430,8 @@ function App() {
               <button type="button" className="btn btn-secondary" disabled={deployBusy} onClick={() => setShowDeployUpdateModal(false)}>
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary" disabled={deployBusy}>
-                {deployBusy ? 'Starting…' : 'Update & restart'}
+              <button type="submit" className="btn btn-primary" disabled={deployBusy || deployUpdateServerBusy}>
+                {deployBusy ? 'Starting…' : deployUpdateServerBusy ? 'Update running…' : 'Update & restart'}
               </button>
             </div>
           </form>

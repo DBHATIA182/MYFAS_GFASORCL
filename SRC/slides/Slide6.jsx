@@ -3,7 +3,7 @@ import axios from 'axios';
 import ReportTable from '../components/ReportTable';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { downloadExcelRows } from '../utils/excelExport';
-import { toInputDateString, toOracleDate, toDisplayDate } from '../utils/dateFormat';
+import { toInputDateString, toOracleDate, toDisplayDate, getCurBal, formatCurBal } from '../utils/dateFormat';
 
 const DEFAULT_HISTORY_START_DATE = '2001-04-01';
 
@@ -32,6 +32,12 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
   const [billStart, setBillStart] = useState('');
   const [billEnd, setBillEnd] = useState('');
   const [payEndDate, setPayEndDate] = useState('');
+  const [requireInterest, setRequireInterest] = useState('N');
+  const [interestAsOf, setInterestAsOf] = useState('');
+  const [intGsDays, setIntGsDays] = useState('0');
+  const [intGedDays, setIntGedDays] = useState('30');
+  const [intGroupCd, setIntGroupCd] = useState('0');
+  const [intBombayDhara, setIntBombayDhara] = useState('0');
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -43,16 +49,21 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
   const compUid = formData.comp_uid ?? formData.COMP_UID;
   const compName = formData.comp_name ?? formData.COMP_NAME ?? '';
   const compYear = formData.comp_year ?? formData.COMP_YEAR ?? '';
+  const isSupplierLedger = String(formData.reportType || '').toLowerCase() === 'supplier-ledger';
+  const ledgerKind = isSupplierLedger ? 'supplier' : 'customer';
+  const ledgerTitle = isSupplierLedger ? 'SupplierLedger' : 'CustomerLedger';
+  const showPartyBal = !isSupplierLedger;
 
   useEffect(() => {
-    const eRaw = formData.comp_e_dt ?? formData.COMP_E_DT;
-    const e = toInputDateString(eRaw);
+    if (!compCode) return;
+    const today = toInputDateString(new Date());
     setBillStart(DEFAULT_HISTORY_START_DATE);
-    if (e) {
-      setBillEnd(e);
-      setPayEndDate(e);
-    }
+    setBillEnd(today);
+    setPayEndDate(today);
+    setInterestAsOf(today);
   }, [
+    compCode,
+    compUid,
     formData.comp_s_dt,
     formData.comp_e_dt,
     formData.COMP_S_DT,
@@ -64,15 +75,15 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
       if (!compCode || !compUid) return;
       try {
         const { data } = await axios.get(`${apiBase}/api/bill-ledger-parties`, {
-          params: { comp_code: compCode, comp_uid: compUid },
+          params: { comp_code: compCode, comp_uid: compUid, ledger_kind: ledgerKind },
         });
         setParties(Array.isArray(data) ? data : []);
       } catch (err) {
-        console.error('Bill ledger parties:', err);
+        console.error(`${ledgerTitle} parties:`, err);
       }
     };
     load();
-  }, [apiBase, compCode, compUid]);
+  }, [apiBase, compCode, compUid, ledgerKind, ledgerTitle]);
 
   const filteredParties = useMemo(() => {
     const q = partySearch.trim().toLowerCase();
@@ -120,28 +131,46 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
       alert('Please set bill date range and payment ending date.');
       return;
     }
-
     setLoading(true);
     try {
+      const params = {
+        comp_code: compCode,
+        code: selectedCode,
+        s_date: toOracleDate(billStart),
+        e_date: toOracleDate(billEnd),
+        p_edt: toOracleDate(payEndDate),
+        mco,
+        comp_uid: compUid,
+        ledger_kind: ledgerKind,
+      };
+      if (requireInterest === 'Y') {
+        const asOf = interestAsOf || payEndDate;
+        if (!asOf) {
+          alert('Interest as-of date is required when interest is Yes.');
+          setLoading(false);
+          return;
+        }
+        params.include_interest = 'Y';
+        params.int_indt = toOracleDate(asOf);
+        params.gs_days = intGsDays.trim() || '0';
+        params.ged_days = intGedDays.trim() || '30';
+        params.group_cd = intGroupCd.trim() || '0';
+        params.bombay_dhara = intBombayDhara.trim() || '0';
+      } else {
+        params.include_interest = 'N';
+      }
+
       const { data } = await axios.get(`${apiBase}/api/bill-ledger`, {
-        params: {
-          comp_code: compCode,
-          code: selectedCode,
-          s_date: toOracleDate(billStart),
-          e_date: toOracleDate(billEnd),
-          p_edt: toOracleDate(payEndDate),
-          mco,
-          comp_uid: compUid,
-        },
+        params,
         withCredentials: true,
-        timeout: 60000,
+        timeout: 120000,
       });
       const rows = Array.isArray(data) ? data : [];
       if (rows.length === 0) {
         alert(
-          'No rows returned from BILLS for this party and dates.\n\n' +
-            'The desktop “Ledger” report usually reads the LEDGER table; this report reads BILLS (bill-wise). ' +
-            'If vouchers exist only in LEDGER, widen dates or check that sales/purchase lines are in BILLS with expected VR_TYPE (e.g. SL, BV, JV).'
+          `No rows returned from BILLS for this party and dates for ${ledgerTitle}.\n\n` +
+            `This report reads BILLS bill-wise (${isSupplierLedger ? 'supplier mode: CR - DR' : 'customer mode: DR - CR'}). ` +
+            'If vouchers exist only in LEDGER, widen dates or check expected rows in BILLS.'
         );
       } else {
         setReportData(rows);
@@ -162,6 +191,11 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
     endDate: `${toDisplayDate(billStart)} – ${toDisplayDate(billEnd)}`,
     payEndDate: toDisplayDate(payEndDate),
     filterLabel: mco === 'O' ? 'Outstanding bills only' : 'All bills',
+    billLedgerInterest: requireInterest === 'Y',
+    interestAsOfLabel:
+      requireInterest === 'Y' ? toDisplayDate(interestAsOf || payEndDate) : '',
+    billLedgerTitle: ledgerTitle,
+    billLedgerKind: ledgerKind,
   };
 
   const downloadPDF = () =>
@@ -169,7 +203,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
 
   const shareWhatsApp = () => {
     const shareText = [
-      `Bill-wise ledger — ${compName}`,
+      `${ledgerTitle} — ${compName}`,
       `${compYear} | ${selectedPartyRow?.NAME ?? selectedCode} (${selectedCode})`,
       `Bills: ${toDisplayDate(billStart)} – ${toDisplayDate(billEnd)} | Pay to: ${toDisplayDate(payEndDate)}`,
       mco === 'O' ? 'Filter: Outstanding' : 'Filter: All',
@@ -181,7 +215,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
     return (
       <div className="slide slide-report">
         <div className="report-toolbar">
-          <h2>Bill-wise ledger</h2>
+          <h2>{ledgerTitle}</h2>
           <div className="toolbar-actions">
             <button type="button" className="btn btn-toolbar-back" onClick={() => setShowReport(false)}>
               ← Back
@@ -198,7 +232,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
               className="btn btn-excel"
               onClick={() => {
                 try {
-                  downloadExcelRows(reportData, 'BillLedger', `${compName}_BillLedger_${selectedCode}`);
+                  downloadExcelRows(reportData, ledgerTitle, `${compName}_${ledgerTitle}_${selectedCode}`);
                 } catch (e) {
                   alert(String(e?.message || e));
                 }
@@ -225,12 +259,28 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
             <br />
             Bills {toDisplayDate(billStart)} – {toDisplayDate(billEnd)} · Payment cut-off {toDisplayDate(payEndDate)}
             <br />
-            {mco === 'O' ? 'Outstanding only' : 'All bills'}
+            {mco === 'O' ? 'Outstanding only' : 'All bills'} · {isSupplierLedger ? 'Balance formula: CR - DR' : 'Balance formula: DR - CR'}
+            {requireInterest === 'Y' ? (
+              <>
+                <br />
+                Interest ({isSupplierLedger ? 'GETINT_SUP' : 'GETINT'}) as of {toDisplayDate(interestAsOf || payEndDate)} · grace {intGsDays}/{intGedDays}{' '}
+                days · group_cd {intGroupCd} · bombay_dhara {intBombayDhara}
+              </>
+            ) : null}
           </p>
         </div>
 
         <div className="report-display">
-          <ReportTable data={reportData} type="bill-ledger" />
+          <ReportTable
+            data={reportData}
+            type="bill-ledger"
+            billLedgerInterest={requireInterest === 'Y'}
+            billLedgerKind={ledgerKind}
+            meta={{
+              billLedgerPartyCode: selectedCode,
+              billLedgerPartyName: selectedPartyRow?.NAME ?? selectedPartyRow?.name ?? '',
+            }}
+          />
         </div>
 
         <div className="button-group">
@@ -247,14 +297,15 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
 
   return (
     <div className="slide slide-6">
-      <h2>Bill-wise ledger — parameters</h2>
+      <h2>{ledgerTitle} — parameters</h2>
 
       <p className="company-info">
         {compName} | FY {compYear}
         <br />
         <span className="compdet-date-hint">
-          Search party (customers / suppliers per schedule 8–9 and 11.10). Bill dates and payment ending date match
-          your legacy report prompts.
+          {isSupplierLedger
+            ? 'Search supplier (schedule 11.10). Bill dates and payment ending date match your legacy prompts.'
+            : 'Search customer (schedule 8-9). Bill dates and payment ending date match your legacy prompts.'}
         </span>
       </p>
 
@@ -269,7 +320,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
         </div>
 
         <div className="form-group account-search-group">
-          <label htmlFor="party-search">Search party</label>
+          <label htmlFor="party-search">{isSupplierLedger ? 'Search supplier' : 'Search customer'}</label>
           <input
             id="party-search"
             ref={partySearchInputRef}
@@ -301,6 +352,12 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
           {selectedCode ? (
             <p className="account-selected-hint">
               Selected: <strong>{selectedPartyRow?.NAME ?? '—'}</strong> (<code>{selectedCode}</code>)
+              {showPartyBal ? (
+                <>
+                  {' · '}
+                  Bal {formatCurBal(getCurBal(selectedPartyRow) ?? 0)}
+                </>
+              ) : null}
               <button
                 type="button"
                 className="btn-text-clear"
@@ -317,16 +374,21 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
           ) : null}
           {!selectedCode ? (
             <div className="account-search-results party-search-results" role="listbox" aria-label="Matching parties">
-              <div className="account-search-header party-search-header" aria-hidden="true">
+              <div className={`account-search-header party-search-header${showPartyBal ? ' party-search-header--with-bal' : ''}`} aria-hidden="true">
                 <span>Code</span>
                 <span>Name</span>
                 <span>City</span>
+                {showPartyBal ? <span className="account-search-bal-h">Bal</span> : null}
               </div>
               {filteredParties.length === 0 ? (
                 <div className="account-search-empty">No parties match your search.</div>
               ) : (
                 filteredParties.map((row, index) => {
                   const code = row.CODE ?? row.code;
+                  const balRaw = getCurBal(row);
+                  const bal = balRaw ?? 0;
+                  const n = Number(bal);
+                  const dc = !Number.isNaN(n) ? (n < 0 ? 'Cr' : 'Dr') : '';
                   const rowHi = safeHighlight === index;
                   return (
                     <button
@@ -334,7 +396,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
                       type="button"
                       role="option"
                       aria-selected={rowHi}
-                      className={`account-search-row party-search-row${rowHi ? ' is-highlight' : ''}`}
+                      className={`account-search-row party-search-row${showPartyBal ? ' party-search-row--with-bal' : ''}${rowHi ? ' is-highlight' : ''}`}
                       onMouseEnter={() => setListHighlight(index)}
                       onClick={() => selectParty(row)}
                     >
@@ -345,6 +407,12 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
                       <span className="account-search-city" title={row.CITY ?? row.city ?? ''}>
                         {row.CITY ?? row.city ?? '—'}
                       </span>
+                      {showPartyBal ? (
+                        <span className={`account-search-bal ${dc === 'Cr' ? 'is-cr' : dc === 'Dr' ? 'is-dr' : ''}`}>
+                          {formatCurBal(bal)}
+                          {dc ? <span className="account-search-bal-dc">{dc}</span> : null}
+                        </span>
+                      ) : null}
                     </button>
                   );
                 })
@@ -403,6 +471,103 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
             onChange={(e) => setPayEndDate(e.target.value)}
           />
         </div>
+
+        <div className="form-group">
+          <span className="form-label-block">Interest on bills (Oracle {isSupplierLedger ? 'GETINT_SUP' : 'GETINT'})</span>
+          <div className="radio-row">
+            <label className="radio-inline">
+              <input
+                type="radio"
+                name="req-int"
+                value="N"
+                checked={requireInterest === 'N'}
+                onChange={() => setRequireInterest('N')}
+              />
+              No (N)
+            </label>
+            <label className="radio-inline">
+              <input
+                type="radio"
+                name="req-int"
+                value="Y"
+                checked={requireInterest === 'Y'}
+                onChange={() => {
+                  setRequireInterest('Y');
+                  setInterestAsOf((prev) => prev || toInputDateString(new Date()));
+                }}
+              />
+              Yes (Y) — add interest columns from GETINT
+            </label>
+          </div>
+        </div>
+
+        {requireInterest === 'Y' ? (
+          <>
+            <div className="form-group">
+              <label htmlFor="int-asof">Interest as-of date (INDT / same DD-MM-YYYY as other dates)</label>
+              <input
+                id="int-asof"
+                type="date"
+                lang="en-GB"
+                className="form-input"
+                value={interestAsOf || toInputDateString(new Date())}
+                onChange={(e) => setInterestAsOf(e.target.value)}
+              />
+            </div>
+            <div className="form-row-broker">
+              <div className="form-group">
+                <label htmlFor="int-gs">G_GSDAYS</label>
+                <input
+                  id="int-gs"
+                  type="text"
+                  inputMode="numeric"
+                  className="form-input"
+                  value={intGsDays}
+                  onChange={(e) => setIntGsDays(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="int-ged">G_GEDAYS</label>
+                <input
+                  id="int-ged"
+                  type="text"
+                  inputMode="numeric"
+                  className="form-input"
+                  value={intGedDays}
+                  onChange={(e) => setIntGedDays(e.target.value)}
+                  placeholder="30"
+                />
+              </div>
+            </div>
+            <div className="form-row-broker">
+              <div className="form-group">
+                <label htmlFor="int-grp">GROUP_CD</label>
+                <input
+                  id="int-grp"
+                  type="text"
+                  inputMode="numeric"
+                  className="form-input"
+                  value={intGroupCd}
+                  onChange={(e) => setIntGroupCd(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="int-bomb">BOMBAY_DHARA</label>
+                <input
+                  id="int-bomb"
+                  type="text"
+                  inputMode="numeric"
+                  className="form-input"
+                  value={intBombayDhara}
+                  onChange={(e) => setIntBombayDhara(e.target.value)}
+                  placeholder="0 or 365"
+                />
+              </div>
+            </div>
+          </>
+        ) : null}
 
         <div className="button-group">
           <button type="button" className="btn btn-secondary" onClick={onPrev}>

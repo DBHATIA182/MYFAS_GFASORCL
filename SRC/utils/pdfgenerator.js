@@ -174,6 +174,16 @@ const PDF_REPORT_STYLES = `
           letter-spacing: 0.05em;
         }
         table.table-report tr.report-grand-total td.amount { color: #fff !important; font-size: 10px; }
+        table.table-report td.amount.bill-ledger-interest-amt-pdf {
+          color: #c2410c !important;
+          font-weight: 800;
+        }
+        table.table-report tr.subtotal-row td.amount.bill-ledger-interest-amt-pdf {
+          color: #9a3412 !important;
+        }
+        table.table-report tr.report-grand-total td.amount.bill-ledger-interest-amt-pdf {
+          color: #fdba74 !important;
+        }
         table.table-report td.amount.ageing-cur-bal-alert { color: #c53030 !important; font-weight: 700; }
         table.table-report tr.report-grand-total td.amount.ageing-cur-bal-alert { color: #fecaca !important; }
         .report-foot {
@@ -418,12 +428,17 @@ function buildLedgerReportHtml(data, metadata) {
   `;
 }
 
-/** Bill-wise ledger PDF (BILLS, running balance per bill) */
+/** Bill-wise ledger PDF (BILLS, running balance per bill); optional GETINT columns */
 function buildBillLedgerReportHtml(data, metadata) {
   const rows = data || [];
+  const useInt = Boolean(metadata.billLedgerInterest);
+  const ledgerTitle = escHtml(metadata.billLedgerTitle || 'CustomerLedger');
+  const ledgerKind = String(metadata.billLedgerKind || 'customer').toLowerCase() === 'supplier' ? 'supplier' : 'customer';
   let sumDr = 0;
   let sumCr = 0;
   let sumCurrent = 0;
+  let sumInterest = 0;
+  let sumClosePlusInt = 0;
 
   const company = escHtml(metadata.companyName);
   const year = escHtml(metadata.year);
@@ -432,6 +447,7 @@ function buildBillLedgerReportHtml(data, metadata) {
   const period = escHtml(metadata.endDate);
   const payEnd = escHtml(metadata.payEndDate ?? '');
   const filt = escHtml(metadata.filterLabel ?? '');
+  const intAsOf = escHtml(metadata.interestAsOfLabel ?? '');
   const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
 
   const billKeyOf = (row) => {
@@ -440,6 +456,11 @@ function buildBillLedgerReportHtml(data, metadata) {
     const bType = String(row.B_TYPE ?? row.b_type ?? '').trim();
     return `${billDt}__${billNo}__${bType}`;
   };
+
+  const intHead = useInt
+    ? '<th class="amount">Int days</th><th class="amount">Interest</th><th class="amount">Closing+int</th>'
+    : '';
+  const intBlank = useInt ? '<td class="amount" style="opacity:.65">—</td><td class="amount" style="opacity:.65">—</td><td class="amount" style="opacity:.65">—</td>' : '';
 
   let bodyRows = '';
   let billDr = 0;
@@ -460,17 +481,16 @@ function buildBillLedgerReportHtml(data, metadata) {
     const vrDt = escHtml(formatLedgerDateDisplay(row.VR_DATE ?? row.vr_date));
     bodyRows += `
             <tr>
-              <td class="col-code">${escHtml(row.CODE ?? row.code ?? '')}</td>
-              <td class="col-name">${escHtml(row.NAME ?? row.name ?? '')}</td>
               <td class="col-vr">${escHtml(row.BILL_NO ?? row.bill_no ?? '')}</td>
               <td class="col-date">${billDt}</td>
               <td class="col-type">${escHtml(row.B_TYPE ?? row.b_type ?? '')}</td>
               <td class="col-date">${vrDt}</td>
               <td class="col-vr">${escHtml(row.VR_NO ?? row.vr_no ?? '')}</td>
               <td class="col-type">${escHtml(row.VR_TYPE ?? row.vr_type ?? '')}</td>
-              <td class="amount">${formatAmtPdf(row.DR_AMT ?? row.dr_amt)}</td>
               <td class="amount">${formatAmtPdf(row.CR_AMT ?? row.cr_amt)}</td>
+              <td class="amount">${formatAmtPdf(row.DR_AMT ?? row.dr_amt)}</td>
               <td class="amount bal">${formatAmtPdf(row.CL_BALANCE ?? row.cl_balance)}</td>
+              ${intBlank}
             </tr>`;
 
     const curKey = billKeyOf(row);
@@ -481,12 +501,24 @@ function buildBillLedgerReportHtml(data, metadata) {
 
     const bt = escHtml(String(row.B_TYPE ?? row.b_type ?? ''));
     const bn = escHtml(String(row.BILL_NO ?? row.bill_no ?? ''));
+    const intAmt = useInt ? parseFloat(row.INTEREST_AMT ?? row.interest_amt ?? '') || 0 : 0;
+    const idays = useInt ? row.INTEREST_DAYS ?? row.interest_days : '';
+    const idaysEsc = idays === '' || idays == null ? '—' : escHtml(String(idays));
+    const closePlus = useInt ? billCurrent + intAmt : 0;
+    if (useInt) {
+      sumInterest += intAmt;
+      sumClosePlusInt += closePlus;
+    }
+    const intCells = useInt
+      ? `<td class="amount"><strong>${idaysEsc}</strong></td><td class="amount bill-ledger-interest-amt-pdf"><strong>${formatAmtPdf(intAmt)}</strong></td><td class="amount"><strong>${formatAmtPdf(closePlus)}</strong></td>`
+      : '';
     bodyRows += `
             <tr class="subtotal-row">
-              <td colspan="8" class="col-name"><strong>Bill total — ${billDt} / ${bn} / ${bt}</strong></td>
-              <td class="amount"><strong>${formatAmtPdf(billDr)}</strong></td>
+              <td colspan="6" class="col-name"><strong>Bill total — ${billDt} / ${bn} / ${bt}</strong></td>
               <td class="amount"><strong>${formatAmtPdf(billCr)}</strong></td>
+              <td class="amount"><strong>${formatAmtPdf(billDr)}</strong></td>
               <td class="amount"><strong>${formatAmtPdf(billCurrent)}</strong></td>
+              ${intCells}
             </tr>`;
     sumCurrent += billCurrent;
     billDr = 0;
@@ -494,18 +526,26 @@ function buildBillLedgerReportHtml(data, metadata) {
     billCurrent = 0;
   });
 
+  const intGrand = useInt
+    ? `<td class="amount"><strong>—</strong></td><td class="amount bill-ledger-interest-amt-pdf"><strong>${formatAmtPdf(sumInterest)}</strong></td><td class="amount"><strong>${formatAmtPdf(sumClosePlusInt)}</strong></td>`
+    : '';
+  const filterRowExtra = useInt
+    ? `<tr><td class="lbl">Interest as of</td><td class="val" colspan="3">${intAsOf} (Oracle GETINT)</td></tr>`
+    : '';
+
   return `
     <div class="report-doc">
       <style>${PDF_REPORT_STYLES}</style>
       <div class="report-topbar">
         <div class="kicker">ACCOUNTING REPORT</div>
-        <h1>BILL-WISE LEDGER</h1>
+        <h1>${ledgerTitle.toUpperCase()}</h1>
         <div class="company">${company}</div>
         <table class="report-grid">
           <tr><td class="lbl">Financial year</td><td class="val">${year}</td><td class="lbl">Party code</td><td class="val">${pcode}</td></tr>
           <tr><td class="lbl">Party name</td><td class="val" colspan="3">${party}</td></tr>
           <tr><td class="lbl">Bill date range</td><td class="val">${period}</td><td class="lbl">Payment ending</td><td class="val">${payEnd}</td></tr>
-          <tr><td class="lbl">Filter</td><td class="val" colspan="3">${filt}</td></tr>
+          <tr><td class="lbl">Filter</td><td class="val" colspan="3">${filt} (${ledgerKind === 'supplier' ? 'CR - DR' : 'DR - CR'})</td></tr>
+          ${filterRowExtra}
         </table>
         <div class="report-period"><strong>Generated:</strong> ${generated}</div>
       </div>
@@ -513,32 +553,35 @@ function buildBillLedgerReportHtml(data, metadata) {
       <table class="table-report">
         <thead>
           <tr>
-            <th>Code</th>
-            <th>Name</th>
             <th>Bill no</th>
             <th>Bill date</th>
             <th>B type</th>
             <th>Vr date</th>
             <th>Vr no</th>
             <th>Vr type</th>
-            <th class="amount">Dr</th>
             <th class="amount">Cr</th>
+            <th class="amount">Dr</th>
             <th class="amount">Current bal</th>
+            ${intHead}
           </tr>
         </thead>
         <tbody>
           ${bodyRows}
           <tr class="report-grand-total">
-            <td colspan="8" class="lbl-total">GRAND TOTAL <span style="font-weight:600;opacity:.9">(Dr/Cr sums + current bal total)</span></td>
-            <td class="amount">${formatAmtPdf(sumDr)}</td>
+            <td colspan="6" class="lbl-total">GRAND TOTAL <span style="font-weight:600;opacity:.9">(Dr/Cr sums + current bal total${useInt ? '; interest from GETINT' : ''})</span></td>
             <td class="amount">${formatAmtPdf(sumCr)}</td>
+            <td class="amount">${formatAmtPdf(sumDr)}</td>
             <td class="amount">${formatAmtPdf(sumCurrent)}</td>
+            ${intGrand}
           </tr>
         </tbody>
       </table>
 
       <div class="report-foot">
         Current balance is shown per line and per bill total (Bill date + Bill no + B type), with a final grand total.
+        <br />
+        Balance formula: ${ledgerKind === 'supplier' ? 'CR - DR' : 'DR - CR'}.
+        ${useInt ? `<br />Interest columns use Oracle ${ledgerKind === 'supplier' ? 'GETINT_SUP' : 'GETINT'} logic (legacy VFP9-compatible).` : ''}
         <br />
         Computer-generated report — no signature required.
       </div>
@@ -1992,7 +2035,7 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
     reportType === 'trial-balance'
       ? 'Trial Balance'
       : reportType === 'bill-ledger'
-        ? 'Bill-wise ledger'
+        ? metadata?.billLedgerTitle || 'CustomerLedger'
         : reportType === 'broker-os'
           ? 'Broker outstanding'
           : reportType === 'sale-list'

@@ -46,12 +46,6 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
   const compYear = formData.comp_year ?? formData.COMP_YEAR ?? '';
 
   useEffect(() => {
-    const eRaw = formData.comp_e_dt ?? formData.COMP_E_DT;
-    const e = toInputDateString(eRaw);
-    if (e) setBillDate(e);
-  }, [formData.comp_e_dt, formData.COMP_E_DT]);
-
-  useEffect(() => {
     const load = async () => {
       if (!compCode || !compUid) return;
       setLookupError('');
@@ -328,6 +322,7 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
               className="form-input"
               value={billDate}
               onChange={(e) => setBillDate(e.target.value)}
+              title="Optional: leave blank to search all dates for this type / filters"
             />
           </div>
         </div>

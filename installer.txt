@@ -9,3 +9,4 @@ powershell -ExecutionPolicy Bypass -File .\setup-client.ps1 -ClientKey marutiove
 Guide:
 
 See CLIENT_SETUP.md
+.\start-apptest-services.ps1

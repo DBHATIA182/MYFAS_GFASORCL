@@ -83,6 +83,13 @@ function envTrim(name) {
   return s;
 }
 
+/** True for 1, true, yes, on (case-insensitive). */
+function envTruthy(name) {
+  const v = envTrim(name);
+  if (!v) return false;
+  return /^(1|true|yes|on)$/i.test(v);
+}
+
 /** First non-empty non-comment line from a secret file. */
 function readFirstSecretLine(filePath) {
   const raw = fs.readFileSync(filePath, 'utf8');
@@ -115,6 +122,41 @@ function getDeployUpdateSecret() {
 
 const DEPLOY_UPDATE_SECRET = getDeployUpdateSecret();
 
+/**
+ * Skip deploy key if GFAS_DEPLOY_UPDATE_SKIP_KEY=1/true/yes/on, or if a marker file exists next to
+ * server.cjs (may be empty). Checks on each request so you can add the file without restarting Node.
+ * Filenames: deploy-update-no-key.txt, deploy-update-no-key.txt.txt (Notepad), or deploy-update-no-key.
+ * Use only on trusted LAN / VPN.
+ */
+let loggedDeploySkipKey = false;
+function deployUpdateSkipKeyNow() {
+  if (envTruthy('GFAS_DEPLOY_UPDATE_SKIP_KEY')) {
+    if (!loggedDeploySkipKey) {
+      console.log('Deploy update: key check disabled (GFAS_DEPLOY_UPDATE_SKIP_KEY).');
+      loggedDeploySkipKey = true;
+    }
+    return true;
+  }
+  const markerNames = ['deploy-update-no-key.txt', 'deploy-update-no-key.txt.txt', 'deploy-update-no-key'];
+  for (const name of markerNames) {
+    try {
+      if (fs.existsSync(path.join(__dirname, name))) {
+        if (!loggedDeploySkipKey) {
+          console.log(`Deploy update: key check disabled (marker file ${name}).`);
+          loggedDeploySkipKey = true;
+        }
+        return true;
+      }
+    } catch (_) {}
+  }
+  loggedDeploySkipKey = false;
+  return false;
+}
+
+function deployUpdateConfigured() {
+  return deployUpdateSkipKeyNow() || (DEPLOY_UPDATE_SECRET && DEPLOY_UPDATE_SECRET.length >= 8);
+}
+
 function deployKeyMatches(provided) {
   if (!DEPLOY_UPDATE_SECRET || DEPLOY_UPDATE_SECRET.length < 8) return false;
   const a = String(provided ?? '').trim();
@@ -126,6 +168,20 @@ function deployKeyMatches(provided) {
 }
 
 let deployUpdateJobLock = false;
+let deployUpdateSafetyTimer = null;
+
+function clearDeployUpdateSafetyTimer() {
+  if (deployUpdateSafetyTimer) {
+    clearTimeout(deployUpdateSafetyTimer);
+    deployUpdateSafetyTimer = null;
+  }
+}
+
+function releaseDeployUpdateJobLock(reason) {
+  clearDeployUpdateSafetyTimer();
+  deployUpdateJobLock = false;
+  if (reason) console.log(`deploy-update: lock released (${reason}).`);
+}
 
 function spawnDeployUpdateJob() {
   const ps1 = path.join(__dirname, 'run-deploy-update.ps1');
@@ -144,6 +200,31 @@ function spawnDeployUpdateJob() {
       windowsHide: true,
     }
   );
+  let finished = false;
+  function finish(detail) {
+    if (finished) return;
+    finished = true;
+    child.removeListener('exit', onExit);
+    child.removeListener('error', onSpawnErr);
+    releaseDeployUpdateJobLock(detail);
+  }
+  function onExit(code, signal) {
+    finish(`script exit code ${code}${signal ? ` signal ${signal}` : ''}`);
+  }
+  function onSpawnErr(err) {
+    console.error('deploy-update spawn error:', err.message);
+    finish('spawn error');
+  }
+  child.once('exit', onExit);
+  child.once('error', onSpawnErr);
+  // If 'exit' never fires (abnormal), allow retry after 15 minutes.
+  clearDeployUpdateSafetyTimer();
+  deployUpdateSafetyTimer = setTimeout(() => {
+    deployUpdateSafetyTimer = null;
+    if (!deployUpdateJobLock) return;
+    console.warn('deploy-update: safety timeout cleared job lock (check logs\\deploy-update.log).');
+    releaseDeployUpdateJobLock();
+  }, 900000);
   child.unref();
 }
 
@@ -1136,37 +1217,40 @@ async function drainOracleLobsInRows(rows) {
 
 // --- ENDPOINTS ---
 
-/** In-app update: enabled when server has a deploy secret (env or deploy-update-secret.txt). */
+/** In-app update: enabled when deploy secret is set, or skip-key (env or deploy-update-no-key.txt). */
 app.get('/api/deploy-update/status', (req, res) => {
-  const enabled = Boolean(DEPLOY_UPDATE_SECRET && DEPLOY_UPDATE_SECRET.length >= 8);
-  res.json({ enabled });
+  const skipKey = deployUpdateSkipKeyNow();
+  const enabled = skipKey || (DEPLOY_UPDATE_SECRET && DEPLOY_UPDATE_SECRET.length >= 8);
+  const requiresDeployKey = enabled && !skipKey;
+  res.json({ enabled, requiresDeployKey, busy: deployUpdateJobLock });
 });
 
 /**
  * Pull latest from Git, npm ci, npm run build, restart Node stack (run-autostart-stack.cmd).
- * Body: { "deployKey": "<secret>" }. Requires Node process user to be allowed to run PowerShell + git.
+ * Body: { "deployKey": "<secret>" } unless skip-key mode (GFAS_DEPLOY_UPDATE_SKIP_KEY or deploy-update-no-key.txt).
+ * Requires Node process user to be allowed to run PowerShell + git.
  */
 app.post('/api/deploy-update', (req, res) => {
   try {
-    if (!DEPLOY_UPDATE_SECRET || DEPLOY_UPDATE_SECRET.length < 8) {
+    if (!deployUpdateConfigured()) {
       return res.status(503).json({
         error:
-          'In-app update is not configured. Set environment variable GFAS_DEPLOY_UPDATE_KEY or create deploy-update-secret.txt (one line, at least 8 characters) in the app folder.',
+          'In-app update is not configured. For no deploy key: set GFAS_DEPLOY_UPDATE_SKIP_KEY=1 or create an empty marker file next to server.cjs: deploy-update-no-key.txt (or deploy-update-no-key if extensions are hidden). Trusted networks only. Otherwise set GFAS_DEPLOY_UPDATE_KEY or deploy-update-secret.txt (first line, 8+ chars).',
       });
     }
     if (deployUpdateJobLock) {
       return res.status(429).json({
-        error: 'An update is already running. Wait several minutes and check logs\\deploy-update.log on the server.',
+        error:
+          'An update is already running. Wait for it to finish, check logs\\deploy-update.log, or restart the API if this message persists after the script has exited.',
       });
     }
-    const key = String(req.body?.deployKey ?? req.body?.key ?? '').trim();
-    if (!deployKeyMatches(key)) {
-      return res.status(401).json({ error: 'Invalid deploy key.' });
+    if (!deployUpdateSkipKeyNow()) {
+      const key = String(req.body?.deployKey ?? req.body?.key ?? '').trim();
+      if (!deployKeyMatches(key)) {
+        return res.status(401).json({ error: 'Invalid deploy key.' });
+      }
     }
     deployUpdateJobLock = true;
-    setTimeout(() => {
-      deployUpdateJobLock = false;
-    }, 180000);
     spawnDeployUpdateJob();
     res.json({
       ok: true,
@@ -1174,7 +1258,7 @@ app.post('/api/deploy-update', (req, res) => {
         'Update and restart have been started in the background. Wait about 2–6 minutes, then refresh this page. If the site does not come back, check logs\\deploy-update.log on the server PC.',
     });
   } catch (err) {
-    deployUpdateJobLock = false;
+    releaseDeployUpdateJobLock();
     console.error('deploy-update:', err.message);
     res.status(500).json({ error: err.message });
   }
@@ -1556,15 +1640,26 @@ app.get('/api/ageing-ledger-detail', async (req, res) => {
 app.get('/api/bill-ledger-parties', async (req, res) => {
   try {
     const { comp_code, comp_uid } = req.query;
+    const ledgerKind = String(req.query.ledger_kind || 'customer').trim().toLowerCase() === 'supplier' ? 'supplier' : 'customer';
+    const scheduleFilter =
+      ledgerKind === 'supplier'
+        ? '(SCHEDULE = 11.10 OR ROUND(SCHEDULE, 2) = 11.1)'
+        : '(SCHEDULE >= 8 AND SCHEDULE < 9)';
+    const balExpr = ledgerKind === 'supplier' ? 'NVL(L.CR_AMT,0)-NVL(L.DR_AMT,0)' : 'NVL(L.DR_AMT,0)-NVL(L.CR_AMT,0)';
     const sql = `
-      SELECT NAME, CITY, CODE
-      FROM MASTER
-      WHERE COMP_CODE = :comp_code
-        AND (
-          (SCHEDULE >= 8 AND SCHEDULE < 9)
-          OR SCHEDULE = 11.10
-        )
-      ORDER BY NAME, CITY, CODE`;
+      SELECT
+        M.NAME,
+        M.CITY,
+        M.CODE,
+        NVL(SUM(${balExpr}), 0) AS CUR_BAL
+      FROM MASTER M
+      LEFT JOIN LEDGER L
+        ON M.COMP_CODE = L.COMP_CODE
+       AND M.CODE = L.CODE
+      WHERE M.COMP_CODE = :comp_code
+        AND ${scheduleFilter.replace(/SCHEDULE/g, 'M.SCHEDULE')}
+      GROUP BY M.NAME, M.CITY, M.CODE
+      ORDER BY M.NAME, M.CITY, M.CODE`;
     const rows = await runQuery(sql, { comp_code }, comp_uid);
     res.json(rows);
   } catch (err) {
@@ -1573,13 +1668,49 @@ app.get('/api/bill-ledger-parties', async (req, res) => {
   }
 });
 
-/** Bill-wise ledger from BILLS; date rules relaxed so SL/sale debits are not dropped when BILL_DATE is null/out of range but VR_DATE is in range */
+/** GETINT return format: LPAD(days,5,'0') || 'I' || TO_CHAR(amount) — legacy Oracle function (orafun). */
+function parseOraGetintReturn(raw) {
+  if (raw == null) return { interestDays: null, interestAmt: null };
+  const s = String(raw).trim();
+  if (!s) return { interestDays: null, interestAmt: null };
+  const i = s.indexOf('I');
+  if (i < 1) return { interestDays: null, interestAmt: null };
+  const dayStr = s.slice(0, i).trim();
+  const amtStr = s.slice(i + 1).trim().replace(/,/g, '');
+  const interestDays = parseInt(dayStr, 10);
+  const interestAmt = parseFloat(amtStr);
+  return {
+    interestDays: Number.isFinite(interestDays) ? interestDays : null,
+    interestAmt: Number.isFinite(interestAmt) ? interestAmt : null,
+  };
+}
+
+/**
+ * Bill-wise ledger from BILLS; optional interest from GETINT (customer) or GETINT_SUP (supplier).
+ * Query:
+ * - ledger_kind=customer|supplier (default customer)
+ * - include_interest=Y, int_indt (DD-MM-YYYY), gs_days, ged_days, group_cd, bombay_dhara
+ */
 app.get('/api/bill-ledger', async (req, res) => {
   try {
     const { comp_code, code, s_date, e_date, p_edt, mco, comp_uid } = req.query;
     const mode = String(mco || 'A').toUpperCase() === 'O' ? 'O' : 'A';
+    const ledgerKind = String(req.query.ledger_kind || 'customer').trim().toLowerCase() === 'supplier' ? 'supplier' : 'customer';
+    const balanceExpr = ledgerKind === 'supplier' ? 'lines.CR_AMT - lines.DR_AMT' : 'lines.DR_AMT - lines.CR_AMT';
+    const outstandingExpr = ledgerKind === 'supplier' ? 'NVL(CR_AMT,0) - NVL(DR_AMT,0)' : 'NVL(DR_AMT,0) - NVL(CR_AMT,0)';
+    const wantInt = String(req.query.include_interest ?? '')
+      .trim()
+      .toUpperCase()
+      .startsWith('Y');
+    const intIndt = wantInt ? String(req.query.int_indt ?? '').trim() : '';
+    if (wantInt && !intIndt) {
+      return res.status(400).json({
+        error:
+          'When include_interest=Y, int_indt is required (interest as-of date, DD-MM-YYYY, same format as other bill-ledger dates).',
+      });
+    }
 
-    const sql = `
+    const linesCte = `
       WITH lines AS (
         SELECT
           A.CODE,
@@ -1636,38 +1767,43 @@ app.get('/api/bill-ledger', async (req, res) => {
               )
             )
           )
-      )
-      SELECT
-        lines.CODE,
-        lines.NAME,
-        lines.BILL_NO,
-        lines.BILL_DATE,
-        lines.B_TYPE,
-        lines.VR_DATE,
-        lines.VR_NO,
-        lines.VR_TYPE,
-        lines.DR_AMT,
-        lines.CR_AMT,
-        SUM(lines.DR_AMT - lines.CR_AMT) OVER (
-          PARTITION BY lines.CODE, lines.BILL_NO
-          ORDER BY lines.VR_DATE, lines.VR_NO
-          ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-        ) CL_BALANCE
-      FROM lines
-      WHERE (
-        :mco = 'A'
-        OR
-        (:mco = 'O' AND lines.BILL_NO IN (
-          SELECT BILL_NO
-          FROM BILLS
-          WHERE COMP_CODE = :comp_code2
-            AND CODE = :code2
-          GROUP BY BILL_NO
-          HAVING SUM(NVL(DR_AMT,0) - NVL(CR_AMT,0)) <> 0
-        ))
-      )
-      ORDER BY NVL(lines.BILL_DATE, TRUNC(lines.VR_DATE)), lines.BILL_NO, lines.VR_DATE, lines.VR_NO`;
+      ),
+      filtered AS (
+        SELECT
+          lines.CODE,
+          lines.NAME,
+          lines.BILL_NO,
+          lines.BILL_DATE,
+          lines.B_TYPE,
+          lines.VR_DATE,
+          lines.VR_NO,
+          lines.VR_TYPE,
+          lines.DR_AMT,
+          lines.CR_AMT,
+          SUM(${balanceExpr}) OVER (
+            PARTITION BY lines.CODE, lines.BILL_NO
+            ORDER BY lines.VR_DATE, lines.VR_NO
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          ) CL_BALANCE
+        FROM lines
+        WHERE (
+          :mco = 'A'
+          OR
+          (:mco = 'O' AND lines.BILL_NO IN (
+            SELECT BILL_NO
+            FROM BILLS
+            WHERE COMP_CODE = :comp_code2
+              AND CODE = :code2
+            GROUP BY BILL_NO
+            HAVING SUM(${outstandingExpr}) <> 0
+          ))
+        )
+      )`;
 
+    const orderBy = `
+      ORDER BY NVL(filtered.BILL_DATE, TRUNC(filtered.VR_DATE)), filtered.BILL_NO, filtered.VR_DATE, filtered.VR_NO`;
+
+    let sql;
     const binds = {
       comp_code,
       code,
@@ -1679,7 +1815,122 @@ app.get('/api/bill-ledger', async (req, res) => {
       code2: code,
     };
 
-    const rows = await runQuery(sql, binds, comp_uid);
+    if (wantInt) {
+      const gs = req.query.gs_days != null && String(req.query.gs_days).trim() !== '' ? String(req.query.gs_days).trim() : '0';
+      const ged = req.query.ged_days != null && String(req.query.ged_days).trim() !== '' ? String(req.query.ged_days).trim() : '30';
+      const grp = req.query.group_cd != null && String(req.query.group_cd).trim() !== '' ? String(req.query.group_cd).trim() : '0';
+      const bomb = req.query.bombay_dhara != null && String(req.query.bombay_dhara).trim() !== '' ? String(req.query.bombay_dhara).trim() : '0';
+      binds.int_indt = intIndt;
+      binds.gs_days = gs;
+      binds.ged_days = ged;
+      binds.group_cd = grp;
+      binds.bombay_dhara = bomb;
+      binds.comp_code_gi = String(comp_code).trim();
+      const interestFn = ledgerKind === 'supplier' ? 'GETINT_SUP' : 'GETINT';
+      const interestFnSql =
+        ledgerKind === 'supplier'
+          ? `${interestFn}(
+            TO_NUMBER(TRIM(:comp_code_gi)),
+            TRIM(bk.CODE),
+            bk.BILL_DATE,
+            bk.BILL_NO,
+            TRIM(bk.B_TYPE),
+            TO_DATE(:int_indt, 'DD-MM-YYYY'),
+            TO_NUMBER(:gs_days),
+            TO_NUMBER(:ged_days),
+            TO_NUMBER(:group_cd),
+            TO_NUMBER(:bombay_dhara),
+            TO_DATE(:e_date, 'DD-MM-YYYY')
+          )`
+          : `${interestFn}(
+            TO_NUMBER(TRIM(:comp_code_gi)),
+            TRIM(bk.CODE),
+            bk.BILL_DATE,
+            bk.BILL_NO,
+            TRIM(bk.B_TYPE),
+            TO_DATE(:int_indt, 'DD-MM-YYYY'),
+            TO_NUMBER(:gs_days),
+            TO_NUMBER(:ged_days),
+            TO_NUMBER(:group_cd),
+            TO_NUMBER(:bombay_dhara),
+            TO_DATE(:e_date, 'DD-MM-YYYY'),
+            TO_DATE(:p_edt, 'DD-MM-YYYY')
+          )`;
+
+      sql =
+        linesCte +
+        `,
+      bill_keys AS (
+        SELECT DISTINCT
+          filtered.CODE,
+          filtered.BILL_DATE,
+          filtered.BILL_NO,
+          filtered.B_TYPE
+        FROM filtered
+      ),
+      bill_int AS (
+        SELECT
+          bk.CODE,
+          bk.BILL_DATE,
+          bk.BILL_NO,
+          bk.B_TYPE,
+          ${interestFnSql} AS GETINT_RAW
+        FROM bill_keys bk
+      )
+      SELECT
+        filtered.CODE,
+        filtered.NAME,
+        filtered.BILL_NO,
+        filtered.BILL_DATE,
+        filtered.B_TYPE,
+        filtered.VR_DATE,
+        filtered.VR_NO,
+        filtered.VR_TYPE,
+        filtered.DR_AMT,
+        filtered.CR_AMT,
+        filtered.CL_BALANCE,
+        bi.GETINT_RAW
+      FROM filtered
+      LEFT JOIN bill_int bi ON
+        TRIM(filtered.CODE) = TRIM(bi.CODE)
+        AND NVL(TRUNC(filtered.BILL_DATE), DATE '1899-12-30') = NVL(TRUNC(bi.BILL_DATE), DATE '1899-12-30')
+        AND NVL(TO_CHAR(filtered.BILL_NO), ' ') = NVL(TO_CHAR(bi.BILL_NO), ' ')
+        AND NVL(TRIM(filtered.B_TYPE), ' ') = NVL(TRIM(bi.B_TYPE), ' ')` + orderBy;
+    } else {
+      sql =
+        linesCte +
+        `
+      SELECT
+        filtered.CODE,
+        filtered.NAME,
+        filtered.BILL_NO,
+        filtered.BILL_DATE,
+        filtered.B_TYPE,
+        filtered.VR_DATE,
+        filtered.VR_NO,
+        filtered.VR_TYPE,
+        filtered.DR_AMT,
+        filtered.CR_AMT,
+        filtered.CL_BALANCE
+      FROM filtered` +
+        orderBy;
+    }
+
+    let rows = await runQuery(sql, binds, comp_uid);
+    rows = rows || [];
+    if (wantInt) {
+      rows = rows.map((r) => {
+        const raw = r.GETINT_RAW ?? r.getint_raw;
+        const { interestDays, interestAmt } = parseOraGetintReturn(raw);
+        const out = { ...r };
+        delete out.GETINT_RAW;
+        delete out.getint_raw;
+        out.INTEREST_DAYS = interestDays;
+        out.INTEREST_AMT = interestAmt;
+        return out;
+      });
+    }
+    rows = rows.map((r) => ({ ...r, LEDGER_KIND: ledgerKind }));
     res.json(rows);
   } catch (err) {
     console.error('❌ Bill ledger error:', err.message);

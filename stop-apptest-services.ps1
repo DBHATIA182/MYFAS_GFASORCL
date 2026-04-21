@@ -21,17 +21,25 @@
   Also stop Windows services with names:
   GFAS-<client>-API or GFAS-<client>-AllServices (if present).
 
+.PARAMETER ReleaseApiPort5001
+  After the normal stop, find anything listening on TCP port 5001 and stop it if the
+  process is node.exe (frees the API port when a stray Node process was missed).
+
 .EXAMPLE
   .\stop-apptest-services.ps1
 
 .EXAMPLE
   .\stop-apptest-services.ps1 -StopScheduledTasks -StopWindowsServices
+
+.EXAMPLE
+  .\stop-apptest-services.ps1 -ReleaseApiPort5001
 #>
 [CmdletBinding()]
 param(
     [string]$AppRoot = "",
     [switch]$StopScheduledTasks,
-    [switch]$StopWindowsServices
+    [switch]$StopWindowsServices,
+    [switch]$ReleaseApiPort5001
 )
 
 Set-StrictMode -Version Latest
@@ -41,12 +49,12 @@ function Log([string]$Message, [ConsoleColor]$Color = [ConsoleColor]::Gray) {
     Write-Host $Message -ForegroundColor $Color
 }
 
-function Safe-StopProcessById([int]$Pid, [string]$Label) {
+function Safe-StopProcessById([int]$ProcessId, [string]$Label) {
     try {
-        Stop-Process -Id $Pid -Force -ErrorAction Stop
-        Log ("Stopped {0} (PID {1})" -f $Label, $Pid) Green
+        Stop-Process -Id $ProcessId -Force -ErrorAction Stop
+        Log ("Stopped {0} (PID {1})" -f $Label, $ProcessId) Green
     } catch {
-        Log ("Could not stop {0} (PID {1}): {2}" -f $Label, $Pid, $_.Exception.Message) Yellow
+        Log ("Could not stop {0} (PID {1}): {2}" -f $Label, $ProcessId, $_.Exception.Message) Yellow
     }
 }
 
@@ -71,7 +79,7 @@ $nodeCandidates = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
 
 if ($nodeCandidates) {
     foreach ($p in $nodeCandidates) {
-        Safe-StopProcessById -Pid $p.ProcessId -Label "node.exe"
+        Safe-StopProcessById -ProcessId $p.ProcessId -Label "node.exe"
     }
 } else {
     Log "No node.exe API/frontend process found for this app." DarkYellow
@@ -87,10 +95,35 @@ $cloudCandidates = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
 
 if ($cloudCandidates) {
     foreach ($p in $cloudCandidates) {
-        Safe-StopProcessById -Pid $p.ProcessId -Label "cloudflared.exe"
+        Safe-StopProcessById -ProcessId $p.ProcessId -Label "cloudflared.exe"
     }
 } else {
     Log "No cloudflared.exe process found for this app." DarkYellow
+}
+
+# 2b) Optional: free API port when a Node listener was not matched by path (EADDRINUSE on 5001).
+if ($ReleaseApiPort5001) {
+    Log ""
+    Log "==> Checking TCP port 5001 (API)..." Cyan
+    try {
+        $rawPids = Get-NetTCPConnection -LocalPort 5001 -State Listen -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.OwningProcess }
+        $pids = @($rawPids | Sort-Object -Unique | Where-Object { $_ -and $_ -gt 4 })
+        if ($pids.Count -eq 0) {
+            Log "No LISTEN process found on port 5001." DarkYellow
+        }
+        foreach ($procId in $pids) {
+            $wp = Get-CimInstance Win32_Process -Filter "ProcessId = $procId" -ErrorAction SilentlyContinue
+            if (-not $wp) { continue }
+            if ($wp.Name -ne "node.exe") {
+                Log ("Port 5001: PID {0} is {1} - not stopped automatically. Close it manually if needed." -f $procId, $wp.Name) Yellow
+                continue
+            }
+            Safe-StopProcessById -ProcessId $procId -Label "node.exe (listener on :5001)"
+        }
+    } catch {
+        Log ("Port check failed: {0}" -f $_.Exception.Message) Yellow
+    }
 }
 
 # 3) Optional: stop known scheduled tasks for this client.
@@ -157,5 +190,18 @@ if ($StopWindowsServices) {
 }
 
 Start-Sleep -Seconds 1
+
+try {
+    $still5001 = Get-NetTCPConnection -LocalPort 5001 -State Listen -ErrorAction SilentlyContinue
+    if ($still5001) {
+        Log ""
+        Log "Port 5001 is still in use (API will fail with EADDRINUSE). Run:" Yellow
+        Log "  .\stop-apptest-services.ps1 -ReleaseApiPort5001" Yellow
+        Log "Or stop the owning process in Task Manager (Details tab: find PID from netstat)." Yellow
+    }
+} catch {
+    # Get-NetTCPConnection not available on very old hosts; ignore.
+}
+
 Log ""
 Log "Done. APPTEST runtime processes are stopped for this app root." Cyan

@@ -51,19 +51,36 @@ export default function Slide3({ onPrev, onNext, formData }) {
         </div>
 
         <div 
-          className={`report-option ${reportType === 'bill-ledger' ? 'selected' : ''}`}
-          onClick={() => setReportType('bill-ledger')}
+          className={`report-option ${reportType === 'customer-ledger' ? 'selected' : ''}`}
+          onClick={() => setReportType('customer-ledger')}
         >
           <input
             type="radio"
             name="reportType"
-            value="bill-ledger"
-            checked={reportType === 'bill-ledger'}
+            value="customer-ledger"
+            checked={reportType === 'customer-ledger'}
             onChange={(e) => setReportType(e.target.value)}
           />
           <label>
-            <h3>Bill-wise ledger</h3>
-            <p>Customer / supplier bills with running balance per bill</p>
+            <h3>CustomerLedger</h3>
+            <p>Customer bills with running balance per bill (DR - CR)</p>
+          </label>
+        </div>
+
+        <div 
+          className={`report-option ${reportType === 'supplier-ledger' ? 'selected' : ''}`}
+          onClick={() => setReportType('supplier-ledger')}
+        >
+          <input
+            type="radio"
+            name="reportType"
+            value="supplier-ledger"
+            checked={reportType === 'supplier-ledger'}
+            onChange={(e) => setReportType(e.target.value)}
+          />
+          <label>
+            <h3>SupplierLedger</h3>
+            <p>Supplier bills with running balance per bill (CR - DR)</p>
           </label>
         </div>
 

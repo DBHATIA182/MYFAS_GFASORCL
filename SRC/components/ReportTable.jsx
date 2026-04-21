@@ -6,7 +6,17 @@ import { ageingCurBalDisplay } from '../utils/ageingDisplay';
 
 const LEDGER_SALE_VR_TYPES = new Set(['SL', 'SE', 'CN']);
 
-export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick, onVoucherClick, onLedgerSaleBillClick, meta }) {
+export default function ReportTable({
+  data,
+  type,
+  onLedgerClick,
+  onSaleBillClick,
+  onVoucherClick,
+  onLedgerSaleBillClick,
+  meta,
+  billLedgerInterest = false,
+  billLedgerKind = 'customer',
+}) {
   if (!data || data.length === 0) return <p className="no-data">No data available.</p>;
 
   const saleListTopScrollRef = useRef(null);
@@ -401,6 +411,8 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
     let sumDr = 0;
     let sumCr = 0;
     let sumCurrent = 0;
+    let sumInterest = 0;
+    let sumClosePlusInt = 0;
     const displayRows = [];
 
     let billDr = 0;
@@ -427,6 +439,13 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
       if (!billEnds) return;
 
       sumCurrent += billCurrent;
+      const intAmt = billLedgerInterest ? parseFloat(row.INTEREST_AMT ?? row.interest_amt ?? '') || 0 : 0;
+      const idays = billLedgerInterest ? (row.INTEREST_DAYS ?? row.interest_days ?? '') : '';
+      const closePlusInt = billLedgerInterest ? billCurrent + intAmt : null;
+      if (billLedgerInterest) {
+        sumInterest += intAmt;
+        sumClosePlusInt += closePlusInt ?? 0;
+      }
       displayRows.push({
         kind: 'bill-total',
         CODE: row.CODE ?? row.code ?? '',
@@ -437,6 +456,9 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
         DR_AMT: billDr,
         CR_AMT: billCr,
         CL_BALANCE: billCurrent,
+        INTEREST_DAYS: idays === '' || idays == null ? null : idays,
+        INTEREST_AMT: intAmt,
+        CLOSE_PLUS_INT: closePlusInt,
       });
 
       billDr = 0;
@@ -444,13 +466,34 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
       billCurrent = 0;
     });
 
+    const intHead = billLedgerInterest ? (
+      <>
+        <th className="text-right" scope="col">
+          Int days
+        </th>
+        <th className="text-right bill-ledger-th-interest" scope="col">
+          Interest
+        </th>
+        <th className="text-right" scope="col">
+          Closing + int
+        </th>
+      </>
+    ) : null;
+
+    const firstRow = data?.[0] || {};
+    const partyCodeTop = String(meta?.billLedgerPartyCode ?? firstRow.CODE ?? firstRow.code ?? '').trim();
+    const partyNameTop = String(meta?.billLedgerPartyName ?? firstRow.NAME ?? firstRow.name ?? '').trim();
+
     return (
       <div className="table-responsive table-responsive--bill-ledger">
+        {(partyCodeTop || partyNameTop) ? (
+          <p style={{ margin: '0 0 8px', fontWeight: 700, color: '#0f172a' }}>
+            {partyNameTop || 'Party'}{partyCodeTop ? ` (${partyCodeTop})` : ''}
+          </p>
+        ) : null}
         <table className="report-table report-table--bill-ledger">
           <thead>
             <tr>
-              <th scope="col">Code</th>
-              <th scope="col">Name</th>
               <th scope="col">Bill no</th>
               <th scope="col">Bill date</th>
               <th scope="col">B type</th>
@@ -458,14 +501,15 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
               <th scope="col">Vr no</th>
               <th scope="col">Vr type</th>
               <th className="text-right" scope="col">
-                Dr amt
+                Cr amt
               </th>
               <th className="text-right" scope="col">
-                Cr amt
+                Dr amt
               </th>
               <th className="text-right" scope="col">
                 Current bal
               </th>
+              {intHead}
             </tr>
           </thead>
           <tbody>
@@ -476,18 +520,31 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
                 const bType = item.B_TYPE ?? item.b_type ?? '—';
                 return (
                   <tr key={`bt-${i}`} className="bill-ledger-bill-total">
-                    <td colSpan={8}>
+                    <td colSpan={6}>
                       <strong>Bill total — {billDt} / {billNo} / {bType}</strong>
-                    </td>
-                    <td className="text-right">
-                      <strong>{fmtAlways(item.DR_AMT)}</strong>
                     </td>
                     <td className="text-right">
                       <strong>{fmtAlways(item.CR_AMT)}</strong>
                     </td>
                     <td className="text-right">
+                      <strong>{fmtAlways(item.DR_AMT)}</strong>
+                    </td>
+                    <td className="text-right">
                       <strong>{fmtAlways(item.CL_BALANCE)}</strong>
                     </td>
+                    {billLedgerInterest ? (
+                      <>
+                        <td className="text-right">
+                          <strong>{item.INTEREST_DAYS != null && item.INTEREST_DAYS !== '' ? item.INTEREST_DAYS : '—'}</strong>
+                        </td>
+                        <td className="text-right bill-ledger-interest-amt">
+                          <strong>{fmtAlways(item.INTEREST_AMT)}</strong>
+                        </td>
+                        <td className="text-right">
+                          <strong>{fmtAlways(item.CLOSE_PLUS_INT)}</strong>
+                        </td>
+                      </>
+                    ) : null}
                   </tr>
                 );
               }
@@ -498,8 +555,6 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
               const cl = parseFloat(row.CL_BALANCE ?? row.cl_balance ?? 0) || 0;
               return (
                 <tr key={i}>
-                  <td className="bill-code">{row.CODE ?? row.code ?? '—'}</td>
-                  <td className="ledger-detail">{row.NAME ?? row.name ?? '—'}</td>
                   <td>{row.BILL_NO ?? row.bill_no ?? '—'}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{formatLedgerDateDisplay(billDt)}</td>
                   <td>{row.B_TYPE ?? row.b_type ?? '—'}</td>
@@ -510,28 +565,58 @@ export default function ReportTable({ data, type, onLedgerClick, onSaleBillClick
                       {row.VR_TYPE ?? row.vr_type ?? '—'}
                     </span>
                   </td>
-                  <td className="text-right dr-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
                   <td className="text-right cr-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
+                  <td className="text-right dr-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
                   <td className="text-right" style={{ fontWeight: 700, color: '#2c7a7b' }}>
                     {fmtAlways(cl)}
                   </td>
+                  {billLedgerInterest ? (
+                    <>
+                      <td className="text-right" style={{ opacity: 0.65 }}>
+                        —
+                      </td>
+                      <td className="text-right" style={{ opacity: 0.65 }}>
+                        —
+                      </td>
+                      <td className="text-right" style={{ opacity: 0.65 }}>
+                        —
+                      </td>
+                    </>
+                  ) : null}
                 </tr>
               );
             })}
             <tr className="bill-ledger-grand-total">
-              <td colSpan={8}>
+              <td colSpan={6}>
                 <strong>GRAND TOTAL</strong>
-                <span className="bill-ledger-grand-note"> (Dr/Cr totals + sum of bill current balances)</span>
-              </td>
-              <td className="text-right">
-                <strong>{fmtAlways(sumDr)}</strong>
+                <span className="bill-ledger-grand-note">
+                  {' '}
+                  (Dr/Cr totals + sum of bill current balances
+                  {billLedgerInterest ? `; interest per bill (${String(billLedgerKind).toLowerCase() === 'supplier' ? 'GETINT_SUP' : 'GETINT'})` : ''})
+                </span>
               </td>
               <td className="text-right">
                 <strong>{fmtAlways(sumCr)}</strong>
               </td>
               <td className="text-right">
+                <strong>{fmtAlways(sumDr)}</strong>
+              </td>
+              <td className="text-right">
                 <strong>{fmtAlways(sumCurrent)}</strong>
               </td>
+              {billLedgerInterest ? (
+                <>
+                  <td className="text-right">
+                    <strong>—</strong>
+                  </td>
+                  <td className="text-right bill-ledger-interest-amt">
+                    <strong>{fmtAlways(sumInterest)}</strong>
+                  </td>
+                  <td className="text-right">
+                    <strong>{fmtAlways(sumClosePlusInt)}</strong>
+                  </td>
+                </>
+              ) : null}
             </tr>
           </tbody>
         </table>
