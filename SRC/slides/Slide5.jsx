@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import ReportTable from '../components/ReportTable';
 import SaleBillPrintModal from '../components/SaleBillPrintModal';
-import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
+import LedgerReportHeader from '../components/LedgerReportHeader';
+import { generatePDF, sharePdfWithWhatsApp, buildLedgerStatementPdfMetadata } from '../utils/pdfgenerator';
 import { downloadExcelRows } from '../utils/excelExport';
 import { toInputDateString, toOracleDate, toDisplayDate, formatCurBal, getCurBal } from '../utils/dateFormat';
 import { formatLedgerVoucherApiError } from '../utils/apiLabel';
@@ -40,6 +41,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
   const [voucherTitle, setVoucherTitle] = useState('');
   const [billPrintOpen, setBillPrintOpen] = useState(false);
   const [billPrintParams, setBillPrintParams] = useState(null);
+  const [compLedgerHeader, setCompLedgerHeader] = useState(null);
 
   // Period from compdet (passed via Slide2 → App as comp_s_dt / comp_e_dt)
   useEffect(() => {
@@ -72,6 +74,30 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
     };
     fetchAccounts();
   }, [apiBase, formData]);
+
+  useEffect(() => {
+    const code = formData.comp_code || formData.COMP_CODE;
+    const uid = formData.comp_uid || formData.COMP_UID;
+    if (!code || uid == null || String(uid).trim() === '') {
+      setCompLedgerHeader(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await axios.get(`${apiBase}/api/compdet-ledger-header`, {
+          params: { comp_code: code, comp_uid: uid },
+          withCredentials: true,
+        });
+        if (!cancelled) setCompLedgerHeader(data && typeof data === 'object' ? data : null);
+      } catch {
+        if (!cancelled) setCompLedgerHeader(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, formData.comp_code, formData.COMP_CODE, formData.comp_uid, formData.COMP_UID]);
 
   const filteredAccounts = useMemo(() => {
     const q = accountSearch.trim().toLowerCase();
@@ -127,7 +153,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
       const response = await axios.get(`${apiBase}/api/ledger`, {
         params: {
           comp_code: formData.comp_code || formData.COMP_CODE,
-          code: selectedAccount,
+          code: String(selectedAccount).trim(),
           s_date: sDate,
           e_date: eDate,
           comp_uid: formData.comp_uid || formData.COMP_UID,
@@ -184,7 +210,10 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
     const vrType = row.VR_TYPE ?? row.vr_type;
     const vrNo = row.VR_NO ?? row.vr_no;
     const vrDate = row.VR_DATE ?? row.vr_date;
-    if (!vrType || String(vrType).toUpperCase() === 'OP') return;
+    if (!vrType) {
+      alert('Cannot open voucher: missing vr_type on this row.');
+      return;
+    }
     const n = Number(vrNo);
     if (!Number.isFinite(n) || n <= 0) return;
     const ymd = toInputDateString(vrDate);
@@ -220,15 +249,19 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
     }
   };
 
-  const downloadPDF = async () => {
+  const ledgerPdfMeta = () => {
     const account = accounts.find((a) => String(a.CODE) === String(selectedAccount));
-    await generatePDF('ledger', reportData, {
-      companyName: formData.comp_name,
-      year: formData.comp_year,
-      accountName: account?.NAME ?? '',
-      accountCode: String(account?.CODE ?? selectedAccount),
+    return buildLedgerStatementPdfMetadata({
+      formData,
+      compLedgerHeader,
+      account,
+      year: formData.comp_year ?? formData.COMP_YEAR,
       endDate: `${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`,
     });
+  };
+
+  const downloadPDF = async () => {
+    await generatePDF('ledger', reportData, ledgerPdfMeta());
   };
 
   const shareWhatsApp = async () => {
@@ -238,18 +271,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
       `${formData.comp_year} | ${account?.NAME ?? 'Account'} (${String(account?.CODE ?? selectedAccount)})`,
       `${toDisplayDate(startDate)} → ${toDisplayDate(endDate)}`,
     ].join('\n');
-    await sharePdfWithWhatsApp(
-      'ledger',
-      reportData,
-      {
-        companyName: formData.comp_name,
-        year: formData.comp_year,
-        accountName: account?.NAME ?? '',
-        accountCode: String(account?.CODE ?? selectedAccount),
-        endDate: `${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`,
-      },
-      shareText
-    );
+    await sharePdfWithWhatsApp('ledger', reportData, ledgerPdfMeta(), shareText);
   };
 
   if (showReport && reportData.length > 0) {
@@ -303,21 +325,16 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
             </div>
           </div>
 
-          <div className="report-info">
-            <p>
-              {account ? (
-                <>
-                  <strong>{account.NAME}</strong> ({account.CODE})
-                </>
-              ) : (
-                <span>Account code: {selectedAccount}</span>
-              )}
-            </p>
-            <p>
-              Voucher: <strong>{voucherTitle}</strong>
-            </p>
-            <p>{formData.comp_name} | {formData.comp_year}</p>
-          </div>
+          <LedgerReportHeader
+            compHeader={compLedgerHeader}
+            companyNameFallback={formData.comp_name ?? formData.COMP_NAME ?? ''}
+            account={account}
+            accountCodeFallback={selectedAccount}
+            periodLine={`Financial year ${formData.comp_year ?? formData.COMP_YEAR ?? ''} · ${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`}
+          />
+          <p className="ledger-report-voucher-ref">
+            Voucher: <strong>{voucherTitle}</strong>
+          </p>
 
           <div className="report-display">
             <ReportTable data={voucherRows} type="ledger-voucher" />
@@ -370,22 +387,14 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
           </div>
         </div>
 
-        <div className="report-info">
-          <p>
-            {account ? (
-              <>
-                <strong>{account.NAME}</strong> ({account.CODE})
-              </>
-            ) : (
-              <span>Account code: {selectedAccount}</span>
-            )}
-          </p>
-          <p>{formData.comp_name} | {formData.comp_year}</p>
-          <p className="compdet-date-hint">
-            Rows with vr_type SL, SE, or CN: tap to open sale bill print (uses type, vr_no, vr_Date). Other rows (except
-            opening): tap for full voucher detail.
-          </p>
-        </div>
+        <LedgerReportHeader
+          compHeader={compLedgerHeader}
+          companyNameFallback={formData.comp_name ?? formData.COMP_NAME ?? ''}
+          account={account}
+          accountCodeFallback={selectedAccount}
+          periodLine={`Financial year ${formData.comp_year ?? formData.COMP_YEAR ?? ''} · ${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`}
+          hint="Tap a row for voucher detail; sale bill print opens where mapping is available."
+        />
 
         <div className="report-display">
           <ReportTable

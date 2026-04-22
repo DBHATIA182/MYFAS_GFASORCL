@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ReportTable from '../components/ReportTable';
 import SaleBillPrintModal from '../components/SaleBillPrintModal';
+import LedgerReportHeader from '../components/LedgerReportHeader';
 import { toInputDateString, toOracleDate, toDisplayDate } from '../utils/dateFormat';
-import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
+import { generatePDF, sharePdfWithWhatsApp, buildLedgerStatementPdfMetadata } from '../utils/pdfgenerator';
 import { downloadExcelRows } from '../utils/excelExport';
 import { formatLedgerVoucherApiError } from '../utils/apiLabel';
 
@@ -20,6 +21,7 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
   const [voucherTitle, setVoucherTitle] = useState('');
   const [billPrintOpen, setBillPrintOpen] = useState(false);
   const [billPrintParams, setBillPrintParams] = useState(null);
+  const [compLedgerHeader, setCompLedgerHeader] = useState(null);
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -45,6 +47,28 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
     formData.COMP_S_DT,
     formData.COMP_E_DT,
   ]);
+
+  useEffect(() => {
+    if (!compCode || compUid == null || String(compUid).trim() === '') {
+      setCompLedgerHeader(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await axios.get(`${apiBase}/api/compdet-ledger-header`, {
+          params: { comp_code: compCode, comp_uid: compUid },
+          withCredentials: true,
+        });
+        if (!cancelled) setCompLedgerHeader(data && typeof data === 'object' ? data : null);
+      } catch {
+        if (!cancelled) setCompLedgerHeader(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, compCode, compUid]);
 
   const formatScheduleParam = () => {
     const n = parseFloat(String(schedule).replace(',', '.'));
@@ -147,7 +171,10 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
     const vrType = row.VR_TYPE ?? row.vr_type;
     const vrNo = row.VR_NO ?? row.vr_no;
     const vrDate = row.VR_DATE ?? row.vr_date;
-    if (!vrType || String(vrType).toUpperCase() === 'OP') return;
+    if (!vrType) {
+      alert('Cannot open voucher: missing vr_type on this row.');
+      return;
+    }
     const n = Number(vrNo);
     if (!Number.isFinite(n) || n <= 0) return;
     const ymd = toInputDateString(vrDate);
@@ -200,14 +227,17 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
     );
 
   const ledgerAccountCode = String(ledgerRows[0]?.CODE ?? ledgerRows[0]?.code ?? '');
+  const ledgerFirstRow = ledgerRows[0];
 
-  const ledgerPdfMeta = {
-    companyName: compName,
+  const ledgerPdfMeta = buildLedgerStatementPdfMetadata({
+    formData,
+    compLedgerHeader,
+    ledgerFirstRow,
     year: compYear,
-    accountName: ledgerTitle,
-    accountCode: ledgerAccountCode,
     endDate: `${periodStartLabel} – ${periodEndLabel}`,
-  };
+    accountNameOverride: ledgerTitle,
+    accountCodeOverride: ledgerAccountCode,
+  });
 
   const downloadLedgerPdf = () => generatePDF('ledger', ledgerRows, ledgerPdfMeta);
 
@@ -243,13 +273,18 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
             </button>
           </div>
         </div>
-        <div className="company-info">
-          <strong>{ledgerTitle}</strong>
-          <br />
+        <LedgerReportHeader
+          compHeader={compLedgerHeader}
+          companyNameFallback={compName}
+          account={ledgerRows[0]}
+          accountNameFallback={ledgerTitle}
+          accountCodeFallback={ledgerAccountCode}
+          periodLine={`Financial year ${compYear} · ${periodStartLabel} – ${periodEndLabel}`}
+        />
+        <p className="ledger-report-voucher-ref">
           Voucher: <strong>{voucherTitle}</strong>
-          <br />
-          <span className="compdet-date-hint">All accounts posted on this voucher (LEDGER).</span>
-        </div>
+        </p>
+        <p className="compdet-date-hint">All accounts posted on this voucher (LEDGER).</p>
         <ReportTable data={voucherRows} type="ledger-voucher" />
         <div className="button-group">
           <button type="button" className="btn btn-secondary" onClick={() => setViewMode(VIEW.LEDGER)}>
@@ -301,15 +336,15 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
             </button>
           </div>
         </div>
-        <div className="company-info">
-          <strong>{ledgerTitle}</strong>
-          <br />
-          Period (comp_s_dt → comp_e_dt): {periodStartLabel} to {periodEndLabel}
-          <br />
-          <span className="compdet-date-hint">
-            vr_type SL, SE, or CN: tap for sale bill print. Other rows (except opening): tap for voucher detail.
-          </span>
-        </div>
+        <LedgerReportHeader
+          compHeader={compLedgerHeader}
+          companyNameFallback={compName}
+          account={ledgerFirstRow}
+          accountNameFallback={ledgerTitle}
+          accountCodeFallback={ledgerAccountCode}
+          periodLine={`Financial year ${compYear} · ${periodStartLabel} – ${periodEndLabel}`}
+          hint="Tap a row for voucher detail; sale bill print opens where mapping is available."
+        />
         <ReportTable
           data={ledgerRows}
           type="ledger"

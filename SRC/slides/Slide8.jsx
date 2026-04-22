@@ -47,6 +47,7 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [saleSortMode, setSaleSortMode] = useState('date');
 
   const [billPrintOpen, setBillPrintOpen] = useState(false);
   const [billPrintParams, setBillPrintParams] = useState(null);
@@ -236,6 +237,7 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
         alert('No rows returned. Widen the date range or clear filters.');
       } else {
         setReportData(rows);
+        setSaleSortMode('date');
         setShowReport(true);
       }
     } catch (error) {
@@ -272,6 +274,8 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
   };
 
   if (showReport && reportData.length > 0) {
+    const saleSortLabel =
+      saleSortMode === 'party' ? 'Party-wise' : saleSortMode === 'item' ? 'Item-wise' : saleSortMode === 'broker' ? 'Broker-wise' : 'Date-wise';
     return (
       <div className="slide slide-report">
         <SaleBillPrintModal
@@ -322,6 +326,38 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
           </div>
         </div>
 
+        <div className="report-sort-switch" role="group" aria-label="Sale list sort">
+          <span className="report-sort-switch__label">Sort:</span>
+          <button
+            type="button"
+            className={`btn btn-secondary btn-sort-switch${saleSortMode === 'date' ? ' is-active' : ''}`}
+            onClick={() => setSaleSortMode('date')}
+          >
+            Date
+          </button>
+          <button
+            type="button"
+            className={`btn btn-secondary btn-sort-switch${saleSortMode === 'party' ? ' is-active' : ''}`}
+            onClick={() => setSaleSortMode('party')}
+          >
+            Party
+          </button>
+          <button
+            type="button"
+            className={`btn btn-secondary btn-sort-switch${saleSortMode === 'item' ? ' is-active' : ''}`}
+            onClick={() => setSaleSortMode('item')}
+          >
+            Item
+          </button>
+          <button
+            type="button"
+            className={`btn btn-secondary btn-sort-switch${saleSortMode === 'broker' ? ' is-active' : ''}`}
+            onClick={() => setSaleSortMode('broker')}
+          >
+            Broker
+          </button>
+        </div>
+
         <div className="report-info">
           <p>
             <strong>Dates</strong> {toDisplayDate(startDate)} – {toDisplayDate(endDate)}
@@ -335,12 +371,18 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
           <p>
             {compName} | FY {compYear}
             <br />
-            Types SL, SE, CN — click a detail row to open the printable sale bill (tax invoice / bill of supply). Day totals, then item-wise QNTY / WEIGHT / AMOUNT, then grand total (all measures).
+            Types SL, SE, CN — click a detail row to open the printable sale bill (tax invoice / bill of supply). Current view:{' '}
+            <strong>{saleSortLabel}</strong>
+            {saleSortMode === 'date'
+              ? ' with day totals, item-wise summary, and grand total.'
+              : saleSortMode === 'party' || saleSortMode === 'broker'
+                ? ' with bill-wise totals and grand total.'
+                : ' with grand total at the end.'}
           </p>
         </div>
 
         <div className="report-display">
-          <ReportTable data={reportData} type="sale-list" onSaleBillClick={openSaleBill} />
+          <ReportTable data={reportData} type="sale-list" onSaleBillClick={openSaleBill} saleListSortMode={saleSortMode} />
         </div>
 
         <div className="button-group">

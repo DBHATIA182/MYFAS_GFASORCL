@@ -1386,33 +1386,40 @@ app.get('/api/ledger', async (req, res) => {
 
     const sql = `
       WITH OP AS (
-        SELECT SUM(NVL(DR_AMT,0) - NVL(CR_AMT,0)) OP_BAL 
-        FROM LEDGER 
-        WHERE COMP_CODE = :comp_code AND CODE = :code AND VR_DATE < TO_DATE(:s_date, 'DD-MM-YYYY')
+        SELECT SUM(NVL(DR_AMT,0) - NVL(CR_AMT,0)) OP_BAL
+        FROM LEDGER
+        WHERE COMP_CODE = :comp_code
+          AND CODE = :code
+          AND VR_DATE < TO_DATE(:s_date, 'DD-MM-YYYY')
       ),
       DATA AS (
-        SELECT :code AS CODE, B.NAME, B.CITY, B.GST_NO, TO_DATE(:s_date,'DD-MM-YYYY') AS VR_DATE, 
+        SELECT :code AS CODE, B.NAME, B.CITY, B.GST_NO, B.PAN, B.ADD1, B.ADD2, B.TEL_NO_O,
+               TO_DATE(:s_date,'DD-MM-YYYY') AS VR_DATE,
+               CAST(NULL AS DATE) AS V_DATE,
                0 AS VR_NO, 'OP' AS VR_TYPE, NULL AS TYPE, 0 AS TRN_NO, 'OPENING BALANCE' AS DETAIL,
                CASE WHEN OP.OP_BAL > 0 THEN OP.OP_BAL ELSE 0 END AS DR_AMT,
-               CASE WHEN OP.OP_BAL < 0 THEN ABS(OP.OP_BAL) ELSE 0 END AS CR_AMT, 
+               CASE WHEN OP.OP_BAL < 0 THEN ABS(OP.OP_BAL) ELSE 0 END AS CR_AMT,
                NULL AS DC_CODE, NULL AS DC_NAME
-        FROM OP, MASTER B 
-        WHERE B.COMP_CODE = :comp_code AND B.CODE = :code
+        FROM OP, MASTER B
+        WHERE B.COMP_CODE = :comp_code
+          AND B.CODE = :code
         UNION ALL
-        SELECT A.CODE, B.NAME, B.CITY, B.GST_NO, A.VR_DATE, A.VR_NO, A.VR_TYPE, A.TYPE, A.TRN_NO, 
-               A.DETAIL, A.DR_AMT, A.CR_AMT, A.DC_CODE, C.NAME 
-        FROM LEDGER A, MASTER B, MASTER C 
-        WHERE A.COMP_CODE = :comp_code AND A.CODE = :code 
-        AND A.VR_DATE BETWEEN TO_DATE(:s_date, 'DD-MM-YYYY') AND TO_DATE(:e_date, 'DD-MM-YYYY')
-        AND A.COMP_CODE = B.COMP_CODE AND A.CODE = B.CODE 
-        AND A.COMP_CODE = C.COMP_CODE (+) AND A.DC_CODE = C.CODE
+        SELECT A.CODE, B.NAME, B.CITY, B.GST_NO, B.PAN, B.ADD1, B.ADD2, B.TEL_NO_O,
+               A.VR_DATE, A.V_DATE, A.VR_NO, A.VR_TYPE, A.TYPE, A.TRN_NO,
+               A.DETAIL, A.DR_AMT, A.CR_AMT, A.DC_CODE, NULL AS DC_NAME
+        FROM LEDGER A, MASTER B
+        WHERE A.COMP_CODE = :comp_code
+          AND A.CODE = :code
+          AND A.VR_DATE BETWEEN TO_DATE(:s_date, 'DD-MM-YYYY') AND TO_DATE(:e_date, 'DD-MM-YYYY')
+          AND A.COMP_CODE = B.COMP_CODE
+          AND A.CODE = B.CODE
       )
-      SELECT DATA.*, 
+      SELECT DATA.*,
              SUM(NVL(DR_AMT,0) - NVL(CR_AMT,0)) OVER (
-               ORDER BY VR_DATE, VR_NO, VR_TYPE, TRN_NO 
+               ORDER BY VR_DATE, VR_NO, VR_TYPE, TRN_NO
                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-             ) AS RUN_BAL 
-      FROM DATA 
+             ) AS RUN_BAL
+      FROM DATA
       ORDER BY VR_DATE, VR_NO, VR_TYPE, TRN_NO`;
 
     const bindParams = { 
@@ -1480,13 +1487,21 @@ app.get('/api/accounts', async (req, res) => {
     
     // Your exact query optimized for the helper
     const sql = `
-      SELECT A.NAME, A.CITY, A.CODE, SUM(NVL(B.DR_AMT,0) - NVL(B.CR_AMT,0)) CUR_BAL 
-      FROM MASTER A, LEDGER B 
-      WHERE A.COMP_CODE = :comp_code 
-      AND A.COMP_CODE = B.COMP_CODE (+) 
-      AND A.CODE = B.CODE (+) 
-      GROUP BY A.NAME, A.CITY, A.CODE 
-      ORDER BY A.NAME, A.CITY`;
+      SELECT MAX(A.NAME) AS NAME,
+             MAX(A.CITY) AS CITY,
+             A.CODE,
+             MAX(A.ADD1) AS ADD1,
+             MAX(A.ADD2) AS ADD2,
+             MAX(A.GST_NO) AS GST_NO,
+             MAX(A.PAN) AS PAN,
+             MAX(A.TEL_NO_O) AS TEL_NO_O,
+             SUM(NVL(B.DR_AMT,0) - NVL(B.CR_AMT,0)) AS CUR_BAL
+      FROM MASTER A, LEDGER B
+      WHERE A.COMP_CODE = :comp_code
+      AND A.COMP_CODE = B.COMP_CODE (+)
+      AND A.CODE = B.CODE (+)
+      GROUP BY A.CODE
+      ORDER BY MAX(A.NAME), MAX(A.CITY)`;
 
     const rows = await runQuery(sql, { comp_code: comp_code }, comp_uid);
     res.json(rows);
@@ -2329,6 +2344,37 @@ app.get('/api/compdet-print-header', async (req, res) => {
     res.json(one);
   } catch (err) {
     console.error('❌ compdet print header error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Text-only company lines for ledger screen/PDF (no logos; avoids heavy print-header payload). */
+app.get('/api/compdet-ledger-header', async (req, res) => {
+  try {
+    const { comp_code, comp_uid } = req.query;
+    if (!comp_code || comp_uid == null || String(comp_uid).trim() === '') {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const row = await runCompdetHeaderRow(comp_code, comp_uid);
+    if (!row) {
+      return res.json({});
+    }
+    stripSalePrintImageFields(row);
+    const textVal = (logical) => {
+      const v = rowValueCI(row, logical);
+      if (v == null || v === '') return '';
+      if (typeof v === 'object') return '';
+      return String(v).trim();
+    };
+    const gst = textVal('gst_no') || textVal('comp_gst') || textVal('gstin') || '';
+    res.json({
+      COMP_NAME: textVal('comp_name'),
+      COMP_ADD1: textVal('comp_add1'),
+      COMP_ADD2: textVal('comp_add2'),
+      GST_NO: gst,
+    });
+  } catch (err) {
+    console.error('❌ compdet ledger header error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

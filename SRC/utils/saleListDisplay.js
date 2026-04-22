@@ -29,6 +29,14 @@ function itemName(row) {
   return String(row.ITEM_NAME ?? row.item_name ?? '').trim();
 }
 
+function textOf(row, upper, lower) {
+  return String(row?.[upper] ?? row?.[lower] ?? '').trim();
+}
+
+function cmpText(a, b) {
+  return String(a).localeCompare(String(b), 'en', { sensitivity: 'base', numeric: true });
+}
+
 function compareLines(a, b) {
   const da = dayKey(a).localeCompare(dayKey(b));
   if (da !== 0) return da;
@@ -45,14 +53,181 @@ function compareLines(a, b) {
   return (parseFloat(a.TRN_NO ?? a.trn_no) || 0) - (parseFloat(b.TRN_NO ?? b.trn_no) || 0);
 }
 
+function compareByParty(a, b) {
+  const nCmp = cmpText(textOf(a, 'NAME', 'name'), textOf(b, 'NAME', 'name'));
+  if (nCmp !== 0) return nCmp;
+  const cCmp = cmpText(textOf(a, 'CODE', 'code'), textOf(b, 'CODE', 'code'));
+  if (cCmp !== 0) return cCmp;
+  return compareLines(a, b);
+}
+
+function compareByItem(a, b) {
+  const nCmp = cmpText(textOf(a, 'ITEM_NAME', 'item_name'), textOf(b, 'ITEM_NAME', 'item_name'));
+  if (nCmp !== 0) return nCmp;
+  const cCmp = cmpText(textOf(a, 'ITEM_CODE', 'item_code'), textOf(b, 'ITEM_CODE', 'item_code'));
+  if (cCmp !== 0) return cCmp;
+  return compareLines(a, b);
+}
+
+function compareByBroker(a, b) {
+  const nCmp = cmpText(textOf(a, 'BK_NAME', 'bk_name'), textOf(b, 'BK_NAME', 'bk_name'));
+  if (nCmp !== 0) return nCmp;
+  const cCmp = cmpText(textOf(a, 'BK_CODE', 'bk_code'), textOf(b, 'BK_CODE', 'bk_code'));
+  if (cCmp !== 0) return cCmp;
+  return compareLines(a, b);
+}
+
+function compareSaleRows(a, b, sortMode) {
+  if (sortMode === 'party') return compareByParty(a, b);
+  if (sortMode === 'item') return compareByItem(a, b);
+  if (sortMode === 'broker') return compareByBroker(a, b);
+  return compareLines(a, b);
+}
+
+function billKeyOf(row) {
+  return [
+    String(row.TYPE ?? row.type ?? '').trim().toUpperCase(),
+    toInputDateString(row.BILL_DATE ?? row.bill_date) || '_nodate',
+    String(row.BILL_NO ?? row.bill_no ?? '').trim(),
+    String(row.B_TYPE ?? row.b_type ?? '').trim(),
+  ].join('__');
+}
+
 /**
  * Day blocks → day totals → item-wise summary (qty, weight, amount) → **grand total last** (all measure columns).
  *
  * @returns {{ displayRows: Array<{kind:string,...}> }}
  */
-export function buildSaleListDisplayRows(data) {
+export function buildSaleListDisplayRows(data, sortMode = 'date') {
   const raw = [...(data || [])];
-  raw.sort(compareLines);
+  raw.sort((a, b) => compareSaleRows(a, b, sortMode));
+
+  if (sortMode !== 'date') {
+    const displayRows = [];
+    const showBillTotals = sortMode === 'party' || sortMode === 'broker';
+    let grandQ = 0;
+    let grandW = 0;
+    let grandA = 0;
+    let grandTax = 0;
+    let grandC = 0;
+    let grandS = 0;
+    let grandI = 0;
+    let grandB = 0;
+    let grandDis = 0;
+    let grandOth = 0;
+    let bQ = 0;
+    let bW = 0;
+    let bA = 0;
+    let bTax = 0;
+    let bCgst = 0;
+    let bSgst = 0;
+    let bIgst = 0;
+    let bBill = 0;
+    let bDis = 0;
+    let bOth = 0;
+    let billType = '';
+    let billNo = '';
+    let billBType = '';
+    let billDateLabel = '';
+    let activeBillKey = '';
+    const flushBillGroup = () => {
+      if (!showBillTotals || !activeBillKey) return;
+      displayRows.push({
+        kind: 'bill-total',
+        type: billType || '—',
+        billNo: billNo || '—',
+        bType: billBType || '—',
+        billDateLabel: billDateLabel || '—',
+        qnty: bQ,
+        weight: bW,
+        amount: bA,
+        taxable: bTax,
+        cgstAmt: bCgst,
+        sgstAmt: bSgst,
+        igstAmt: bIgst,
+        billAmt: bBill,
+        disAmt: bDis,
+        othExp5: bOth,
+      });
+      bQ = 0;
+      bW = 0;
+      bA = 0;
+      bTax = 0;
+      bCgst = 0;
+      bSgst = 0;
+      bIgst = 0;
+      bBill = 0;
+      bDis = 0;
+      bOth = 0;
+      activeBillKey = '';
+    };
+
+    for (let i = 0; i < raw.length; i += 1) {
+      const row = raw[i];
+      if (showBillTotals) {
+        const currentBillKey = billKeyOf(row);
+        if (!activeBillKey || currentBillKey !== activeBillKey) {
+          flushBillGroup();
+          activeBillKey = currentBillKey;
+          billType = String(row.TYPE ?? row.type ?? '').trim().toUpperCase();
+          billNo = String(row.BILL_NO ?? row.bill_no ?? '').trim();
+          billBType = String(row.B_TYPE ?? row.b_type ?? '').trim();
+          billDateLabel = toDisplayDate(toInputDateString(row.BILL_DATE ?? row.bill_date));
+        }
+      }
+      displayRows.push({ kind: 'detail', row });
+      const q = saleListMeas(row, 'QNTY', 'qnty');
+      const w = saleListMeas(row, 'WEIGHT', 'weight');
+      const a = saleListMeas(row, 'AMOUNT', 'amount');
+      const tax = saleListMeas(row, 'TAXABLE', 'taxable');
+      const cgst = saleListMeas(row, 'CGST_AMT', 'cgst_amt');
+      const sgst = saleListMeas(row, 'SGST_AMT', 'sgst_amt');
+      const igst = saleListMeas(row, 'IGST_AMT', 'igst_amt');
+      const b = saleListMeas(row, 'BILL_AMT', 'bill_amt');
+      const dis = n(row, 'DIS_AMT', 'dis_amt');
+      const oth = n(row, 'OTH_EXP5', 'oth_exp5');
+
+      grandQ += q;
+      grandW += w;
+      grandA += a;
+      grandTax += tax;
+      grandC += cgst;
+      grandS += sgst;
+      grandI += igst;
+      grandB += b;
+      grandDis += dis;
+      grandOth += oth;
+      if (showBillTotals) {
+        bQ += q;
+        bW += w;
+        bA += a;
+        bTax += tax;
+        bCgst += cgst;
+        bSgst += sgst;
+        bIgst += igst;
+        bBill += b;
+        bDis += dis;
+        bOth += oth;
+      }
+    }
+    flushBillGroup();
+
+    displayRows.push({
+      kind: 'grand-total',
+      qnty: grandQ,
+      weight: grandW,
+      amount: grandA,
+      taxable: grandTax,
+      cgstAmt: grandC,
+      sgstAmt: grandS,
+      igstAmt: grandI,
+      billAmt: grandB,
+      disAmt: grandDis,
+      othExp5: grandOth,
+    });
+
+    return { displayRows };
+  }
 
   const byDay = new Map();
   for (const row of raw) {
@@ -130,14 +305,6 @@ export function buildSaleListDisplayRows(data) {
       bOth = 0;
       hasBillGroup = false;
     };
-    const billKeyOf = (row) =>
-      [
-        String(row.TYPE ?? row.type ?? '').trim().toUpperCase(),
-        toInputDateString(row.BILL_DATE ?? row.bill_date) || '_nodate',
-        String(row.BILL_NO ?? row.bill_no ?? '').trim(),
-        String(row.B_TYPE ?? row.b_type ?? '').trim(),
-      ].join('__');
-
     for (let i = 0; i < dayRows.length; i += 1) {
       const row = dayRows[i];
       const currentBillKey = billKeyOf(row);

@@ -18,6 +18,63 @@ function escHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+/** Ledger PDF header: name · city · gst · pan (from MASTER row or first ledger line). */
+export function buildLedgerPartyLine(row) {
+  if (!row) return '';
+  const name = String(row.NAME ?? row.name ?? '').trim();
+  const city = String(row.CITY ?? row.city ?? '').trim();
+  const gst = String(row.GST_NO ?? row.gst_no ?? '').trim();
+  const pan = String(row.PAN ?? row.pan ?? '').trim();
+  const parts = [];
+  if (name) parts.push(name);
+  if (city) parts.push(city);
+  if (gst) parts.push(gst);
+  if (pan) parts.push(pan);
+  return parts.join(' · ');
+}
+
+/** Metadata for ledger account statement PDF (company + account address blocks). */
+export function buildLedgerStatementPdfMetadata({
+  formData,
+  compLedgerHeader,
+  account,
+  ledgerFirstRow,
+  year,
+  endDate,
+  accountNameOverride,
+  accountCodeOverride,
+}) {
+  const fd = formData || {};
+  const ch = compLedgerHeader && typeof compLedgerHeader === 'object' ? compLedgerHeader : {};
+  const acc = account || ledgerFirstRow || {};
+  const nameO =
+    accountNameOverride != null && String(accountNameOverride).trim() !== ''
+      ? String(accountNameOverride).trim()
+      : rowFieldAny(acc, ['NAME', 'name']);
+  const codeO =
+    accountCodeOverride != null && String(accountCodeOverride).trim() !== ''
+      ? String(accountCodeOverride).trim()
+      : rowFieldAny(acc, ['CODE', 'code']);
+  const companyName =
+    rowFieldAny(ch, ['COMP_NAME', 'comp_name']) || String(fd.comp_name ?? fd.COMP_NAME ?? '').trim();
+  return {
+    companyName,
+    year: year ?? fd.comp_year ?? fd.COMP_YEAR ?? '',
+    accountName: nameO,
+    accountCode: codeO,
+    endDate,
+    companyAdd1: rowFieldAny(ch, ['COMP_ADD1', 'comp_add1']),
+    companyAdd2: rowFieldAny(ch, ['COMP_ADD2', 'comp_add2']),
+    companyGst: rowFieldAny(ch, ['GST_NO', 'gst_no', 'comp_gst', 'gstin']),
+    accountAdd1: rowFieldAny(acc, ['ADD1', 'add1']),
+    accountAdd2: rowFieldAny(acc, ['ADD2', 'add2']),
+    accountCity: rowFieldAny(acc, ['CITY', 'city']),
+    accountGst: rowFieldAny(acc, ['GST_NO', 'gst_no']),
+    accountPan: rowFieldAny(acc, ['PAN', 'pan']),
+    accountTel: rowFieldAny(acc, ['TEL_NO_O', 'tel_no_o', 'TEL_NOO', 'tel_noo']),
+  };
+}
+
 function formatAmtPdf(n) {
   const v = parseFloat(n) || 0;
   return v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -228,6 +285,84 @@ const PDF_REPORT_STYLES = `
         table.table-report .col-vr { width: 6%; white-space: nowrap; }
         table.table-report .col-type { width: 5%; white-space: nowrap; }
         table.table-report .col-detail { word-wrap: break-word; max-width: 220px; }
+        /* Ledger statement: narrow amount columns, more room for detail */
+        table.table-report.table-report-ledger { table-layout: fixed; }
+        table.table-report.table-report-ledger thead th {
+          text-transform: none;
+          letter-spacing: 0.02em;
+        }
+        table.table-report.table-report-ledger .col-detail {
+          max-width: 90px;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          font-size: 6.6px;
+        }
+        table.table-report.table-report-ledger th.col-ledger-value-dt,
+        table.table-report.table-report-ledger td.col-ledger-value-dt {
+          width: 8%;
+          max-width: 72px;
+          white-space: nowrap;
+          font-size: 7.5px;
+        }
+        table.table-report.table-report-ledger th.ledger-amt-col,
+        table.table-report.table-report-ledger td.ledger-amt-col {
+          width: 9%;
+          max-width: 76px;
+          font-size: 7.5px;
+          padding: 3px 3px;
+        }
+        table.table-report.table-report-ledger td.ledger-cl-bal-pos {
+          font-weight: 700;
+          color: #0f766e;
+        }
+        table.table-report.table-report-ledger td.ledger-cl-bal-neg {
+          font-weight: 700;
+          color: #c53030 !important;
+        }
+        table.table-report tr.report-grand-total td.ledger-cl-bal-neg {
+          color: #fecaca !important;
+        }
+        .report-grid td.val-ledger-acct-strong {
+          text-align: left;
+          font-weight: 700;
+        }
+        .report-grid td.ledger-party-line {
+          text-align: left;
+          font-weight: 700;
+          font-size: 9px;
+        }
+        .ledger-pdf-company-block,
+        .ledger-pdf-account-block {
+          text-align: left;
+          margin: 8px auto 0 auto;
+          max-width: 100%;
+          font-size: 9px;
+          color: #0f172a;
+        }
+        .ledger-pdf-company-block {
+          margin-bottom: 8px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid #94a3b8;
+        }
+        .ledger-pdf-account-block {
+          margin-bottom: 10px;
+          font-weight: 600;
+        }
+        .ledger-pdf-block-title {
+          font-size: 8px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #475569;
+          margin-bottom: 4px;
+          font-weight: 700;
+        }
+        .ledger-pdf-company-name {
+          font-size: 11px;
+          font-weight: 800;
+          color: #0f172a;
+          margin-bottom: 4px;
+        }
+        .ledger-pdf-line { margin: 2px 0; line-height: 1.35; }
 `;
 
 /** Trial balance PDF — same shell and grid lines as ledger */
@@ -360,24 +495,69 @@ function buildLedgerReportHtml(data, metadata) {
   const period = escHtml(metadata.endDate);
   const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
 
+  const cAdd1 = escHtml(String(metadata.companyAdd1 ?? '').trim());
+  const cAdd2 = escHtml(String(metadata.companyAdd2 ?? '').trim());
+  const cGst = escHtml(String(metadata.companyGst ?? '').trim());
+  const aAdd1 = escHtml(String(metadata.accountAdd1 ?? '').trim());
+  const aAdd2 = escHtml(String(metadata.accountAdd2 ?? '').trim());
+  const aCity = escHtml(String(metadata.accountCity ?? '').trim());
+  const aGst = escHtml(String(metadata.accountGst ?? '').trim());
+  const aPan = escHtml(String(metadata.accountPan ?? '').trim());
+  const aTel = escHtml(String(metadata.accountTel ?? '').trim());
+
+  const companyLines = [
+    company ? `<div class="ledger-pdf-company-name">${company}</div>` : '',
+    cAdd1 ? `<div class="ledger-pdf-line">${cAdd1}</div>` : '',
+    cAdd2 ? `<div class="ledger-pdf-line">${cAdd2}</div>` : '',
+    cGst ? `<div class="ledger-pdf-line"><strong>GST:</strong> ${cGst}</div>` : '',
+  ]
+    .filter(Boolean)
+    .join('');
+  const companyBlock =
+    companyLines !== '' ? `<div class="ledger-pdf-company-block">${companyLines}</div>` : '';
+
+  const accMetaParts = [
+    aCity ? `City: ${aCity}` : '',
+    aGst ? `GST: ${aGst}` : '',
+    aPan ? `PAN: ${aPan}` : '',
+    aTel ? `Tel: ${aTel}` : '',
+  ]
+    .filter(Boolean)
+    .join(' &nbsp;|&nbsp; ');
+  const accountLines = [
+    `<div><strong>${accName}</strong> (${accCode})</div>`,
+    aAdd1 ? `<div class="ledger-pdf-line">${aAdd1}</div>` : '',
+    aAdd2 ? `<div class="ledger-pdf-line">${aAdd2}</div>` : '',
+    accMetaParts ? `<div class="ledger-pdf-line">${accMetaParts}</div>` : '',
+  ]
+    .filter(Boolean)
+    .join('');
+  const accountBlock = `<div class="ledger-pdf-account-block"><div class="ledger-pdf-block-title">Account</div>${accountLines}</div>`;
+
   let bodyRows = '';
   rows.forEach((row) => {
     const vrType = row.VR_TYPE ?? row.vr_type ?? '';
     const opClass = vrType === 'OP' ? ' op-row' : '';
     const d = escHtml(formatLedgerDateDisplay(row.VR_DATE ?? row.vr_date));
+    const vdRaw = row.V_DATE ?? row.v_date;
+    const vdDisp = vdRaw != null && vdRaw !== '' ? formatLedgerDateDisplay(vdRaw) : '';
+    const vd = escHtml(vdDisp || '—');
     const lineType = row.TYPE ?? row.type ?? '';
     const detail = escHtml(row.DETAIL ?? row.detail ?? '');
     const clBal = row.CL_BALANCE ?? row.cl_balance ?? row.RUN_BAL ?? row.run_bal;
+    const clNum = parseFloat(clBal) || 0;
+    const clCls = clNum < 0 ? 'ledger-cl-bal-neg' : 'ledger-cl-bal-pos';
     bodyRows += `
             <tr class="${opClass.trim()}">
               <td class="col-date">${d}</td>
+              <td class="col-date col-ledger-value-dt">${vd}</td>
               <td class="col-vr">${escHtml(row.VR_NO ?? row.vr_no ?? '—')}</td>
               <td class="col-type">${escHtml(vrType)}</td>
               <td class="col-type">${escHtml(lineType !== '' ? String(lineType) : '—')}</td>
               <td class="col-detail">${detail}</td>
-              <td class="amount">${formatAmtPdf(row.DR_AMT ?? row.dr_amt)}</td>
-              <td class="amount">${formatAmtPdf(row.CR_AMT ?? row.cr_amt)}</td>
-              <td class="amount bal">${formatAmtPdf(clBal)}</td>
+              <td class="amount ledger-amt-col">${formatAmtPdf(row.DR_AMT ?? row.dr_amt)}</td>
+              <td class="amount ledger-amt-col">${formatAmtPdf(row.CR_AMT ?? row.cr_amt)}</td>
+              <td class="amount ledger-amt-col ${clCls}">${formatAmtPdf(clBal)}</td>
             </tr>`;
   });
 
@@ -387,34 +567,35 @@ function buildLedgerReportHtml(data, metadata) {
       <div class="report-topbar">
         <div class="kicker">ACCOUNTING REPORT</div>
         <h1>LEDGER ACCOUNT STATEMENT</h1>
-        <div class="company">${company}</div>
+        ${companyBlock}
+        ${accountBlock}
         <table class="report-grid">
           <tr><td class="lbl">Financial year</td><td class="val">${year}</td><td class="lbl">Account code</td><td class="val">${accCode}</td></tr>
-          <tr><td class="lbl">Account name</td><td class="val" colspan="3">${accName}</td></tr>
         </table>
-        <div class="report-period"><strong>Period:</strong> ${period} &nbsp;|&nbsp; <strong>Generated:</strong> ${generated}</div>
+        <div class="report-period"><strong>Period: ${period}</strong> &nbsp;|&nbsp; <strong>Generated:</strong> ${generated}</div>
       </div>
 
-      <table class="table-report">
+      <table class="table-report table-report-ledger">
         <thead>
           <tr>
-            <th>vr_Date</th>
-            <th>vr_no</th>
-            <th>vr_type</th>
-            <th>type</th>
-            <th>detail</th>
-            <th class="amount">dr_amt</th>
-            <th class="amount">cr_amt</th>
-            <th class="amount">cl_balance</th>
+            <th>Vr.Date</th>
+            <th class="col-ledger-value-dt">Value Date</th>
+            <th>Vr.No.</th>
+            <th>Vr.Type</th>
+            <th>Type</th>
+            <th>Detail</th>
+            <th class="amount ledger-amt-col">Dr.Amount</th>
+            <th class="amount ledger-amt-col">Cr.Amount</th>
+            <th class="amount ledger-amt-col">Cl.Balance</th>
           </tr>
         </thead>
         <tbody>
           ${bodyRows}
           <tr class="report-grand-total">
-            <td colspan="5" class="lbl-total">GRAND TOTAL</td>
-            <td class="amount">${formatAmtPdf(sumDr)}</td>
-            <td class="amount">${formatAmtPdf(sumCr)}</td>
-            <td class="amount">${formatAmtPdf(closingBal)}</td>
+            <td colspan="6" class="lbl-total">GRAND TOTAL</td>
+            <td class="amount ledger-amt-col">${formatAmtPdf(sumDr)}</td>
+            <td class="amount ledger-amt-col">${formatAmtPdf(sumCr)}</td>
+            <td class="amount ledger-amt-col ${closingBal < 0 ? 'ledger-cl-bal-neg' : ''}">${formatAmtPdf(closingBal)}</td>
           </tr>
         </tbody>
       </table>

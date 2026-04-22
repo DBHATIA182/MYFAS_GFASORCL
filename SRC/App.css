@@ -140,6 +140,33 @@ body {
   white-space: nowrap;
 }
 
+.report-sort-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.25rem 0 0.7rem;
+}
+
+.report-sort-switch__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.btn-sort-switch {
+  min-width: 4.4rem;
+  padding: 0.3rem 0.55rem !important;
+  font-size: 0.72rem !important;
+  line-height: 1.15;
+}
+
+.btn-sort-switch.is-active {
+  background: #1e3a8a !important;
+  border-color: #1e3a8a !important;
+  color: #fff !important;
+}
+
 .btn-toolbar-back {
   background: #edf2f7 !important;
   color: #2d3748 !important;
@@ -218,6 +245,63 @@ body {
   font-weight: 500;
   color: #64748b;
   line-height: 1.35;
+}
+
+/* Ledger report: company (compdet) then party (MASTER) */
+.ledger-report-header {
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 1rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.ledger-report-header-company {
+  padding-bottom: 0.65rem;
+  margin-bottom: 0.65rem;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.ledger-report-header-company-name {
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.ledger-report-header-account-title {
+  font-size: 0.88rem;
+  margin-bottom: 0.2rem;
+}
+
+.ledger-report-header-code {
+  font-weight: 600;
+  color: #4a5568;
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 0.8rem;
+}
+
+.ledger-report-header-line {
+  color: #2d3748;
+  font-size: 0.8rem;
+}
+
+.ledger-report-header-account-meta {
+  font-weight: 600;
+  color: #1a365d;
+}
+
+.ledger-report-header-period {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #2c5282;
+}
+
+.ledger-report-voucher-ref {
+  margin: 0 0 1rem 0;
+  font-size: 0.85rem;
 }
 
 /* Step 3 report list: compact so many report types fit */
@@ -472,23 +556,80 @@ body {
 }
 
 .report-table--ledger {
-  min-width: 920px;
+  min-width: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.report-table--ledger-compact .col-ledger-dt {
+  width: 5.4rem;
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+.report-table--ledger-compact .col-ledger-value-dt {
+  width: 5.2rem;
+}
+
+.report-table--ledger-compact .col-ledger-detail-narrow {
+  width: 5.8rem;
+  max-width: 5.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.62rem;
+  padding-right: 2px !important;
+}
+
+.report-table--ledger .ledger-cl-balance {
+  font-weight: 700;
+  color: #2c7a7b;
+}
+
+.report-table--ledger .ledger-cl-balance--negative {
+  color: #c53030 !important;
+}
+
+.report-table--ledger tr.ledger-grand-total .ledger-cl-balance-total {
+  color: #fff !important;
+}
+
+.report-table--ledger tr.ledger-grand-total .ledger-cl-balance-total--negative {
+  color: #fecaca !important;
+}
+
+.report-table--ledger-compact .col-ledger-vr-no {
+  width: 3rem;
+  white-space: nowrap;
+  font-size: 0.72rem;
 }
 
 .report-table--ledger .col-ledger-type {
   white-space: nowrap;
-  max-width: 4.5rem;
+  width: 3.4rem;
+  max-width: 3.4rem;
 }
 
 .report-table--ledger .col-ledger-line-type {
   white-space: nowrap;
-  max-width: 3.5rem;
+  width: 2.6rem;
+  max-width: 2.6rem;
+}
+
+.report-table--ledger-compact .col-ledger-amt {
+  width: 6.2rem;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  padding-left: 2px !important;
+  padding-right: 4px !important;
 }
 
 .report-table--ledger .ledger-detail {
-  min-width: 140px;
-  max-width: 260px;
+  min-width: 0;
+  width: auto;
+  max-width: none;
   word-break: break-word;
+  font-size: 0.74rem;
 }
 
 .report-table--bill-ledger {
@@ -518,12 +659,24 @@ body {
   letter-spacing: 0.04em;
 }
 
+.report-table--ledger-compact thead th {
+  padding: 6px 4px;
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
 .report-table--ledger tbody td,
 .report-table--bill-ledger tbody td,
 .report-table--broker-os tbody td {
   border: 1px solid #94a3b8;
   padding: 8px;
   font-size: 0.8rem;
+}
+
+.report-table--ledger-compact tbody td {
+  padding: 5px 4px;
+  font-size: 0.72rem;
 }
 
 .report-table--ledger tbody tr:nth-child(odd) td,
@@ -1174,20 +1327,20 @@ mark.search-highlight {
 
 .report-table--sale-list th:nth-child(2),
 .report-table--sale-list td:nth-child(2) {
-  min-width: 2.7rem;
-  width: 2.7rem;
-  max-width: 2.7rem;
+  min-width: 3.2rem;
+  width: 3.2rem;
+  max-width: 3.2rem;
   padding-left: 0 !important;
-  padding-right: 0.03rem !important;
+  padding-right: 0.08rem !important;
 }
 
 .report-table--sale-list th:nth-child(3),
 .report-table--sale-list td:nth-child(3) {
-  min-width: 1.95rem;
-  width: 1.95rem;
-  max-width: 1.95rem;
+  min-width: 2.3rem;
+  width: 2.3rem;
+  max-width: 2.3rem;
   text-align: right;
-  padding-left: 0.03rem !important;
+  padding-left: 0.08rem !important;
 }
 
 .report-table--sale-list th:nth-child(4),
@@ -1359,6 +1512,53 @@ tr.sale-list-item-col-head .sale-list-item-col-head-label {
 tr.sale-list-item-summary-head th {
   text-transform: none;
   letter-spacing: 0.02em;
+}
+
+/* Override compact invoice-column widths for item-summary block to prevent overlap. */
+.report-table--sale-list tr.sale-list-item-summary-head th:nth-child(1),
+.report-table--sale-list tr.sale-list-item-summary-row td:nth-child(1) {
+  min-width: 3.8rem;
+  width: 3.8rem;
+  max-width: 3.8rem;
+  text-align: left;
+  padding-left: 0.24rem !important;
+  padding-right: 0.12rem !important;
+}
+
+.report-table--sale-list tr.sale-list-item-summary-head th:nth-child(2),
+.report-table--sale-list tr.sale-list-item-summary-row td:nth-child(2) {
+  min-width: 12.5rem;
+  width: 12.5rem;
+  max-width: 12.5rem;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 0.24rem !important;
+  padding-right: 0.16rem !important;
+}
+
+.report-table--sale-list tr.sale-list-item-summary-head th:nth-child(3),
+.report-table--sale-list tr.sale-list-item-summary-row td:nth-child(3) {
+  min-width: 4.4rem;
+  width: 4.4rem;
+  max-width: 4.4rem;
+  text-align: right;
+}
+
+.report-table--sale-list tr.sale-list-item-summary-head th:nth-child(4),
+.report-table--sale-list tr.sale-list-item-summary-row td:nth-child(4) {
+  min-width: 4.8rem;
+  width: 4.8rem;
+  max-width: 4.8rem;
+  text-align: right;
+}
+
+.report-table--sale-list tr.sale-list-item-summary-head th:nth-child(5),
+.report-table--sale-list tr.sale-list-item-summary-row td:nth-child(5) {
+  min-width: 5.8rem;
+  width: 5.8rem;
+  max-width: 5.8rem;
+  text-align: right;
 }
 
 tr.sale-list-item-summary-head th.bill-code,

@@ -14,6 +14,7 @@ export default function ReportTable({
   onVoucherClick,
   onLedgerSaleBillClick,
   meta,
+  saleListSortMode = 'date',
   billLedgerInterest = false,
   billLedgerKind = 'customer',
 }) {
@@ -198,29 +199,33 @@ export default function ReportTable({
       lastRow != null
         ? parseFloat(lastRow.CL_BALANCE ?? lastRow.cl_balance ?? lastRow.RUN_BAL ?? lastRow.run_bal ?? 0) || 0
         : 0;
+    const closingNeg = closingBal < 0;
 
     return (
       <div className="table-responsive table-responsive--ledger">
-        <table className="report-table report-table--ledger">
+        <table className="report-table report-table--ledger report-table--ledger-compact">
           <thead>
             <tr>
-              <th>vr_Date</th>
-              <th>vr_no</th>
-              <th>vr_type</th>
-              <th>type</th>
-              <th>detail</th>
-              <th className="text-right">dr_amt</th>
-              <th className="text-right">cr_amt</th>
-              <th className="text-right">cl_balance</th>
+              <th className="col-ledger-dt">Vr.Date</th>
+              <th className="col-ledger-dt col-ledger-value-dt">Value Date</th>
+              <th className="col-ledger-vr-no">Vr.No.</th>
+              <th className="col-ledger-type">Vr.Type</th>
+              <th className="col-ledger-line-type">Type</th>
+              <th className="ledger-detail col-ledger-detail-narrow">Detail</th>
+              <th className="text-right col-ledger-amt">Dr.Amount</th>
+              <th className="text-right col-ledger-amt">Cr.Amount</th>
+              <th className="text-right col-ledger-amt">Cl.Balance</th>
             </tr>
           </thead>
           <tbody>
             {data.map((row, i) => {
               const vrType = row.VR_TYPE ?? row.vr_type;
               const vrDate = row.VR_DATE ?? row.vr_date;
+              const valueDate = row.V_DATE ?? row.v_date;
               const vrNo = row.VR_NO ?? row.vr_no;
               const lineType = row.TYPE ?? row.type;
               const clBal = row.CL_BALANCE ?? row.cl_balance ?? row.RUN_BAL ?? row.run_bal;
+              const clBalNum = parseFloat(clBal) || 0;
               const vrUpper = vrType ? String(vrType).toUpperCase() : '';
               const canSaleBill =
                 typeof onLedgerSaleBillClick === 'function' &&
@@ -232,8 +237,6 @@ export default function ReportTable({
               const canDrill =
                 !canSaleBill &&
                 onVoucherClick &&
-                vrType &&
-                vrUpper !== 'OP' &&
                 vrNo != null &&
                 String(vrNo).trim() !== '' &&
                 Number(vrNo) > 0;
@@ -249,7 +252,10 @@ export default function ReportTable({
                     else if (canDrill) onVoucherClick(row);
                   }}
                 >
-                  <td style={{ whiteSpace: 'nowrap' }}>{formatLedgerDateDisplay(vrDate)}</td>
+                  <td className="col-ledger-dt">{formatLedgerDateDisplay(vrDate)}</td>
+                  <td className="col-ledger-dt col-ledger-value-dt">
+                    {valueDate != null && valueDate !== '' ? formatLedgerDateDisplay(valueDate) : '—'}
+                  </td>
                   <td className="col-ledger-vr-no">{vrNo != null && vrNo !== '' ? String(vrNo) : '—'}</td>
                   <td className="col-ledger-type">
                     <span className={`badge-type ${String(vrType ?? '').replace(/\s+/g, '')}`}>{vrType ?? '—'}</span>
@@ -257,26 +263,36 @@ export default function ReportTable({
                   <td className="col-ledger-line-type">
                     {lineType != null && lineType !== '' ? String(lineType) : '—'}
                   </td>
-                  <td className="ledger-detail">{row.DETAIL ?? row.detail}</td>
-                  <td className="text-right dr-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
-                  <td className="text-right cr-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
-                  <td className="text-right" style={{ fontWeight: 'bold', color: '#2c7a7b' }}>
+                  <td className="ledger-detail col-ledger-detail-narrow" title={String(row.DETAIL ?? row.detail ?? '')}>
+                    {row.DETAIL ?? row.detail}
+                  </td>
+                  <td className="text-right dr-amt col-ledger-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
+                  <td className="text-right cr-amt col-ledger-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
+                  <td
+                    className={`text-right col-ledger-amt ledger-cl-balance${
+                      clBalNum < 0 ? ' ledger-cl-balance--negative' : ''
+                    }`}
+                  >
                     {fmt(clBal)}
                   </td>
                 </tr>
               );
             })}
             <tr className="ledger-grand-total">
-              <td colSpan={5}>
+              <td colSpan={6}>
                 <strong>GRAND TOTAL</strong>
               </td>
-              <td className="text-right">
+              <td className="text-right col-ledger-amt">
                 <strong>{fmt(sumDr)}</strong>
               </td>
-              <td className="text-right">
+              <td className="text-right col-ledger-amt">
                 <strong>{fmt(sumCr)}</strong>
               </td>
-              <td className="text-right">
+              <td
+                className={`text-right col-ledger-amt ledger-cl-balance-total${
+                  closingNeg ? ' ledger-cl-balance-total--negative' : ''
+                }`}
+              >
                 <strong>{fmt(closingBal)}</strong>
               </td>
             </tr>
@@ -674,7 +690,7 @@ export default function ReportTable({
 
   // --- SALE LIST (SALE + MASTER + ITEMMAST); day / grand totals + item summaries; detail row opens bill ---
   if (type === 'sale-list') {
-    const { displayRows } = buildSaleListDisplayRows(data);
+    const { displayRows } = buildSaleListDisplayRows(data, saleListSortMode);
     const clickable = typeof onSaleBillClick === 'function';
     return (
       <div className="table-responsive table-responsive--sale-list" ref={saleListGridScrollRef}>

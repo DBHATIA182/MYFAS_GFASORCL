@@ -33,6 +33,14 @@ function fmtAmt(v) {
   return x.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function t(row, upper, lower) {
+  return String(row?.[upper] ?? row?.[lower] ?? '').trim();
+}
+
+function cmpTxt(a, b) {
+  return String(a).localeCompare(String(b), 'en', { sensitivity: 'base', numeric: true });
+}
+
 export default function Slide11({ apiBase, formData, onPrev, onReset }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -51,6 +59,7 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showReport, setShowReport] = useState(false);
+  const [purchaseSortMode, setPurchaseSortMode] = useState('date');
   const [billPrintOpen, setBillPrintOpen] = useState(false);
   const [billPrintParams, setBillPrintParams] = useState(null);
 
@@ -91,6 +100,37 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
     })();
   }, [apiBase, compCode, compUid]);
 
+  const sortedRows = useMemo(() => {
+    const out = [...rows];
+    const compareDateTail = (a, b) => {
+      const dCmp = cmpTxt(toInputDateString(a.R_DATE ?? a.r_date), toInputDateString(b.R_DATE ?? b.r_date));
+      if (dCmp !== 0) return dCmp;
+      const rCmp = cmpTxt(t(a, 'R_NO', 'r_no'), t(b, 'R_NO', 'r_no'));
+      if (rCmp !== 0) return rCmp;
+      return (parseFloat(a.TRN_NO ?? a.trn_no) || 0) - (parseFloat(b.TRN_NO ?? b.trn_no) || 0);
+    };
+    out.sort((a, b) => {
+      if (purchaseSortMode === 'party') {
+        const nCmp = cmpTxt(t(a, 'NAME', 'name'), t(b, 'NAME', 'name'));
+        if (nCmp !== 0) return nCmp;
+        const cCmp = cmpTxt(t(a, 'CODE', 'code'), t(b, 'CODE', 'code'));
+        if (cCmp !== 0) return cCmp;
+      } else if (purchaseSortMode === 'item') {
+        const nCmp = cmpTxt(t(a, 'ITEM_NAME', 'item_name'), t(b, 'ITEM_NAME', 'item_name'));
+        if (nCmp !== 0) return nCmp;
+        const cCmp = cmpTxt(t(a, 'ITEM_CODE', 'item_code'), t(b, 'ITEM_CODE', 'item_code'));
+        if (cCmp !== 0) return cCmp;
+      } else if (purchaseSortMode === 'broker') {
+        const nCmp = cmpTxt(t(a, 'PUR_NAME', 'pur_name'), t(b, 'PUR_NAME', 'pur_name'));
+        if (nCmp !== 0) return nCmp;
+        const cCmp = cmpTxt(t(a, 'PUR_CODE', 'pur_code'), t(b, 'PUR_CODE', 'pur_code'));
+        if (cCmp !== 0) return cCmp;
+      }
+      return compareDateTail(a, b);
+    });
+    return out;
+  }, [rows, purchaseSortMode]);
+
   const totals = useMemo(() => {
     let q = 0;
     let w = 0;
@@ -100,7 +140,7 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
     let s = 0;
     let i = 0;
     let b = 0;
-    for (const r of rows) {
+    for (const r of sortedRows) {
       q += signedDnVal(r, 'QNTY', 'qnty');
       w += signedDnVal(r, 'WEIGHT', 'weight');
       a += signedDnVal(r, 'AMOUNT', 'amount');
@@ -111,9 +151,9 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
       b += signedDnVal(r, 'BILL_AMT', 'bill_amt');
     }
     return { q, w, a, tx, c, s, i, b };
-  }, [rows]);
+  }, [sortedRows]);
 
-  const pdfData = useMemo(() => ({ rows }), [rows]);
+  const pdfData = useMemo(() => ({ rows: sortedRows }), [sortedRows]);
   const pdfMeta = useMemo(
     () => ({
       companyName: compName,
@@ -153,6 +193,7 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
         timeout: 120000,
       });
       setRows(Array.isArray(data) ? data : []);
+      setPurchaseSortMode('date');
       setShowReport(true);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to load purchase list');
@@ -191,6 +232,14 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
   };
 
   if (showReport) {
+    const purchaseSortLabel =
+      purchaseSortMode === 'party'
+        ? 'Party-wise'
+        : purchaseSortMode === 'item'
+          ? 'Item-wise'
+          : purchaseSortMode === 'broker'
+            ? 'Broker/Purchase code-wise'
+            : 'Date-wise';
     return (
       <div className="slide slide-report slide-11">
         <PurchaseBillPrintModal
@@ -219,7 +268,7 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
               className="btn btn-excel"
               onClick={() => {
                 try {
-                  downloadExcelRows(rows, 'PurchaseList', `${compName}_PurchaseList`);
+                  downloadExcelRows(sortedRows, 'PurchaseList', `${compName}_PurchaseList`);
                 } catch (e) {
                   alert(String(e?.message || e));
                 }
@@ -233,6 +282,38 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
           </div>
         </div>
 
+        <div className="report-sort-switch" role="group" aria-label="Purchase list sort">
+          <span className="report-sort-switch__label">Sort:</span>
+          <button
+            type="button"
+            className={`btn btn-secondary btn-sort-switch${purchaseSortMode === 'date' ? ' is-active' : ''}`}
+            onClick={() => setPurchaseSortMode('date')}
+          >
+            Date
+          </button>
+          <button
+            type="button"
+            className={`btn btn-secondary btn-sort-switch${purchaseSortMode === 'party' ? ' is-active' : ''}`}
+            onClick={() => setPurchaseSortMode('party')}
+          >
+            Party
+          </button>
+          <button
+            type="button"
+            className={`btn btn-secondary btn-sort-switch${purchaseSortMode === 'item' ? ' is-active' : ''}`}
+            onClick={() => setPurchaseSortMode('item')}
+          >
+            Item
+          </button>
+          <button
+            type="button"
+            className={`btn btn-secondary btn-sort-switch${purchaseSortMode === 'broker' ? ' is-active' : ''}`}
+            onClick={() => setPurchaseSortMode('broker')}
+          >
+            Broker/Pur
+          </button>
+        </div>
+
         <div className="report-info">
           <p>
             <strong>Dates</strong> {toDisplayDate(startDate)} - {toDisplayDate(endDate)} · <strong>Supplier</strong> {code || 'All'} ·{' '}
@@ -241,7 +322,7 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
           </p>
           <p>
             {compName} | FY {compYear} — TYPE DN rows show qty/weight/amount/tax columns in negative. Click any data row to
-            open the purchase bill / debit note print.
+            open the purchase bill / debit note print. Current view: <strong>{purchaseSortLabel}</strong>.
           </p>
         </div>
 
@@ -278,7 +359,7 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
+              {sortedRows.map((r, i) => (
                 <tr
                   key={`${r.R_NO ?? r.r_no}-${r.TRN_NO ?? r.trn_no}-${i}`}
                   className="purchase-list-row-clickable"
@@ -354,7 +435,7 @@ export default function Slide11({ apiBase, formData, onPrev, onReset }) {
               </tr>
             </tbody>
           </table>
-          {rows.length === 0 ? <p className="stock-sum-empty">No rows returned.</p> : null}
+          {sortedRows.length === 0 ? <p className="stock-sum-empty">No rows returned.</p> : null}
         </div>
 
         <div className="button-group">
