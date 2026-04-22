@@ -1502,6 +1502,117 @@ app.get('/api/ledger', async (req, res) => {
   }
 });
 
+// 4A. Ledger with Interest Report
+app.get('/api/ledger-interest', async (req, res) => {
+  try {
+    const { comp_code, code, s_date, e_date, int_date, int_rate, grace_dr_days, grace_cr_days, comp_uid } = req.query;
+    if (!comp_code || !code || !s_date || !e_date || !int_date) {
+      return res.status(400).json({
+        error: 'comp_code, code, s_date, e_date, and int_date are required',
+      });
+    }
+
+    const rateNum = Number(int_rate);
+    const graceDrNum = Number(grace_dr_days);
+    const graceCrNum = Number(grace_cr_days);
+    const safeRate = Number.isFinite(rateNum) ? rateNum : 0;
+    const safeGraceDr = Number.isFinite(graceDrNum) ? graceDrNum : 0;
+    const safeGraceCr = Number.isFinite(graceCrNum) ? graceCrNum : 0;
+
+    const sql = `
+      WITH OP AS (
+        SELECT SUM(NVL(DR_AMT,0) - NVL(CR_AMT,0)) OP_BAL
+        FROM LEDGER
+        WHERE COMP_CODE = :comp_code
+          AND CODE = :code
+          AND VR_DATE < TO_DATE(:s_date, 'DD-MM-YYYY')
+      ),
+      DATA AS (
+        SELECT :code AS CODE, B.NAME, B.CITY, B.GST_NO, B.PAN, B.ADD1, B.ADD2, B.TEL_NO_O,
+               TO_DATE(:s_date,'DD-MM-YYYY') AS VR_DATE,
+               CAST(NULL AS DATE) AS V_DATE,
+               0 AS VR_NO, 'OP' AS VR_TYPE, NULL AS TYPE, 0 AS TRN_NO, 'OPENING BALANCE' AS DETAIL,
+               CASE WHEN OP.OP_BAL > 0 THEN OP.OP_BAL ELSE 0 END AS DR_AMT,
+               CASE WHEN OP.OP_BAL < 0 THEN ABS(OP.OP_BAL) ELSE 0 END AS CR_AMT,
+               0 AS DR_DAYS, 0 AS CR_DAYS,
+               0 AS DR_INTEREST, 0 AS CR_INTEREST,
+               NULL AS DC_CODE, NULL AS DC_NAME
+        FROM OP, MASTER B
+        WHERE B.COMP_CODE = :comp_code
+          AND B.CODE = :code
+        UNION ALL
+        SELECT A.CODE, B.NAME, B.CITY, B.GST_NO, B.PAN, B.ADD1, B.ADD2, B.TEL_NO_O,
+               A.VR_DATE, A.V_DATE, A.VR_NO, A.VR_TYPE, A.TYPE, A.TRN_NO,
+               A.DETAIL, A.DR_AMT, A.CR_AMT,
+               CASE
+                 WHEN NVL(A.DR_AMT,0) > 0 THEN
+                   GREATEST(
+                     TRUNC(TO_DATE(:int_date,'DD-MM-YYYY')) - (TRUNC(NVL(A.V_DATE, A.VR_DATE)) + :grace_dr_days),
+                     0
+                   )
+                 ELSE 0
+               END AS DR_DAYS,
+               CASE
+                 WHEN NVL(A.CR_AMT,0) > 0 THEN
+                   GREATEST(
+                     TRUNC(TO_DATE(:int_date,'DD-MM-YYYY')) - (TRUNC(NVL(A.V_DATE, A.VR_DATE)) + :grace_cr_days),
+                     0
+                   )
+                 ELSE 0
+               END AS CR_DAYS,
+               ROUND(
+                 (
+                   (NVL(A.DR_AMT,0) * :int_rate / 100) / 365
+                 ) * GREATEST(
+                   TRUNC(TO_DATE(:int_date,'DD-MM-YYYY')) - (TRUNC(NVL(A.V_DATE, A.VR_DATE)) + :grace_dr_days),
+                   0
+                 ),
+                 2
+               ) AS DR_INTEREST,
+               ROUND(
+                 (
+                   (NVL(A.CR_AMT,0) * :int_rate / 100) / 365
+                 ) * GREATEST(
+                   TRUNC(TO_DATE(:int_date,'DD-MM-YYYY')) - (TRUNC(NVL(A.V_DATE, A.VR_DATE)) + :grace_cr_days),
+                   0
+                 ),
+                 2
+               ) AS CR_INTEREST,
+               A.DC_CODE, NULL AS DC_NAME
+        FROM LEDGER A, MASTER B
+        WHERE A.COMP_CODE = :comp_code
+          AND A.CODE = :code
+          AND A.VR_DATE BETWEEN TO_DATE(:s_date, 'DD-MM-YYYY') AND TO_DATE(:e_date, 'DD-MM-YYYY')
+          AND A.COMP_CODE = B.COMP_CODE
+          AND A.CODE = B.CODE
+      )
+      SELECT DATA.*,
+             SUM(NVL(DR_AMT,0) - NVL(CR_AMT,0)) OVER (
+               ORDER BY VR_DATE, VR_NO, VR_TYPE, TRN_NO
+               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+             ) AS RUN_BAL
+      FROM DATA
+      ORDER BY VR_DATE, VR_NO, VR_TYPE, TRN_NO`;
+
+    const bindParams = {
+      comp_code,
+      code,
+      s_date,
+      e_date,
+      int_date,
+      int_rate: safeRate,
+      grace_dr_days: safeGraceDr,
+      grace_cr_days: safeGraceCr,
+    };
+
+    const rows = await runQuery(sql, bindParams, comp_uid);
+    res.json(rows);
+  } catch (err) {
+    console.error('❌ Ledger interest query error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** All LEDGER lines for one voucher (comp_code + vr_date + vr_type + vr_no). */
 app.get('/api/ledger-voucher', async (req, res) => {
   try {
@@ -1515,18 +1626,33 @@ app.get('/api/ledger-voucher', async (req, res) => {
     }
 
     const sql = `
-      SELECT A.VR_DATE, A.VR_NO, A.VR_TYPE, A.TYPE, A.CODE, B.NAME, B.CITY,
-             A.DR_AMT, A.CR_AMT, A.DETAIL, A.DC_CODE, C.NAME AS DC_NAME
-      FROM LEDGER A, MASTER B, MASTER C
+      SELECT
+        A.VR_DATE,
+        A.VR_NO,
+        A.VR_TYPE,
+        A.TYPE,
+        A.CODE,
+        B.NAME,
+        B.CITY,
+        A.DR_AMT,
+        A.CR_AMT,
+        A.DETAIL,
+        A.DC_CODE,
+        (
+          SELECT MAX(M.NAME)
+          FROM MASTER M
+          WHERE M.COMP_CODE = A.COMP_CODE
+            AND M.CODE = A.DC_CODE
+        ) AS DC_NAME
+      FROM LEDGER A
+      LEFT JOIN MASTER B
+        ON A.COMP_CODE = B.COMP_CODE
+       AND A.CODE = B.CODE
       WHERE A.COMP_CODE = :comp_code
         AND A.VR_TYPE = :vr_type
         AND A.VR_DATE = TO_DATE(:vr_date, 'DD-MM-YYYY')
         AND A.VR_NO = :vr_no
-        AND A.COMP_CODE = B.COMP_CODE
-        AND A.CODE = B.CODE
-        AND A.COMP_CODE = C.COMP_CODE (+)
-        AND A.DC_CODE = C.CODE
-      ORDER BY A.VR_DATE, A.VR_NO, A.VR_TYPE, A.TYPE`;
+      ORDER BY A.VR_DATE, A.VR_NO, A.VR_TYPE, A.TYPE, A.TRN_NO`;
 
     const bindParams = {
       comp_code,
@@ -1743,6 +1869,43 @@ app.get('/api/bill-ledger-parties', async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('❌ Bill ledger parties error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Bill-ledger interest defaults from DEFVALUE table: g_days, g_edays */
+app.get('/api/bill-ledger-defaults', async (req, res) => {
+  try {
+    const { comp_code, comp_uid } = req.query;
+    if (!comp_code) {
+      return res.status(400).json({ error: 'comp_code is required' });
+    }
+    const binds = { comp_code };
+    const sqlCandidates = [
+      `SELECT G_DAYS, G_EDAYS FROM DEFVALUE WHERE COMP_CODE = :comp_code`,
+      `SELECT G_DAYS, G_EDAYS FROM DEFAULT WHERE COMP_CODE = :comp_code`,
+      `SELECT G_DAYS, G_EDAYS FROM "DEFAULT" WHERE COMP_CODE = :comp_code`,
+    ];
+    let rows = [];
+    let lastErr = null;
+    for (const sql of sqlCandidates) {
+      try {
+        rows = await runQuery(sql, binds, comp_uid, { suppressDbErrorLog: true });
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (lastErr) throw lastErr;
+    const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    const pick = (up, low) => row?.[up] ?? row?.[low] ?? null;
+    res.json({
+      g_days: pick('G_DAYS', 'g_days'),
+      g_edays: pick('G_EDAYS', 'g_edays'),
+    });
+  } catch (err) {
+    console.error('❌ bill-ledger-defaults error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

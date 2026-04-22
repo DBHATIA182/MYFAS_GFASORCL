@@ -42,6 +42,11 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
   const [billPrintOpen, setBillPrintOpen] = useState(false);
   const [billPrintParams, setBillPrintParams] = useState(null);
   const [compLedgerHeader, setCompLedgerHeader] = useState(null);
+  const [interestRate, setInterestRate] = useState('12');
+  const [graceDrDays, setGraceDrDays] = useState('0');
+  const [graceCrDays, setGraceCrDays] = useState('0');
+  const [interestCalcDate, setInterestCalcDate] = useState('');
+  const isLedgerInterest = String(formData.reportType || '').toLowerCase() === 'ledger-interest';
 
   // Period from compdet (passed via Slide2 → App as comp_s_dt / comp_e_dt)
   useEffect(() => {
@@ -51,6 +56,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
     const e = toInputDateString(eRaw);
     if (s) setStartDate(s);
     if (e) setEndDate(e);
+    if (e) setInterestCalcDate(e);
   }, [
     formData.comp_s_dt,
     formData.comp_e_dt,
@@ -144,20 +150,32 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
       alert('Please select both start and end dates');
       return;
     }
+    if (isLedgerInterest && !interestCalcDate) {
+      alert('Please select interest calculation date');
+      return;
+    }
 
     setLoading(true);
     try {
       const sDate = toOracleDate(startDate);
       const eDate = toOracleDate(endDate);
-      
-      const response = await axios.get(`${apiBase}/api/ledger`, {
-        params: {
-          comp_code: formData.comp_code || formData.COMP_CODE,
-          code: String(selectedAccount).trim(),
-          s_date: sDate,
-          e_date: eDate,
-          comp_uid: formData.comp_uid || formData.COMP_UID,
-        },
+
+      const params = {
+        comp_code: formData.comp_code || formData.COMP_CODE,
+        code: String(selectedAccount).trim(),
+        s_date: sDate,
+        e_date: eDate,
+        comp_uid: formData.comp_uid || formData.COMP_UID,
+      };
+      if (isLedgerInterest) {
+        params.int_date = toOracleDate(interestCalcDate);
+        params.int_rate = String(interestRate).trim() || '0';
+        params.grace_dr_days = String(graceDrDays).trim() || '0';
+        params.grace_cr_days = String(graceCrDays).trim() || '0';
+      }
+
+      const response = await axios.get(`${apiBase}${isLedgerInterest ? '/api/ledger-interest' : '/api/ledger'}`, {
+        params,
         withCredentials: true,
         timeout: 30000
       });
@@ -359,14 +377,16 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
     return (
       <div className="slide slide-report">
         <div className="report-toolbar">
-          <h2>Ledger Report</h2>
+          <h2>{isLedgerInterest ? 'Ledger With Interest' : 'Ledger Report'}</h2>
           <div className="toolbar-actions">
             <button type="button" className="btn btn-toolbar-back" onClick={closeReport}>
               ← Back
             </button>
-            <button type="button" onClick={() => downloadPDF().catch((e) => alert(e?.message || String(e)))} className="btn btn-export">
-              📥 Download PDF
-            </button>
+            {!isLedgerInterest ? (
+              <button type="button" onClick={() => downloadPDF().catch((e) => alert(e?.message || String(e)))} className="btn btn-export">
+                📥 Download PDF
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn btn-excel"
@@ -381,9 +401,11 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
             >
               📊 Excel
             </button>
-            <button type="button" onClick={() => shareWhatsApp().catch((e) => alert(e?.message || String(e)))} className="btn btn-whatsapp">
-              💬 WhatsApp
-            </button>
+            {!isLedgerInterest ? (
+              <button type="button" onClick={() => shareWhatsApp().catch((e) => alert(e?.message || String(e)))} className="btn btn-whatsapp">
+                💬 WhatsApp
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -393,13 +415,19 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
           account={account}
           accountCodeFallback={selectedAccount}
           periodLine={`Financial year ${formData.comp_year ?? formData.COMP_YEAR ?? ''} · ${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`}
-          hint="Tap a row for voucher detail; sale bill print opens where mapping is available."
+          hint={
+            isLedgerInterest
+              ? `Interest date ${toDisplayDate(interestCalcDate)} · Rate ${String(interestRate).trim() || '0'}% · Grace DR ${String(
+                  graceDrDays
+                ).trim() || '0'} · Grace CR ${String(graceCrDays).trim() || '0'}`
+              : 'Tap a row for voucher detail; sale bill print opens where mapping is available.'
+          }
         />
 
         <div className="report-display">
           <ReportTable
             data={reportData}
-            type="ledger"
+            type={isLedgerInterest ? 'ledger-interest' : 'ledger'}
             onVoucherClick={runLedgerVoucher}
             onLedgerSaleBillClick={openLedgerSaleBill}
           />
@@ -420,7 +448,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
 
   return (
     <div className="slide slide-5">
-      <h2>Ledger Report Parameters</h2>
+      <h2>{isLedgerInterest ? 'Ledger With Interest Parameters' : 'Ledger Report Parameters'}</h2>
       
       <p className="company-info">
         {formData.comp_name} | {formData.comp_year}
@@ -555,6 +583,57 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
             className="form-input"
           />
         </div>
+
+        {isLedgerInterest ? (
+          <>
+            <div className="form-group">
+              <label htmlFor="interest-date">Interest calculation date</label>
+              <input
+                id="interest-date"
+                type="date"
+                lang="en-GB"
+                value={interestCalcDate}
+                onChange={(e) => setInterestCalcDate(e.target.value)}
+                className="form-input"
+              />
+            </div>
+            <div className="form-row-broker">
+              <div className="form-group">
+                <label htmlFor="interest-rate">Rate of interest (%)</label>
+                <input
+                  id="interest-rate"
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  value={interestRate}
+                  onChange={(e) => setInterestRate(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="grace-dr">Grace days Debit</label>
+                <input
+                  id="grace-dr"
+                  type="number"
+                  step="1"
+                  className="form-input"
+                  value={graceDrDays}
+                  onChange={(e) => setGraceDrDays(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="grace-cr">Grace days Credit</label>
+                <input
+                  id="grace-cr"
+                  type="number"
+                  step="1"
+                  className="form-input"
+                  value={graceCrDays}
+                  onChange={(e) => setGraceCrDays(e.target.value)}
+                />
+              </div>
+            </div>
+          </>
+        ) : null}
 
         <div className="button-group">
           <button type="button" onClick={onPrev} className="btn btn-secondary">

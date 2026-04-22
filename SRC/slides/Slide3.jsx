@@ -50,6 +50,23 @@ export default function Slide3({ onPrev, onNext, formData }) {
           </label>
         </div>
 
+        <div
+          className={`report-option ${reportType === 'ledger-interest' ? 'selected' : ''}`}
+          onClick={() => setReportType('ledger-interest')}
+        >
+          <input
+            type="radio"
+            name="reportType"
+            value="ledger-interest"
+            checked={reportType === 'ledger-interest'}
+            onChange={(e) => setReportType(e.target.value)}
+          />
+          <label>
+            <h3>Ledger With Interest</h3>
+            <p>Ledger with Dr/Cr interest columns using rate, grace days, and interest calculation date</p>
+          </label>
+        </div>
+
         <div 
           className={`report-option ${reportType === 'customer-ledger' ? 'selected' : ''}`}
           onClick={() => setReportType('customer-ledger')}

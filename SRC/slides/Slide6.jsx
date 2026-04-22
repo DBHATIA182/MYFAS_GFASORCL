@@ -85,6 +85,25 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
     load();
   }, [apiBase, compCode, compUid, ledgerKind, ledgerTitle]);
 
+  useEffect(() => {
+    const loadInterestDefaults = async () => {
+      if (!compCode || !compUid) return;
+      try {
+        const { data } = await axios.get(`${apiBase}/api/bill-ledger-defaults`, {
+          params: { comp_code: compCode, comp_uid: compUid },
+          withCredentials: true,
+        });
+        const gs = data?.g_days;
+        const ged = data?.g_edays;
+        if (gs != null && String(gs).trim() !== '') setIntGsDays(String(gs).trim());
+        if (ged != null && String(ged).trim() !== '') setIntGedDays(String(ged).trim());
+      } catch (err) {
+        console.error('Bill ledger defaults:', err);
+      }
+    };
+    loadInterestDefaults();
+  }, [apiBase, compCode, compUid]);
+
   const filteredParties = useMemo(() => {
     const q = partySearch.trim().toLowerCase();
     if (!q) return parties.slice(0, 150);

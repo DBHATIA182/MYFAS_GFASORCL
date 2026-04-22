@@ -624,6 +624,14 @@ body {
   padding-right: 4px !important;
 }
 
+.report-table--ledger-compact .col-ledger-int {
+  width: 6.6rem;
+}
+
+.report-table--ledger-compact .col-ledger-days {
+  width: 4.8rem;
+}
+
 .report-table--ledger .ledger-detail {
   min-width: 0;
   width: auto;

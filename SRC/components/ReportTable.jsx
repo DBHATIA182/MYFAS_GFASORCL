@@ -85,6 +85,12 @@ export default function ReportTable({
     return num.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   };
 
+  const fmtDays = (val) => {
+    const num = parseFloat(val);
+    if (!Number.isFinite(num)) return '0';
+    return Math.max(0, Math.trunc(num)).toLocaleString('en-IN');
+  };
+
   const clampText = (value, maxLen = 25) => {
     const s = String(value ?? '');
     if (s.length <= maxLen) return s;
@@ -187,12 +193,25 @@ export default function ReportTable({
   }
 
   // --- LEDGER VIEW ---
-  if (type === 'ledger') {
+  if (type === 'ledger' || type === 'ledger-interest') {
+    const showInterestCols = type === 'ledger-interest';
     let sumDr = 0;
     let sumCr = 0;
+    let sumDays = 0;
+    let sumDrInt = 0;
+    let sumCrInt = 0;
     data.forEach((row) => {
       sumDr += parseFloat(row.DR_AMT ?? row.dr_amt ?? 0) || 0;
       sumCr += parseFloat(row.CR_AMT ?? row.cr_amt ?? 0) || 0;
+      if (showInterestCols) {
+        const drAmtNum = parseFloat(row.DR_AMT ?? row.dr_amt ?? 0) || 0;
+        const crAmtNum = parseFloat(row.CR_AMT ?? row.cr_amt ?? 0) || 0;
+        const drDays = parseFloat(row.DR_DAYS ?? row.dr_days ?? 0) || 0;
+        const crDays = parseFloat(row.CR_DAYS ?? row.cr_days ?? 0) || 0;
+        sumDays += drAmtNum > 0 ? drDays : crAmtNum > 0 ? crDays : 0;
+        sumDrInt += parseFloat(row.DR_INTEREST ?? row.dr_interest ?? 0) || 0;
+        sumCrInt += parseFloat(row.CR_INTEREST ?? row.cr_interest ?? 0) || 0;
+      }
     });
     const lastRow = data[data.length - 1];
     const closingBal =
@@ -215,6 +234,9 @@ export default function ReportTable({
               <th className="text-right col-ledger-amt">Dr.Amount</th>
               <th className="text-right col-ledger-amt">Cr.Amount</th>
               <th className="text-right col-ledger-amt">Cl.Balance</th>
+              {showInterestCols ? <th className="text-right col-ledger-amt col-ledger-days">Days</th> : null}
+              {showInterestCols ? <th className="text-right col-ledger-amt col-ledger-int">Dr.Int</th> : null}
+              {showInterestCols ? <th className="text-right col-ledger-amt col-ledger-int">Cr.Int</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -224,6 +246,8 @@ export default function ReportTable({
               const valueDate = row.V_DATE ?? row.v_date;
               const vrNo = row.VR_NO ?? row.vr_no;
               const lineType = row.TYPE ?? row.type;
+              const drAmtNum = parseFloat(row.DR_AMT ?? row.dr_amt ?? 0) || 0;
+              const crAmtNum = parseFloat(row.CR_AMT ?? row.cr_amt ?? 0) || 0;
               const clBal = row.CL_BALANCE ?? row.cl_balance ?? row.RUN_BAL ?? row.run_bal;
               const clBalNum = parseFloat(clBal) || 0;
               const vrUpper = vrType ? String(vrType).toUpperCase() : '';
@@ -275,6 +299,25 @@ export default function ReportTable({
                   >
                     {fmt(clBal)}
                   </td>
+                  {showInterestCols ? (
+                    <td className="text-right col-ledger-amt col-ledger-days">
+                      {drAmtNum > 0
+                        ? fmtDays(row.DR_DAYS ?? row.dr_days)
+                        : crAmtNum > 0
+                          ? fmtDays(row.CR_DAYS ?? row.cr_days)
+                          : '—'}
+                    </td>
+                  ) : null}
+                  {showInterestCols ? (
+                    <td className="text-right dr-amt col-ledger-amt col-ledger-int">
+                      {fmt(row.DR_INTEREST ?? row.dr_interest)}
+                    </td>
+                  ) : null}
+                  {showInterestCols ? (
+                    <td className="text-right cr-amt col-ledger-amt col-ledger-int">
+                      {fmt(row.CR_INTEREST ?? row.cr_interest)}
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
@@ -295,7 +338,35 @@ export default function ReportTable({
               >
                 <strong>{fmt(closingBal)}</strong>
               </td>
+              {showInterestCols ? (
+                <td className="text-right col-ledger-amt col-ledger-days">
+                  <strong>—</strong>
+                </td>
+              ) : null}
+              {showInterestCols ? (
+                <td className="text-right col-ledger-amt col-ledger-int">
+                  <strong>{fmt(sumDrInt)}</strong>
+                </td>
+              ) : null}
+              {showInterestCols ? (
+                <td className="text-right col-ledger-amt col-ledger-int">
+                  <strong>{fmt(sumCrInt)}</strong>
+                </td>
+              ) : null}
             </tr>
+            {showInterestCols ? (
+              <tr className="ledger-grand-total">
+                <td colSpan={9}>
+                  <strong>NET INTEREST</strong>
+                </td>
+                <td className="text-right col-ledger-amt col-ledger-int">
+                  <strong>{fmt(sumDrInt - sumCrInt)}</strong>
+                </td>
+                <td className="text-right col-ledger-amt col-ledger-int">
+                  <strong>—</strong>
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

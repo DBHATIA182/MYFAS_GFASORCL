@@ -314,7 +314,7 @@ function App() {
 
   const handleSlide3Next = (data) => {
     setFormData(prev => ({ ...prev, ...data }));
-    if (data.reportType === 'ledger') setCurrentSlide(5);
+    if (data.reportType === 'ledger' || data.reportType === 'ledger-interest') setCurrentSlide(5);
     else if (data.reportType === 'bill-ledger' || data.reportType === 'customer-ledger' || data.reportType === 'supplier-ledger') setCurrentSlide(6);
     else if (data.reportType === 'broker-os') setCurrentSlide(7);
     else if (data.reportType === 'sale-list') setCurrentSlide(8);
