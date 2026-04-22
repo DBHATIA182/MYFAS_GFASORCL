@@ -123,6 +123,8 @@ function App() {
   const [deployProgressPct, setDeployProgressPct] = useState(0);
   const [deployProgressLabel, setDeployProgressLabel] = useState('');
   const [deployRecentLines, setDeployRecentLines] = useState([]);
+  const [deployFinished, setDeployFinished] = useState(false);
+  const [deployFailed, setDeployFailed] = useState(false);
 
   const syncDeployStatus = async () => {
     try {
@@ -135,6 +137,8 @@ function App() {
       setDeployProgressPct(Number(r.data?.progressPercent ?? 0) || 0);
       setDeployProgressLabel(String(r.data?.statusLabel ?? '').trim());
       setDeployRecentLines(Array.isArray(r.data?.recentLogLines) ? r.data.recentLogLines : []);
+      setDeployFinished(r.data?.isFinished === true);
+      setDeployFailed(r.data?.isError === true);
     } catch {
       /* feature off or API unreachable */
     }
@@ -153,6 +157,8 @@ function App() {
           setDeployProgressPct(Number(r.data?.progressPercent ?? 0) || 0);
           setDeployProgressLabel(String(r.data?.statusLabel ?? '').trim());
           setDeployRecentLines(Array.isArray(r.data?.recentLogLines) ? r.data.recentLogLines : []);
+          setDeployFinished(r.data?.isFinished === true);
+          setDeployFailed(r.data?.isError === true);
         }
       } catch {
         /* feature off or API unreachable */
@@ -193,6 +199,8 @@ function App() {
       setDeployUpdateServerBusy(true);
       setDeployProgressPct(6);
       setDeployProgressLabel('Starting update...');
+      setDeployFinished(false);
+      setDeployFailed(false);
       setDeployRecentLines((prev) =>
         prev.length > 0 ? prev : ['Update started in background. Waiting for first log line...']
       );
@@ -405,6 +413,8 @@ function App() {
                 setDeployMessageIsError(false);
                 setDeployProgressLabel('');
                 setDeployRecentLines([]);
+                setDeployFinished(false);
+                setDeployFailed(false);
                 setShowDeployUpdateModal(true);
                 const base = API_BASE || '';
                 void axios
@@ -416,6 +426,8 @@ function App() {
                       setDeployProgressPct(Number(r.data?.progressPercent ?? 0) || 0);
                       setDeployProgressLabel(String(r.data?.statusLabel ?? '').trim());
                       setDeployRecentLines(Array.isArray(r.data?.recentLogLines) ? r.data.recentLogLines : []);
+                      setDeployFinished(r.data?.isFinished === true);
+                      setDeployFailed(r.data?.isError === true);
                     }
                   })
                   .catch(() => {});
@@ -497,13 +509,20 @@ function App() {
                 ) : null}
               </div>
             ) : null}
+            {deployFinished && !deployFailed ? (
+              <p className="deploy-update-msg">
+                Finished update. Restart browser now, then refresh this page.
+              </p>
+            ) : null}
             <div className="deploy-update-actions">
               <button type="button" className="btn btn-secondary" disabled={deployBusy} onClick={() => setShowDeployUpdateModal(false)}>
-                Cancel
+                {deployFinished ? 'Close' : 'Cancel'}
               </button>
-              <button type="submit" className="btn btn-primary" disabled={deployBusy || deployUpdateServerBusy}>
-                {deployBusy ? 'Starting…' : deployUpdateServerBusy ? 'Update running…' : 'Update & restart'}
-              </button>
+              {!deployFinished ? (
+                <button type="submit" className="btn btn-primary" disabled={deployBusy || deployUpdateServerBusy}>
+                  {deployBusy ? 'Starting…' : deployUpdateServerBusy ? 'Update running…' : 'Update & restart'}
+                </button>
+              ) : null}
             </div>
           </form>
         </div>

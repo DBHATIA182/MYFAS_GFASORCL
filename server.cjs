@@ -191,13 +191,17 @@ function inferDeployProgress(busy, lines) {
   const has = (needle) => text.includes(needle);
   let statusLabel = busy ? 'Update is running...' : 'Idle';
   let pct = busy ? 5 : 0;
+  let isFinished = false;
+  let isError = false;
 
   if (has('ERROR')) {
     statusLabel = 'Update failed. Check deploy-update.log.';
     pct = 100;
+    isError = true;
   } else if (has('--- deploy update finished ---')) {
     statusLabel = 'Update finished. Restart sequence done.';
     pct = 100;
+    isFinished = true;
   } else if (has('Starting run-autostart-stack.cmd') || has('Launcher started.')) {
     statusLabel = 'Restarting services...';
     pct = busy ? 92 : 100;
@@ -216,7 +220,7 @@ function inferDeployProgress(busy, lines) {
   }
 
   if (busy && pct >= 100) pct = 95;
-  return { progressPercent: pct, statusLabel };
+  return { progressPercent: pct, statusLabel, isFinished, isError };
 }
 
 function clearDeployUpdateSafetyTimer() {
@@ -1279,6 +1283,8 @@ app.get('/api/deploy-update/status', (req, res) => {
     busy: deployUpdateJobLock,
     progressPercent: p.progressPercent,
     statusLabel: p.statusLabel,
+    isFinished: p.isFinished,
+    isError: p.isError,
     recentLogLines,
   });
 });
