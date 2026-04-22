@@ -120,6 +120,25 @@ function App() {
   const [deployBusy, setDeployBusy] = useState(false);
   const [deployMessage, setDeployMessage] = useState('');
   const [deployMessageIsError, setDeployMessageIsError] = useState(false);
+  const [deployProgressPct, setDeployProgressPct] = useState(0);
+  const [deployProgressLabel, setDeployProgressLabel] = useState('');
+  const [deployRecentLines, setDeployRecentLines] = useState([]);
+
+  const syncDeployStatus = async () => {
+    try {
+      const base = API_BASE || '';
+      const r = await axios.get(`${base}/api/deploy-update/status`);
+      if (!r.data?.enabled) return;
+      setDeployUpdateEnabled(true);
+      setDeployUpdateRequiresKey(r.data?.requiresDeployKey !== false);
+      setDeployUpdateServerBusy(r.data?.busy === true);
+      setDeployProgressPct(Number(r.data?.progressPercent ?? 0) || 0);
+      setDeployProgressLabel(String(r.data?.statusLabel ?? '').trim());
+      setDeployRecentLines(Array.isArray(r.data?.recentLogLines) ? r.data.recentLogLines : []);
+    } catch {
+      /* feature off or API unreachable */
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -131,6 +150,9 @@ function App() {
           setDeployUpdateEnabled(true);
           setDeployUpdateRequiresKey(r.data?.requiresDeployKey !== false);
           setDeployUpdateServerBusy(r.data?.busy === true);
+          setDeployProgressPct(Number(r.data?.progressPercent ?? 0) || 0);
+          setDeployProgressLabel(String(r.data?.statusLabel ?? '').trim());
+          setDeployRecentLines(Array.isArray(r.data?.recentLogLines) ? r.data.recentLogLines : []);
         }
       } catch {
         /* feature off or API unreachable */
@@ -140,6 +162,23 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!showDeployUpdateModal) return;
+    let stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      await syncDeployStatus();
+    };
+    void tick();
+    const timer = window.setInterval(() => {
+      void tick();
+    }, 3000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [showDeployUpdateModal]);
 
   const handleDeployUpdateSubmit = async (e) => {
     e.preventDefault();
@@ -151,7 +190,14 @@ function App() {
       const r = await axios.post(`${base}/api/deploy-update`, payload);
       setDeployMessageIsError(false);
       setDeployMessage(r.data?.message || 'Started.');
+      setDeployUpdateServerBusy(true);
+      setDeployProgressPct(6);
+      setDeployProgressLabel('Starting update...');
+      setDeployRecentLines((prev) =>
+        prev.length > 0 ? prev : ['Update started in background. Waiting for first log line...']
+      );
       setDeployKeyInput('');
+      await syncDeployStatus();
     } catch (err) {
       setDeployMessageIsError(true);
       const msg = err.response?.data?.error || err.message || 'Request failed';
@@ -357,6 +403,8 @@ function App() {
                 setShowViewSettings(false);
                 setDeployMessage('');
                 setDeployMessageIsError(false);
+                setDeployProgressLabel('');
+                setDeployRecentLines([]);
                 setShowDeployUpdateModal(true);
                 const base = API_BASE || '';
                 void axios
@@ -365,6 +413,9 @@ function App() {
                     if (r.data?.enabled) {
                       setDeployUpdateRequiresKey(r.data?.requiresDeployKey !== false);
                       setDeployUpdateServerBusy(r.data?.busy === true);
+                      setDeployProgressPct(Number(r.data?.progressPercent ?? 0) || 0);
+                      setDeployProgressLabel(String(r.data?.statusLabel ?? '').trim());
+                      setDeployRecentLines(Array.isArray(r.data?.recentLogLines) ? r.data.recentLogLines : []);
                     }
                   })
                   .catch(() => {});
@@ -425,6 +476,26 @@ function App() {
             ) : null}
             {deployMessage ? (
               <p className={`deploy-update-msg${deployMessageIsError ? ' deploy-update-msg--err' : ''}`}>{deployMessage}</p>
+            ) : null}
+            {(deployUpdateServerBusy || deployProgressPct > 0) ? (
+              <div className="deploy-update-progress-wrap" aria-live="polite">
+                <div className="deploy-update-progress-label">
+                  {deployProgressLabel || (deployUpdateServerBusy ? 'Update is running...' : 'Update status')}
+                  <span>{Math.max(0, Math.min(100, Math.round(deployProgressPct)))}%</span>
+                </div>
+                <div className="deploy-update-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, Math.round(deployProgressPct)))}>
+                  <div className="deploy-update-progress-fill" style={{ width: `${Math.max(0, Math.min(100, deployProgressPct))}%` }} />
+                </div>
+                {deployRecentLines.length > 0 ? (
+                  <div className="deploy-update-log">
+                    {deployRecentLines.map((line, idx) => (
+                      <div key={`${idx}-${line}`} className="deploy-update-log-line">
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             ) : null}
             <div className="deploy-update-actions">
               <button type="button" className="btn btn-secondary" disabled={deployBusy} onClick={() => setShowDeployUpdateModal(false)}>

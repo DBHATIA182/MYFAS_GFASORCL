@@ -2225,6 +2225,59 @@ td.sale-list-total-pad {
   color: #b91c1c;
 }
 
+.deploy-update-progress-wrap {
+  margin-bottom: 0.8rem;
+}
+
+.deploy-update-progress-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+  color: #334155;
+  margin-bottom: 0.32rem;
+}
+
+.deploy-update-progress-label span {
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.deploy-update-progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.deploy-update-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1d4ed8, #0ea5e9);
+  transition: width 260ms ease;
+}
+
+.deploy-update-log {
+  margin-top: 0.45rem;
+  max-height: 6.2rem;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.36rem 0.44rem;
+  background: #f8fafc;
+}
+
+.deploy-update-log-line {
+  font-size: 0.72rem;
+  color: #475569;
+  line-height: 1.35;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .deploy-update-actions {
   display: flex;
   gap: 0.5rem;

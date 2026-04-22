@@ -169,6 +169,55 @@ function deployKeyMatches(provided) {
 
 let deployUpdateJobLock = false;
 let deployUpdateSafetyTimer = null;
+const DEPLOY_LOG_PATH = path.join(__dirname, 'logs', 'deploy-update.log');
+
+function readDeployUpdateLogLines(maxLines = 12) {
+  try {
+    if (!fs.existsSync(DEPLOY_LOG_PATH)) return [];
+    const raw = fs.readFileSync(DEPLOY_LOG_PATH, 'utf8');
+    const lines = raw
+      .split(/\r?\n/)
+      .map((s) => String(s || '').trim())
+      .filter(Boolean);
+    if (lines.length <= maxLines) return lines;
+    return lines.slice(lines.length - maxLines);
+  } catch (_) {
+    return [];
+  }
+}
+
+function inferDeployProgress(busy, lines) {
+  const text = lines.join('\n');
+  const has = (needle) => text.includes(needle);
+  let statusLabel = busy ? 'Update is running...' : 'Idle';
+  let pct = busy ? 5 : 0;
+
+  if (has('ERROR')) {
+    statusLabel = 'Update failed. Check deploy-update.log.';
+    pct = 100;
+  } else if (has('--- deploy update finished ---')) {
+    statusLabel = 'Update finished. Restart sequence done.';
+    pct = 100;
+  } else if (has('Starting run-autostart-stack.cmd') || has('Launcher started.')) {
+    statusLabel = 'Restarting services...';
+    pct = busy ? 92 : 100;
+  } else if (has('Stopping Node processes for this app')) {
+    statusLabel = 'Stopping old processes...';
+    pct = 80;
+  } else if (has('update-from-git.ps1 finished OK')) {
+    statusLabel = 'Update downloaded and built.';
+    pct = 65;
+  } else if (has('Running update-from-git.ps1')) {
+    statusLabel = 'Pulling latest code and building...';
+    pct = 35;
+  } else if (has('--- deploy update started ---')) {
+    statusLabel = 'Update started...';
+    pct = 12;
+  }
+
+  if (busy && pct >= 100) pct = 95;
+  return { progressPercent: pct, statusLabel };
+}
 
 function clearDeployUpdateSafetyTimer() {
   if (deployUpdateSafetyTimer) {
@@ -1222,7 +1271,16 @@ app.get('/api/deploy-update/status', (req, res) => {
   const skipKey = deployUpdateSkipKeyNow();
   const enabled = skipKey || (DEPLOY_UPDATE_SECRET && DEPLOY_UPDATE_SECRET.length >= 8);
   const requiresDeployKey = enabled && !skipKey;
-  res.json({ enabled, requiresDeployKey, busy: deployUpdateJobLock });
+  const recentLogLines = readDeployUpdateLogLines(10);
+  const p = inferDeployProgress(deployUpdateJobLock, recentLogLines);
+  res.json({
+    enabled,
+    requiresDeployKey,
+    busy: deployUpdateJobLock,
+    progressPercent: p.progressPercent,
+    statusLabel: p.statusLabel,
+    recentLogLines,
+  });
 });
 
 /**
