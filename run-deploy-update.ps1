@@ -116,18 +116,30 @@ try {
     if (-not (Test-Path -LiteralPath $updateScript)) {
         throw "Missing update-from-git.ps1"
     }
-    Log 'Running update-from-git.ps1 -Branch main ...'
-    $prevEap = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        $updateOut = & $updateScript -Branch main 2>&1
-    } finally {
-        $ErrorActionPreference = $prevEap
+    Log 'Running update-from-git.ps1 -Branch main (subprocess) ...'
+    $tmpOut = Join-Path $logDir ("update-from-git-" + [Guid]::NewGuid().ToString('N') + ".log")
+    $updateProc = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        "`"$updateScript`"",
+        '-Branch',
+        'main'
+    ) -WorkingDirectory $AppRoot -RedirectStandardOutput $tmpOut -RedirectStandardError $tmpOut -Wait -PassThru
+    if (Test-Path -LiteralPath $tmpOut) {
+        try {
+            Get-Content -LiteralPath $tmpOut -ErrorAction SilentlyContinue | ForEach-Object {
+                $line = String($_).Trim()
+                if ($line) { Log $line }
+            }
+        } finally {
+            Remove-Item -LiteralPath $tmpOut -Force -ErrorAction SilentlyContinue
+        }
     }
-    foreach ($line in $updateOut) {
-        Log ($line | Out-String).Trim()
-    }
-    if ($LASTEXITCODE -ne 0) { throw "update-from-git.ps1 exited with code $LASTEXITCODE" }
+    if ($updateProc.ExitCode -ne 0) { throw "update-from-git.ps1 exited with code $($updateProc.ExitCode)" }
     Log 'update-from-git.ps1 finished OK'
 } catch {
     Log ("ERROR in update step: " + $_.Exception.Message)
