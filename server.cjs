@@ -262,15 +262,28 @@ function spawnDeployUpdateJob() {
   ].filter(Boolean);
   let child = null;
   let lastSpawnErr = null;
+  const childLogPath = path.join(logsDir, 'deploy-update-child.log');
+  let childLogFd = null;
+  try {
+    childLogFd = fs.openSync(childLogPath, 'a');
+    fs.writeSync(
+      childLogFd,
+      `[${new Date().toISOString()}] --- spawn cycle start --- script=${ps1}\n`
+    );
+  } catch (_) {
+    childLogFd = null;
+  }
   for (const exe of psCandidates) {
     try {
       appendDeployLogLine(`Deploy spawn attempt using: ${exe}`);
-      child = spawn(exe, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1], {
+      const args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ps1];
+      const spawnOpts = {
         cwd: __dirname,
         detached: true,
-        stdio: 'ignore',
+        stdio: childLogFd != null ? ['ignore', childLogFd, childLogFd] : 'ignore',
         windowsHide: true,
-      });
+      };
+      child = spawn(exe, args, spawnOpts);
       lastSpawnErr = null;
       break;
     } catch (err) {
@@ -289,9 +302,20 @@ function spawnDeployUpdateJob() {
     finished = true;
     child.removeListener('exit', onExit);
     child.removeListener('error', onSpawnErr);
+    if (childLogFd != null) {
+      try {
+        fs.writeSync(
+          childLogFd,
+          `[${new Date().toISOString()}] --- spawn cycle end --- ${detail || ''}\n`
+        );
+        fs.closeSync(childLogFd);
+      } catch (_) {}
+      childLogFd = null;
+    }
     releaseDeployUpdateJobLock(detail);
   }
   function onExit(code, signal) {
+    appendDeployLogLine(`deploy-update child exited: code=${code} signal=${signal || ''}`);
     finish(`script exit code ${code}${signal ? ` signal ${signal}` : ''}`);
   }
   function onSpawnErr(err) {
