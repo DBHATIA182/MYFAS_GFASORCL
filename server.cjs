@@ -276,7 +276,23 @@ function spawnDeployUpdateJob() {
   for (const exe of psCandidates) {
     try {
       appendDeployLogLine(`Deploy spawn attempt using: ${exe}`);
-      const args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ps1];
+      const ps1Esc = ps1.replace(/'/g, "''");
+      const bootstrapCmd =
+        `$ErrorActionPreference='Stop';` +
+        `Write-Output ('[bootstrap] ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' running ' + [System.Security.Principal.WindowsIdentity]::GetCurrent().Name);` +
+        `& '${ps1Esc}';` +
+        `$ec=$LASTEXITCODE;` +
+        `if($ec -ne $null -and $ec -ne 0){exit $ec};` +
+        `exit 0;`;
+      const args = [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        bootstrapCmd,
+      ];
       const spawnOpts = {
         cwd: __dirname,
         detached: true,
