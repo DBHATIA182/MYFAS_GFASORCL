@@ -6,6 +6,18 @@ import { ageingCurBalDisplay } from '../utils/ageingDisplay';
 
 const LEDGER_SALE_VR_TYPES = new Set(['SL', 'SE', 'CN']);
 
+function formatBillLedgerPartyCaption(name, code, city, tel) {
+  const n = String(name || '').trim();
+  const c = String(code || '').trim();
+  const cityStr = String(city || '').trim();
+  const telStr = String(tel || '').trim();
+  const head = c ? `${n || 'Party'} (${c})` : n || 'Party';
+  const bits = [head];
+  if (cityStr) bits.push(cityStr);
+  if (telStr) bits.push(`Tel: ${telStr}`);
+  return bits.join(' · ');
+}
+
 export default function ReportTable({
   data,
   type,
@@ -488,6 +500,8 @@ export default function ReportTable({
 
   // --- BILL-WISE LEDGER (BILLS + running balance per bill) ---
   if (type === 'bill-ledger') {
+    const billLedgerCrFirst = String(billLedgerKind).toLowerCase() === 'supplier';
+
     const billKeyOf = (row) => {
       const billNo = String(row.BILL_NO ?? row.bill_no ?? '').trim();
       const billDt = formatLedgerDateDisplay(row.BILL_DATE ?? row.bill_date);
@@ -555,14 +569,14 @@ export default function ReportTable({
 
     const intHead = billLedgerInterest ? (
       <>
-        <th className="text-right" scope="col">
-          Int days
+        <th className="text-right col-bill-ledger-int-days" scope="col" title="Interest days">
+          Days
         </th>
-        <th className="text-right bill-ledger-th-interest" scope="col">
-          Interest
+        <th className="text-right bill-ledger-th-interest col-bill-ledger-int-amt" scope="col">
+          Int
         </th>
-        <th className="text-right" scope="col">
-          Closing + int
+        <th className="text-right col-bill-ledger-int-close" scope="col" title="Closing + interest">
+          Cl+int
         </th>
       </>
     ) : null;
@@ -570,31 +584,102 @@ export default function ReportTable({
     const firstRow = data?.[0] || {};
     const partyCodeTop = String(meta?.billLedgerPartyCode ?? firstRow.CODE ?? firstRow.code ?? '').trim();
     const partyNameTop = String(meta?.billLedgerPartyName ?? firstRow.NAME ?? firstRow.name ?? '').trim();
+    const partyCityTop = String(meta?.billLedgerPartyCity ?? firstRow.CITY ?? firstRow.city ?? '').trim();
+    const partyTelTop = String(meta?.billLedgerPartyTel ?? firstRow.TEL_NO_O ?? firstRow.tel_no_o ?? '').trim();
+    const compTop = String(meta?.billLedgerCompanyName ?? '').trim();
+    const partyLineTop = formatBillLedgerPartyCaption(partyNameTop, partyCodeTop, partyCityTop, partyTelTop);
 
     return (
       <div className="table-responsive table-responsive--bill-ledger">
-        {(partyCodeTop || partyNameTop) ? (
-          <p style={{ margin: '0 0 8px', fontWeight: 700, color: '#0f172a' }}>
-            {partyNameTop || 'Party'}{partyCodeTop ? ` (${partyCodeTop})` : ''}
-          </p>
+        {compTop ? (
+          <p style={{ margin: '0 0 4px', fontWeight: 700, color: '#0f172a' }}>{compTop}</p>
         ) : null}
-        <table className="report-table report-table--bill-ledger">
+        {partyCodeTop || partyNameTop ? (
+          <p style={{ margin: compTop ? '0 0 8px' : '0 0 8px', fontWeight: 700, color: '#0f172a' }}>{partyLineTop}</p>
+        ) : null}
+        <table
+          className={`report-table report-table--bill-ledger ${
+            billLedgerInterest
+              ? 'report-table--bill-ledger-with-interest'
+              : 'report-table--bill-ledger-no-interest'
+          }`}
+        >
+          <colgroup>
+            {/*
+              One <col> per table column (must match thead th count exactly).
+              With interest: 7 + Dr/Cr/Bal + Days/Int/Cl+int = 13 cols.
+              Without: 7 + Dr/Cr/Bal = 10 cols.
+            */}
+            {billLedgerInterest ? (
+              <>
+                <col style={{ width: '6.5%' }} />
+                <col style={{ width: '9.5%' }} />
+                <col style={{ width: '2.5%' }} />
+                <col style={{ width: '9.5%' }} />
+                <col style={{ width: '9.5%' }} />
+                <col style={{ width: '5.5%' }} />
+                <col style={{ width: '2.5%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '5%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '9.5%' }} />
+              </>
+            ) : (
+              <>
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '3%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '4%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '11%' }} />
+              </>
+            )}
+          </colgroup>
           <thead>
             <tr>
-              <th scope="col">Bill no</th>
-              <th scope="col">Bill date</th>
-              <th scope="col">B type</th>
-              <th scope="col">Vr date</th>
-              <th scope="col">Vr no</th>
-              <th scope="col">Vr type</th>
-              <th className="text-right" scope="col">
-                Cr amt
+              <th scope="col" className="col-bill-ledger-bill-no">
+                Bill no
               </th>
-              <th className="text-right" scope="col">
-                Dr amt
+              <th scope="col" className="col-bill-ledger-date">
+                Bill date
               </th>
-              <th className="text-right" scope="col">
-                Current bal
+              <th scope="col" className="col-bill-ledger-bt" title="Bill type">
+                BT
+              </th>
+              <th scope="col" className="col-bill-ledger-date">
+                Vr date
+              </th>
+              <th scope="col" className="col-bill-ledger-date">
+                V date
+              </th>
+              <th scope="col" className="col-bill-ledger-vr-no">
+                Vr no
+              </th>
+              <th scope="col" className="col-bill-ledger-vt" title="Voucher type">
+                VT
+              </th>
+              <th
+                className="text-right col-bill-ledger-amt"
+                scope="col"
+                title={billLedgerCrFirst ? 'Credit amount' : 'Debit amount'}
+              >
+                {billLedgerCrFirst ? 'Cr.Amount' : 'Dr.Amount'}
+              </th>
+              <th
+                className="text-right col-bill-ledger-amt"
+                scope="col"
+                title={billLedgerCrFirst ? 'Debit amount' : 'Credit amount'}
+              >
+                {billLedgerCrFirst ? 'Dr.Amount' : 'Cr.Amount'}
+              </th>
+              <th className="text-right col-bill-ledger-amt" scope="col" title="Closing balance">
+                Closing Bal.
               </th>
               {intHead}
             </tr>
@@ -607,27 +692,27 @@ export default function ReportTable({
                 const bType = item.B_TYPE ?? item.b_type ?? '—';
                 return (
                   <tr key={`bt-${i}`} className="bill-ledger-bill-total">
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <strong>Bill total — {billDt} / {billNo} / {bType}</strong>
                     </td>
-                    <td className="text-right">
-                      <strong>{fmtAlways(item.CR_AMT)}</strong>
+                    <td className="text-right col-bill-ledger-amt">
+                      <strong>{fmtAlways(billLedgerCrFirst ? item.CR_AMT : item.DR_AMT)}</strong>
                     </td>
-                    <td className="text-right">
-                      <strong>{fmtAlways(item.DR_AMT)}</strong>
+                    <td className="text-right col-bill-ledger-amt">
+                      <strong>{fmtAlways(billLedgerCrFirst ? item.DR_AMT : item.CR_AMT)}</strong>
                     </td>
-                    <td className="text-right">
+                    <td className="text-right col-bill-ledger-amt">
                       <strong>{fmtAlways(item.CL_BALANCE)}</strong>
                     </td>
                     {billLedgerInterest ? (
                       <>
-                        <td className="text-right">
+                        <td className="text-right col-bill-ledger-int-days">
                           <strong>{item.INTEREST_DAYS != null && item.INTEREST_DAYS !== '' ? item.INTEREST_DAYS : '—'}</strong>
                         </td>
-                        <td className="text-right bill-ledger-interest-amt">
+                        <td className="text-right bill-ledger-interest-amt col-bill-ledger-int-amt">
                           <strong>{fmtAlways(item.INTEREST_AMT)}</strong>
                         </td>
-                        <td className="text-right">
+                        <td className="text-right col-bill-ledger-int-close">
                           <strong>{fmtAlways(item.CLOSE_PLUS_INT)}</strong>
                         </td>
                       </>
@@ -639,33 +724,51 @@ export default function ReportTable({
               const row = item.row;
               const billDt = row.BILL_DATE ?? row.bill_date;
               const vrDt = row.VR_DATE ?? row.vr_date;
+              const vDt = row.V_DATE ?? row.v_date;
               const cl = parseFloat(row.CL_BALANCE ?? row.cl_balance ?? 0) || 0;
               return (
                 <tr key={i}>
-                  <td>{row.BILL_NO ?? row.bill_no ?? '—'}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>{formatLedgerDateDisplay(billDt)}</td>
-                  <td>{row.B_TYPE ?? row.b_type ?? '—'}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>{formatLedgerDateDisplay(vrDt)}</td>
-                  <td>{row.VR_NO ?? row.vr_no ?? '—'}</td>
-                  <td>
+                  <td
+                    className="col-bill-ledger-bill-no"
+                    title={String(row.BILL_NO ?? row.bill_no ?? '')}
+                  >
+                    {row.BILL_NO ?? row.bill_no ?? '—'}
+                  </td>
+                  <td className="col-bill-ledger-date">{formatLedgerDateDisplay(billDt)}</td>
+                  <td className="col-bill-ledger-bt">{row.B_TYPE ?? row.b_type ?? '—'}</td>
+                  <td className="col-bill-ledger-date">{formatLedgerDateDisplay(vrDt)}</td>
+                  <td className="col-bill-ledger-date">
+                    {vDt != null && vDt !== '' ? formatLedgerDateDisplay(vDt) : '—'}
+                  </td>
+                  <td
+                    className="col-bill-ledger-vr-no"
+                    title={String(row.VR_NO ?? row.vr_no ?? '')}
+                  >
+                    {row.VR_NO ?? row.vr_no ?? '—'}
+                  </td>
+                  <td className="col-bill-ledger-vt">
                     <span className={`badge-type ${row.VR_TYPE ?? row.vr_type ?? ''}`}>
                       {row.VR_TYPE ?? row.vr_type ?? '—'}
                     </span>
                   </td>
-                  <td className="text-right cr-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
-                  <td className="text-right dr-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
-                  <td className="text-right" style={{ fontWeight: 700, color: '#2c7a7b' }}>
+                  <td className={`text-right col-bill-ledger-amt ${billLedgerCrFirst ? 'cr-amt' : 'dr-amt'}`}>
+                    {fmt(billLedgerCrFirst ? row.CR_AMT ?? row.cr_amt : row.DR_AMT ?? row.dr_amt)}
+                  </td>
+                  <td className={`text-right col-bill-ledger-amt ${billLedgerCrFirst ? 'dr-amt' : 'cr-amt'}`}>
+                    {fmt(billLedgerCrFirst ? row.DR_AMT ?? row.dr_amt : row.CR_AMT ?? row.cr_amt)}
+                  </td>
+                  <td className="text-right col-bill-ledger-amt" style={{ fontWeight: 700, color: '#2c7a7b' }}>
                     {fmtAlways(cl)}
                   </td>
                   {billLedgerInterest ? (
                     <>
-                      <td className="text-right" style={{ opacity: 0.65 }}>
+                      <td className="text-right col-bill-ledger-int-days" style={{ opacity: 0.65 }}>
                         —
                       </td>
-                      <td className="text-right" style={{ opacity: 0.65 }}>
+                      <td className="text-right col-bill-ledger-int-amt" style={{ opacity: 0.65 }}>
                         —
                       </td>
-                      <td className="text-right" style={{ opacity: 0.65 }}>
+                      <td className="text-right col-bill-ledger-int-close" style={{ opacity: 0.65 }}>
                         —
                       </td>
                     </>
@@ -674,7 +777,7 @@ export default function ReportTable({
               );
             })}
             <tr className="bill-ledger-grand-total">
-              <td colSpan={6}>
+              <td colSpan={7}>
                 <strong>GRAND TOTAL</strong>
                 <span className="bill-ledger-grand-note">
                   {' '}
@@ -682,24 +785,24 @@ export default function ReportTable({
                   {billLedgerInterest ? `; interest per bill (${String(billLedgerKind).toLowerCase() === 'supplier' ? 'GETINT_SUP' : 'GETINT'})` : ''})
                 </span>
               </td>
-              <td className="text-right">
-                <strong>{fmtAlways(sumCr)}</strong>
+              <td className="text-right col-bill-ledger-amt">
+                <strong>{fmtAlways(billLedgerCrFirst ? sumCr : sumDr)}</strong>
               </td>
-              <td className="text-right">
-                <strong>{fmtAlways(sumDr)}</strong>
+              <td className="text-right col-bill-ledger-amt">
+                <strong>{fmtAlways(billLedgerCrFirst ? sumDr : sumCr)}</strong>
               </td>
-              <td className="text-right">
+              <td className="text-right col-bill-ledger-amt">
                 <strong>{fmtAlways(sumCurrent)}</strong>
               </td>
               {billLedgerInterest ? (
                 <>
-                  <td className="text-right">
+                  <td className="text-right col-bill-ledger-int-days">
                     <strong>—</strong>
                   </td>
-                  <td className="text-right bill-ledger-interest-amt">
+                  <td className="text-right bill-ledger-interest-amt col-bill-ledger-int-amt">
                     <strong>{fmtAlways(sumInterest)}</strong>
                   </td>
-                  <td className="text-right">
+                  <td className="text-right col-bill-ledger-int-close">
                     <strong>{fmtAlways(sumClosePlusInt)}</strong>
                   </td>
                 </>

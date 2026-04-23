@@ -8,7 +8,8 @@ const cors = require('cors');
 const connectionConfig = require('./connection.config.json');
 const app = express();
 
-const PORT = 5001;
+/** Default 5001; override when busy: PowerShell `$env:PORT=5002; node server.cjs` */
+const PORT = Number(process.env.PORT) || 5001;
 
 // Oracle paths: no drive letter — same parent folder as this app (\gfasorcl\apptest → ..\oracle_bridge, TNS in \gfasorcl)
 const GFASORCL_ROOT = path.join(__dirname, '..');
@@ -1856,6 +1857,7 @@ app.get('/api/bill-ledger-parties', async (req, res) => {
         M.NAME,
         M.CITY,
         M.CODE,
+        M.TEL_NO_O,
         NVL(SUM(${balExpr}), 0) AS CUR_BAL
       FROM MASTER M
       LEFT JOIN LEDGER L
@@ -1863,7 +1865,7 @@ app.get('/api/bill-ledger-parties', async (req, res) => {
        AND M.CODE = L.CODE
       WHERE M.COMP_CODE = :comp_code
         AND ${scheduleFilter.replace(/SCHEDULE/g, 'M.SCHEDULE')}
-      GROUP BY M.NAME, M.CITY, M.CODE
+      GROUP BY M.NAME, M.CITY, M.CODE, M.TEL_NO_O
       ORDER BY M.NAME, M.CITY, M.CODE`;
     const rows = await runQuery(sql, { comp_code }, comp_uid);
     res.json(rows);
@@ -1961,6 +1963,7 @@ app.get('/api/bill-ledger', async (req, res) => {
           A.BILL_DATE,
           A.B_TYPE,
           A.VR_DATE,
+          A.V_DATE,
           A.VR_NO,
           A.VR_TYPE,
           NVL(A.DR_AMT,0) DR_AMT,
@@ -2018,6 +2021,7 @@ app.get('/api/bill-ledger', async (req, res) => {
           lines.BILL_DATE,
           lines.B_TYPE,
           lines.VR_DATE,
+          lines.V_DATE,
           lines.VR_NO,
           lines.VR_TYPE,
           lines.DR_AMT,
@@ -2126,6 +2130,7 @@ app.get('/api/bill-ledger', async (req, res) => {
         filtered.BILL_DATE,
         filtered.B_TYPE,
         filtered.VR_DATE,
+        filtered.V_DATE,
         filtered.VR_NO,
         filtered.VR_TYPE,
         filtered.DR_AMT,
@@ -2149,6 +2154,7 @@ app.get('/api/bill-ledger', async (req, res) => {
         filtered.BILL_DATE,
         filtered.B_TYPE,
         filtered.VR_DATE,
+        filtered.V_DATE,
         filtered.VR_NO,
         filtered.VR_TYPE,
         filtered.DR_AMT,
@@ -3233,7 +3239,7 @@ app.get('/api/purchase-bill-print', async (req, res) => {
 resolveActiveDbConfig()
   .then((cfg) => {
     activeDbConfig = cfg;
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`🚀 API server on port ${PORT}`);
       console.log(`   Oracle hub (before year schema): ${maskOracleLog(activeDbConfig)}`);
       if (!GRAIN_ORACLE_HUB_ENABLED) {
@@ -3248,6 +3254,19 @@ resolveActiveDbConfig()
         '   Reports: /api/salelist-*, /api/stock-sum, /api/stock-sum-detail, /api/stocklot-*, /api/stock-lot, /api/sale-bill-print, /api/purchase-bill-print'
       );
       console.log(`✅ Ready for iPhone connections via Cloudflare Tunnel`);
+    });
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(
+          `❌ Port ${PORT} is already in use (another process, often node.exe). Options:\n` +
+            `   • Free the port: Task Manager → Details → end the other node.exe, or (Admin) taskkill /PID <pid> /F\n` +
+            `   • Use another port:  $env:PORT=5002; node server.cjs   (then point the app / tunnel to that port)`
+        );
+        process.exit(1);
+        return;
+      }
+      console.error(err);
+      process.exit(1);
     });
   })
   .catch((err) => {

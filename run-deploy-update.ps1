@@ -20,7 +20,46 @@ function Log([string]$m) {
 
 Log '--- deploy update started ---'
 
+function Stop-AppProcesses {
+    Log 'Stopping app-related processes...'
+    try {
+        $likeRoot = '*' + $AppRoot + '*'
+        $targets = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.CommandLine -and
+                ($_.CommandLine -like $likeRoot) -and
+                ($_.Name -in @('node.exe', 'esbuild.exe', 'cloudflared.exe'))
+            }
+        foreach ($p in $targets) {
+            try {
+                Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop
+                Log ("Stopped by path/name filter: " + $p.Name + " PID " + $p.ProcessId)
+            } catch {
+                Log ("Could not stop PID " + $p.ProcessId + ": " + $_.Exception.Message)
+            }
+        }
+    } catch {
+        Log ("WARN path-based stop failed: " + $_.Exception.Message)
+    }
+
+    try {
+        Get-Process node, esbuild, cloudflared -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                Stop-Process -Id $_.Id -Force -ErrorAction Stop
+                Log ("Stopped by process-name filter: " + $_.ProcessName + " PID " + $_.Id)
+            } catch {
+                Log ("Could not stop " + $_.ProcessName + " PID " + $_.Id + ": " + $_.Exception.Message)
+            }
+        }
+    } catch {
+        Log ("WARN process-name stop failed: " + $_.Exception.Message)
+    }
+}
+
 try {
+    Stop-AppProcesses
+    Start-Sleep -Seconds 1
+
     $updateScript = Join-Path $AppRoot 'update-from-git.ps1'
     if (-not (Test-Path -LiteralPath $updateScript)) {
         throw "Missing update-from-git.ps1"
@@ -39,37 +78,23 @@ try {
     exit 1
 }
 
-try {
-    Log 'Stopping Node processes for this app (API + Vite)...'
-    $likeRoot = '*' + $AppRoot + '*'
-    $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.Name -eq 'node.exe' -and $_.CommandLine -and
-            ($_.CommandLine -like $likeRoot) -and
-            ($_.CommandLine -match 'server\.cjs' -or $_.CommandLine -match 'vite')
-        }
-    foreach ($p in $procs) {
-        try {
-            Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop
-            Log ("Stopped node.exe PID " + $p.ProcessId)
-        } catch {
-            Log ("Could not stop PID " + $p.ProcessId + ": " + $_.Exception.Message)
-        }
-    }
-} catch {
-    Log ("WARN during process stop: " + $_.Exception.Message)
-}
+Stop-AppProcesses
 
 Start-Sleep -Seconds 2
 
 try {
-    $launcher = Join-Path $AppRoot 'run-autostart-stack.cmd'
-    if (Test-Path -LiteralPath $launcher) {
+    $psLauncher = Join-Path $AppRoot 'start-apptest-services.ps1'
+    $cmdLauncher = Join-Path $AppRoot 'run-autostart-stack.cmd'
+    if (Test-Path -LiteralPath $psLauncher) {
+        Log 'Starting start-apptest-services.ps1...'
+        Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$psLauncher`"", '-AppRoot', "`"$AppRoot`"") -WorkingDirectory $AppRoot -WindowStyle Minimized
+        Log 'start-apptest-services.ps1 started.'
+    } elseif (Test-Path -LiteralPath $cmdLauncher) {
         Log 'Starting run-autostart-stack.cmd...'
-        Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', "`"$launcher`"") -WorkingDirectory $AppRoot -WindowStyle Minimized
-        Log 'Launcher started.'
+        Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', "`"$cmdLauncher`"") -WorkingDirectory $AppRoot -WindowStyle Minimized
+        Log 'run-autostart-stack.cmd started.'
     } else {
-        Log 'WARN: run-autostart-stack.cmd not found — start API + Vite + tunnel manually.'
+        Log 'WARN: Neither start-apptest-services.ps1 nor run-autostart-stack.cmd found — start services manually.'
     }
 } catch {
     Log ("ERROR starting launcher: " + $_.Exception.Message)

@@ -7,6 +7,19 @@ import { toInputDateString, toOracleDate, toDisplayDate, getCurBal, formatCurBal
 
 const DEFAULT_HISTORY_START_DATE = '2001-04-01';
 
+/** Party caption: name (code) · city · Tel: … (omit empty city/tel). */
+function formatBillLedgerPartyCaption(row, code) {
+  const name = String(row?.NAME ?? row?.name ?? '').trim();
+  const c = String(code ?? '').trim();
+  const city = String(row?.CITY ?? row?.city ?? '').trim();
+  const tel = String(row?.TEL_NO_O ?? row?.tel_no_o ?? '').trim();
+  const head = c ? `${name || 'Party'} (${c})` : name || 'Party';
+  const bits = [head];
+  if (city) bits.push(city);
+  if (tel) bits.push(`Tel: ${tel}`);
+  return bits.join(' · ');
+}
+
 function highlightMatch(text, q) {
   if (text == null) return null;
   const s = String(text);
@@ -207,6 +220,8 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
     year: compYear,
     partyName: selectedPartyRow?.NAME ?? selectedPartyRow?.name ?? '',
     partyCode: String(selectedCode),
+    partyCity: selectedPartyRow?.CITY ?? selectedPartyRow?.city ?? '',
+    partyTel: selectedPartyRow?.TEL_NO_O ?? selectedPartyRow?.tel_no_o ?? '',
     endDate: `${toDisplayDate(billStart)} – ${toDisplayDate(billEnd)}`,
     payEndDate: toDisplayDate(payEndDate),
     filterLabel: mco === 'O' ? 'Outstanding bills only' : 'All bills',
@@ -223,7 +238,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
   const shareWhatsApp = () => {
     const shareText = [
       `${ledgerTitle} — ${compName}`,
-      `${compYear} | ${selectedPartyRow?.NAME ?? selectedCode} (${selectedCode})`,
+      `${compYear} | ${formatBillLedgerPartyCaption(selectedPartyRow, selectedCode)}`,
       `Bills: ${toDisplayDate(billStart)} – ${toDisplayDate(billEnd)} | Pay to: ${toDisplayDate(payEndDate)}`,
       mco === 'O' ? 'Filter: Outstanding' : 'Filter: All',
     ].join('\n');
@@ -271,10 +286,11 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
 
         <div className="report-info">
           <p>
-            <strong>{selectedPartyRow?.NAME ?? 'Party'}</strong> ({selectedCode})
+            <strong>{compName || 'Company'}</strong>
+            {compYear ? <> | FY {compYear}</> : null}
           </p>
           <p>
-            {compName} | FY {compYear}
+            {formatBillLedgerPartyCaption(selectedPartyRow, selectedCode)}
             <br />
             Bills {toDisplayDate(billStart)} – {toDisplayDate(billEnd)} · Payment cut-off {toDisplayDate(payEndDate)}
             <br />
@@ -296,8 +312,11 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
             billLedgerInterest={requireInterest === 'Y'}
             billLedgerKind={ledgerKind}
             meta={{
+              billLedgerCompanyName: compName,
               billLedgerPartyCode: selectedCode,
               billLedgerPartyName: selectedPartyRow?.NAME ?? selectedPartyRow?.name ?? '',
+              billLedgerPartyCity: selectedPartyRow?.CITY ?? selectedPartyRow?.city ?? '',
+              billLedgerPartyTel: selectedPartyRow?.TEL_NO_O ?? selectedPartyRow?.tel_no_o ?? '',
             }}
           />
         </div>

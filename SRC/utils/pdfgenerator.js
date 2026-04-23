@@ -285,31 +285,138 @@ const PDF_REPORT_STYLES = `
         table.table-report .col-vr { width: 6%; white-space: nowrap; }
         table.table-report .col-type { width: 5%; white-space: nowrap; }
         table.table-report .col-detail { word-wrap: break-word; max-width: 220px; }
+        table.table-report.bill-ledger-pdf-report { table-layout: fixed; }
+        table.table-report.bill-ledger-pdf-report tbody td {
+          font-size: 9.5px;
+          padding: 4px 2px;
+        }
+        table.table-report.bill-ledger-pdf-report thead th.no-upper {
+          text-transform: none;
+          letter-spacing: 0.02em;
+        }
+        table.table-report.bill-ledger-pdf-report th.col-bill-ledger-bt,
+        table.table-report.bill-ledger-pdf-report td.col-bill-ledger-bt,
+        table.table-report.bill-ledger-pdf-report th.col-bill-ledger-vt,
+        table.table-report.bill-ledger-pdf-report td.col-bill-ledger-vt {
+          text-align: center;
+          padding: 3px 1px;
+          white-space: nowrap;
+          font-size: 8.5px;
+          min-width: 0;
+        }
+        table.table-report.bill-ledger-pdf-report th.col-bill-ledger-date,
+        table.table-report.bill-ledger-pdf-report td.col-bill-ledger-date {
+          white-space: nowrap;
+          font-size: 8.5px;
+          padding: 3px 2px;
+          min-width: 0;
+        }
+        table.table-report.bill-ledger-pdf-report th.col-bill-ledger-bill-no,
+        table.table-report.bill-ledger-pdf-report th.col-bill-ledger-vr-no {
+          overflow: visible;
+          text-overflow: clip;
+          white-space: nowrap;
+          font-size: 8.5px;
+          padding: 3px 1px;
+        }
+        table.table-report.bill-ledger-pdf-report td.col-bill-ledger-bill-no,
+        table.table-report.bill-ledger-pdf-report td.col-bill-ledger-vr-no {
+          white-space: nowrap;
+          font-size: 8.5px;
+          padding: 3px 1px;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        table.table-report.bill-ledger-pdf-report th.col-bill-ledger-int-days,
+        table.table-report.bill-ledger-pdf-report td.col-bill-ledger-int-days,
+        table.table-report.bill-ledger-pdf-report th.col-bill-ledger-int-amt,
+        table.table-report.bill-ledger-pdf-report td.col-bill-ledger-int-amt,
+        table.table-report.bill-ledger-pdf-report th.col-bill-ledger-int-close,
+        table.table-report.bill-ledger-pdf-report td.col-bill-ledger-int-close {
+          text-align: right;
+          white-space: nowrap;
+          min-width: 0;
+          padding: 3px 2px;
+          font-size: 8.5px;
+          font-variant-numeric: tabular-nums;
+        }
+        table.table-report.bill-ledger-pdf-report th.col-bill-ledger-amt,
+        table.table-report.bill-ledger-pdf-report td.col-bill-ledger-amt {
+          text-align: right;
+          padding: 3px 2px;
+          font-size: 8.5px;
+          font-family: Consolas, 'Courier New', monospace;
+          white-space: nowrap;
+          font-variant-numeric: tabular-nums;
+          min-width: 0;
+        }
+        table.table-report.bill-ledger-pdf-report thead th.col-bill-ledger-amt {
+          font-size: 7px;
+          padding: 5px 2px;
+          white-space: normal;
+          line-height: 1.2;
+          vertical-align: bottom;
+        }
+        table.table-report.bill-ledger-pdf-report tr.subtotal-row td.col-bill-ledger-amt {
+          font-size: 8.5px;
+        }
+        table.table-report.bill-ledger-pdf-report tr.report-grand-total td.col-bill-ledger-amt {
+          font-size: 9px;
+          padding: 6px 2px;
+        }
         /* Ledger statement: narrow amount columns, more room for detail */
         table.table-report.table-report-ledger { table-layout: fixed; }
         table.table-report.table-report-ledger thead th {
           text-transform: none;
           letter-spacing: 0.02em;
+          font-size: 10.4px;
+          padding: 8px 4px;
         }
         table.table-report.table-report-ledger .col-detail {
-          max-width: 90px;
+          max-width: none;
           word-wrap: break-word;
           overflow-wrap: break-word;
-          font-size: 6.6px;
+          word-break: break-word;
+          font-size: 10.6px;
+          line-height: 1.4;
+        }
+        table.table-report.table-report-ledger th.col-ledger-vr-date,
+        table.table-report.table-report-ledger td.col-ledger-vr-date,
+        table.table-report.table-report-ledger th.col-ledger-value-dt,
+        table.table-report.table-report-ledger td.col-ledger-value-dt {
+          white-space: nowrap;
+          font-size: 9.6px;
+        }
+        table.table-report.table-report-ledger th.col-ledger-vr-no,
+        table.table-report.table-report-ledger td.col-ledger-vr-no,
+        table.table-report.table-report-ledger th.col-ledger-vr-type,
+        table.table-report.table-report-ledger td.col-ledger-vr-type,
+        table.table-report.table-report-ledger th.col-ledger-line-type,
+        table.table-report.table-report-ledger td.col-ledger-line-type {
+          white-space: nowrap;
+          text-align: center;
+          font-size: 9.4px;
+          padding-left: 2px;
+          padding-right: 2px;
         }
         table.table-report.table-report-ledger th.col-ledger-value-dt,
         table.table-report.table-report-ledger td.col-ledger-value-dt {
-          width: 8%;
-          max-width: 72px;
-          white-space: nowrap;
-          font-size: 7.5px;
+          width: auto;
+          max-width: none;
         }
         table.table-report.table-report-ledger th.ledger-amt-col,
         table.table-report.table-report-ledger td.ledger-amt-col {
-          width: 9%;
-          max-width: 76px;
-          font-size: 7.5px;
-          padding: 3px 3px;
+          width: auto;
+          max-width: none;
+          font-size: 10.2px;
+          padding: 3px 4px;
+          font-variant-numeric: tabular-nums;
+        }
+        table.table-report.table-report-ledger tbody td {
+          font-size: 10.1px;
+          padding-top: 5px;
+          padding-bottom: 5px;
         }
         table.table-report.table-report-ledger td.ledger-cl-bal-pos {
           font-weight: 700;
@@ -336,7 +443,7 @@ const PDF_REPORT_STYLES = `
           text-align: left;
           margin: 8px auto 0 auto;
           max-width: 100%;
-          font-size: 9px;
+          font-size: 10px;
           color: #0f172a;
         }
         .ledger-pdf-company-block {
@@ -349,7 +456,7 @@ const PDF_REPORT_STYLES = `
           font-weight: 600;
         }
         .ledger-pdf-block-title {
-          font-size: 8px;
+          font-size: 8.8px;
           letter-spacing: 0.12em;
           text-transform: uppercase;
           color: #475569;
@@ -357,12 +464,12 @@ const PDF_REPORT_STYLES = `
           font-weight: 700;
         }
         .ledger-pdf-company-name {
-          font-size: 11px;
+          font-size: 12.4px;
           font-weight: 800;
           color: #0f172a;
           margin-bottom: 4px;
         }
-        .ledger-pdf-line { margin: 2px 0; line-height: 1.35; }
+        .ledger-pdf-line { margin: 2px 0; line-height: 1.42; }
 `;
 
 /** Trial balance PDF — same shell and grid lines as ledger */
@@ -534,6 +641,54 @@ function buildLedgerReportHtml(data, metadata) {
     .join('');
   const accountBlock = `<div class="ledger-pdf-account-block"><div class="ledger-pdf-block-title">Account</div>${accountLines}</div>`;
 
+  const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+  const amountLen = (n) => formatAmtPdf(n).replace(/\s+/g, '').length;
+  const maxAmtChars = Math.max(
+    amountLen(sumDr),
+    amountLen(sumCr),
+    amountLen(closingBal),
+    ...rows.map((r) =>
+      Math.max(
+        amountLen(r.DR_AMT ?? r.dr_amt ?? 0),
+        amountLen(r.CR_AMT ?? r.cr_amt ?? 0),
+        amountLen(r.CL_BALANCE ?? r.cl_balance ?? r.RUN_BAL ?? r.run_bal ?? 0)
+      )
+    )
+  );
+  const maxDetailChars = Math.max(
+    12,
+    ...rows.map((r) => String(r.DETAIL ?? r.detail ?? '').replace(/\s+/g, ' ').trim().length)
+  );
+  let amountColW = maxAmtChars >= 14 ? 11.5 : maxAmtChars >= 12 ? 11 : 10.5;
+  const vrDateW = 7;
+  const valueDateW = 7;
+  const vrNoW = 5;
+  const vrTypeW = 4.5;
+  const typeW = 4.5;
+  const fixedW = vrDateW + valueDateW + vrNoW + vrTypeW + typeW;
+  let detailW = clamp(31 + Math.floor((maxDetailChars - 20) / 6), 31, 42);
+  let total = fixedW + detailW + amountColW * 3;
+  if (total > 100) {
+    const overflow = total - 100;
+    amountColW = clamp(amountColW - overflow / 3, 9.6, 12);
+    total = fixedW + detailW + amountColW * 3;
+  }
+  if (total < 100) {
+    detailW = clamp(detailW + (100 - total), 31, 44);
+  }
+  const ledgerColgroup = `
+        <colgroup>
+          <col style="width:${vrDateW.toFixed(2)}%" />
+          <col style="width:${valueDateW.toFixed(2)}%" />
+          <col style="width:${vrNoW.toFixed(2)}%" />
+          <col style="width:${vrTypeW.toFixed(2)}%" />
+          <col style="width:${typeW.toFixed(2)}%" />
+          <col style="width:${detailW.toFixed(2)}%" />
+          <col style="width:${amountColW.toFixed(2)}%" />
+          <col style="width:${amountColW.toFixed(2)}%" />
+          <col style="width:${amountColW.toFixed(2)}%" />
+        </colgroup>`;
+
   let bodyRows = '';
   rows.forEach((row) => {
     const vrType = row.VR_TYPE ?? row.vr_type ?? '';
@@ -549,11 +704,11 @@ function buildLedgerReportHtml(data, metadata) {
     const clCls = clNum < 0 ? 'ledger-cl-bal-neg' : 'ledger-cl-bal-pos';
     bodyRows += `
             <tr class="${opClass.trim()}">
-              <td class="col-date">${d}</td>
+              <td class="col-date col-ledger-vr-date">${d}</td>
               <td class="col-date col-ledger-value-dt">${vd}</td>
-              <td class="col-vr">${escHtml(row.VR_NO ?? row.vr_no ?? '—')}</td>
-              <td class="col-type">${escHtml(vrType)}</td>
-              <td class="col-type">${escHtml(lineType !== '' ? String(lineType) : '—')}</td>
+              <td class="col-vr col-ledger-vr-no">${escHtml(row.VR_NO ?? row.vr_no ?? '—')}</td>
+              <td class="col-type col-ledger-vr-type">${escHtml(vrType)}</td>
+              <td class="col-type col-ledger-line-type">${escHtml(lineType !== '' ? String(lineType) : '—')}</td>
               <td class="col-detail">${detail}</td>
               <td class="amount ledger-amt-col">${formatAmtPdf(row.DR_AMT ?? row.dr_amt)}</td>
               <td class="amount ledger-amt-col">${formatAmtPdf(row.CR_AMT ?? row.cr_amt)}</td>
@@ -576,13 +731,14 @@ function buildLedgerReportHtml(data, metadata) {
       </div>
 
       <table class="table-report table-report-ledger">
+        ${ledgerColgroup}
         <thead>
           <tr>
-            <th>Vr.Date</th>
+            <th class="col-ledger-vr-date">Vr.Date</th>
             <th class="col-ledger-value-dt">Value Date</th>
-            <th>Vr.No.</th>
-            <th>Vr.Type</th>
-            <th>Type</th>
+            <th class="col-ledger-vr-no">Vr.No.</th>
+            <th class="col-ledger-vr-type">Vr.Type</th>
+            <th class="col-ledger-line-type">Type</th>
             <th>Detail</th>
             <th class="amount ledger-amt-col">Dr.Amount</th>
             <th class="amount ledger-amt-col">Cr.Amount</th>
@@ -615,6 +771,7 @@ function buildBillLedgerReportHtml(data, metadata) {
   const useInt = Boolean(metadata.billLedgerInterest);
   const ledgerTitle = escHtml(metadata.billLedgerTitle || 'CustomerLedger');
   const ledgerKind = String(metadata.billLedgerKind || 'customer').toLowerCase() === 'supplier' ? 'supplier' : 'customer';
+  const billLedgerCrFirst = ledgerKind === 'supplier';
   let sumDr = 0;
   let sumCr = 0;
   let sumCurrent = 0;
@@ -623,7 +780,13 @@ function buildBillLedgerReportHtml(data, metadata) {
 
   const company = escHtml(metadata.companyName);
   const year = escHtml(metadata.year);
-  const party = escHtml(metadata.partyName);
+  const partyNameRaw = String(metadata.partyName || '').trim();
+  const partyCityRaw = String(metadata.partyCity ?? '').trim();
+  const partyTelRaw = String(metadata.partyTel ?? '').trim();
+  const partyParts = [partyNameRaw];
+  if (partyCityRaw) partyParts.push(partyCityRaw);
+  if (partyTelRaw) partyParts.push(`Tel: ${partyTelRaw}`);
+  const party = escHtml(partyParts.join(' · '));
   const pcode = escHtml(metadata.partyCode);
   const period = escHtml(metadata.endDate);
   const payEnd = escHtml(metadata.payEndDate ?? '');
@@ -639,9 +802,11 @@ function buildBillLedgerReportHtml(data, metadata) {
   };
 
   const intHead = useInt
-    ? '<th class="amount">Int days</th><th class="amount">Interest</th><th class="amount">Closing+int</th>'
+    ? '<th class="amount col-bill-ledger-int-days no-upper" title="Interest days">Days</th><th class="amount col-bill-ledger-int-amt no-upper">Int</th><th class="amount col-bill-ledger-int-close no-upper" title="Closing + interest">Cl+int</th>'
     : '';
-  const intBlank = useInt ? '<td class="amount" style="opacity:.65">—</td><td class="amount" style="opacity:.65">—</td><td class="amount" style="opacity:.65">—</td>' : '';
+  const intBlank = useInt
+    ? '<td class="amount col-bill-ledger-int-days" style="opacity:.65">—</td><td class="amount col-bill-ledger-int-amt" style="opacity:.65">—</td><td class="amount col-bill-ledger-int-close" style="opacity:.65">—</td>'
+    : '';
 
   let bodyRows = '';
   let billDr = 0;
@@ -660,17 +825,21 @@ function buildBillLedgerReportHtml(data, metadata) {
 
     const billDt = escHtml(formatLedgerDateDisplay(row.BILL_DATE ?? row.bill_date));
     const vrDt = escHtml(formatLedgerDateDisplay(row.VR_DATE ?? row.vr_date));
+    const vDtRaw = row.V_DATE ?? row.v_date;
+    const vDtEsc =
+      vDtRaw != null && vDtRaw !== '' ? escHtml(formatLedgerDateDisplay(vDtRaw)) : '—';
     bodyRows += `
             <tr>
-              <td class="col-vr">${escHtml(row.BILL_NO ?? row.bill_no ?? '')}</td>
-              <td class="col-date">${billDt}</td>
-              <td class="col-type">${escHtml(row.B_TYPE ?? row.b_type ?? '')}</td>
-              <td class="col-date">${vrDt}</td>
-              <td class="col-vr">${escHtml(row.VR_NO ?? row.vr_no ?? '')}</td>
-              <td class="col-type">${escHtml(row.VR_TYPE ?? row.vr_type ?? '')}</td>
-              <td class="amount">${formatAmtPdf(row.CR_AMT ?? row.cr_amt)}</td>
-              <td class="amount">${formatAmtPdf(row.DR_AMT ?? row.dr_amt)}</td>
-              <td class="amount bal">${formatAmtPdf(row.CL_BALANCE ?? row.cl_balance)}</td>
+              <td class="col-vr col-bill-ledger-bill-no">${escHtml(row.BILL_NO ?? row.bill_no ?? '')}</td>
+              <td class="col-date col-bill-ledger-date">${billDt}</td>
+              <td class="col-type col-bill-ledger-bt">${escHtml(row.B_TYPE ?? row.b_type ?? '')}</td>
+              <td class="col-date col-bill-ledger-date">${vrDt}</td>
+              <td class="col-date col-bill-ledger-date">${vDtEsc}</td>
+              <td class="col-vr col-bill-ledger-vr-no">${escHtml(row.VR_NO ?? row.vr_no ?? '')}</td>
+              <td class="col-type col-bill-ledger-vt">${escHtml(row.VR_TYPE ?? row.vr_type ?? '')}</td>
+              <td class="amount col-bill-ledger-amt">${formatAmtPdf(billLedgerCrFirst ? row.CR_AMT ?? row.cr_amt : row.DR_AMT ?? row.dr_amt)}</td>
+              <td class="amount col-bill-ledger-amt">${formatAmtPdf(billLedgerCrFirst ? row.DR_AMT ?? row.dr_amt : row.CR_AMT ?? row.cr_amt)}</td>
+              <td class="amount col-bill-ledger-amt bal">${formatAmtPdf(row.CL_BALANCE ?? row.cl_balance)}</td>
               ${intBlank}
             </tr>`;
 
@@ -691,14 +860,14 @@ function buildBillLedgerReportHtml(data, metadata) {
       sumClosePlusInt += closePlus;
     }
     const intCells = useInt
-      ? `<td class="amount"><strong>${idaysEsc}</strong></td><td class="amount bill-ledger-interest-amt-pdf"><strong>${formatAmtPdf(intAmt)}</strong></td><td class="amount"><strong>${formatAmtPdf(closePlus)}</strong></td>`
+      ? `<td class="amount col-bill-ledger-int-days"><strong>${idaysEsc}</strong></td><td class="amount bill-ledger-interest-amt-pdf col-bill-ledger-int-amt"><strong>${formatAmtPdf(intAmt)}</strong></td><td class="amount col-bill-ledger-int-close"><strong>${formatAmtPdf(closePlus)}</strong></td>`
       : '';
     bodyRows += `
             <tr class="subtotal-row">
-              <td colspan="6" class="col-name"><strong>Bill total — ${billDt} / ${bn} / ${bt}</strong></td>
-              <td class="amount"><strong>${formatAmtPdf(billCr)}</strong></td>
-              <td class="amount"><strong>${formatAmtPdf(billDr)}</strong></td>
-              <td class="amount"><strong>${formatAmtPdf(billCurrent)}</strong></td>
+              <td colspan="7" class="col-name"><strong>Bill total — ${billDt} / ${bn} / ${bt}</strong></td>
+              <td class="amount col-bill-ledger-amt"><strong>${formatAmtPdf(billLedgerCrFirst ? billCr : billDr)}</strong></td>
+              <td class="amount col-bill-ledger-amt"><strong>${formatAmtPdf(billLedgerCrFirst ? billDr : billCr)}</strong></td>
+              <td class="amount col-bill-ledger-amt"><strong>${formatAmtPdf(billCurrent)}</strong></td>
               ${intCells}
             </tr>`;
     sumCurrent += billCurrent;
@@ -708,8 +877,20 @@ function buildBillLedgerReportHtml(data, metadata) {
   });
 
   const intGrand = useInt
-    ? `<td class="amount"><strong>—</strong></td><td class="amount bill-ledger-interest-amt-pdf"><strong>${formatAmtPdf(sumInterest)}</strong></td><td class="amount"><strong>${formatAmtPdf(sumClosePlusInt)}</strong></td>`
+    ? `<td class="amount col-bill-ledger-int-days"><strong>—</strong></td><td class="amount bill-ledger-interest-amt-pdf col-bill-ledger-int-amt"><strong>${formatAmtPdf(sumInterest)}</strong></td><td class="amount col-bill-ledger-int-close"><strong>${formatAmtPdf(sumClosePlusInt)}</strong></td>`
     : '';
+  const pdfColgroup = useInt
+    ? `<colgroup>
+            <col style="width:6.5%" /><col style="width:9.5%" /><col style="width:2.5%" /><col style="width:9.5%" /><col style="width:9.5%" />
+            <col style="width:5.5%" /><col style="width:2.5%" />
+            <col style="width:10%" /><col style="width:10%" /><col style="width:10%" />
+            <col style="width:5%" /><col style="width:10%" /><col style="width:9.5%" />
+          </colgroup>`
+    : `<colgroup>
+            <col style="width:10%" /><col style="width:14%" /><col style="width:3%" /><col style="width:14%" /><col style="width:14%" />
+            <col style="width:8%" /><col style="width:4%" />
+            <col style="width:11%" /><col style="width:11%" /><col style="width:11%" />
+          </colgroup>`;
   const filterRowExtra = useInt
     ? `<tr><td class="lbl">Interest as of</td><td class="val" colspan="3">${intAsOf} (Oracle GETINT)</td></tr>`
     : '';
@@ -731,28 +912,30 @@ function buildBillLedgerReportHtml(data, metadata) {
         <div class="report-period"><strong>Generated:</strong> ${generated}</div>
       </div>
 
-      <table class="table-report">
+      <table class="table-report bill-ledger-pdf-report">
+        ${pdfColgroup}
         <thead>
           <tr>
-            <th>Bill no</th>
-            <th>Bill date</th>
-            <th>B type</th>
-            <th>Vr date</th>
-            <th>Vr no</th>
-            <th>Vr type</th>
-            <th class="amount">Cr</th>
-            <th class="amount">Dr</th>
-            <th class="amount">Current bal</th>
+            <th class="col-bill-ledger-bill-no no-upper">Bill no</th>
+            <th class="col-bill-ledger-date no-upper">Bill date</th>
+            <th class="col-bill-ledger-bt no-upper">BT</th>
+            <th class="col-bill-ledger-date no-upper">Vr date</th>
+            <th class="col-bill-ledger-date no-upper">V date</th>
+            <th class="col-bill-ledger-vr-no no-upper">Vr no</th>
+            <th class="col-bill-ledger-vt no-upper">VT</th>
+            <th class="amount col-bill-ledger-amt no-upper">${billLedgerCrFirst ? 'Cr.Amount' : 'Dr.Amount'}</th>
+            <th class="amount col-bill-ledger-amt no-upper">${billLedgerCrFirst ? 'Dr.Amount' : 'Cr.Amount'}</th>
+            <th class="amount col-bill-ledger-amt no-upper">Closing Bal.</th>
             ${intHead}
           </tr>
         </thead>
         <tbody>
           ${bodyRows}
           <tr class="report-grand-total">
-            <td colspan="6" class="lbl-total">GRAND TOTAL <span style="font-weight:600;opacity:.9">(Dr/Cr sums + current bal total${useInt ? '; interest from GETINT' : ''})</span></td>
-            <td class="amount">${formatAmtPdf(sumCr)}</td>
-            <td class="amount">${formatAmtPdf(sumDr)}</td>
-            <td class="amount">${formatAmtPdf(sumCurrent)}</td>
+            <td colspan="7" class="lbl-total">GRAND TOTAL <span style="font-weight:600;opacity:.9">(Dr/Cr sums + current bal total${useInt ? '; interest from GETINT' : ''})</span></td>
+            <td class="amount col-bill-ledger-amt">${formatAmtPdf(billLedgerCrFirst ? sumCr : sumDr)}</td>
+            <td class="amount col-bill-ledger-amt">${formatAmtPdf(billLedgerCrFirst ? sumDr : sumCr)}</td>
+            <td class="amount col-bill-ledger-amt">${formatAmtPdf(sumCurrent)}</td>
             ${intGrand}
           </tr>
         </tbody>
@@ -2198,6 +2381,60 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Digits-only number for https://wa.me/… (no +). If `raw` is a 10-digit Indian mobile (6–9),
+ * prefixes `countryCode` (default 91). Override with metadata.shareWhatsAppCountryCode.
+ */
+function normalizeWhatsAppPhoneDigits(raw, countryCode = '91') {
+  if (raw == null || raw === '') return '';
+  let d = String(raw).replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('00')) d = d.slice(2);
+  const cc = String(countryCode || '91').replace(/\D/g, '') || '91';
+  if (d.length >= 11 && d.startsWith(cc)) return d;
+  if (d.length === 10 && /^[6-9]/.test(d)) return cc + d;
+  if (d.length >= 10) return d;
+  return '';
+}
+
+function pickWhatsAppDigitsFromMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object') return '';
+  const cc = metadata.shareWhatsAppCountryCode ?? '91';
+  const explicit = normalizeWhatsAppPhoneDigits(
+    metadata.shareWhatsAppPhone ?? metadata.whatsappPhone ?? '',
+    cc
+  );
+  if (explicit.length >= 10) return explicit;
+  for (const key of ['partyTel', 'accountTel', 'customerTel', 'dispatchTel']) {
+    const n = normalizeWhatsAppPhoneDigits(metadata[key], cc);
+    if (n.length >= 10) return n;
+  }
+  return '';
+}
+
+/** wa.me URLs have practical length limits; shrink message if needed. */
+function buildWhatsAppWebUrl(phoneDigits, messageBody, maxUrlLength = 2000) {
+  const base = phoneDigits ? `https://wa.me/${phoneDigits}?text=` : 'https://wa.me/?text=';
+  let msg = String(messageBody ?? '');
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const url = base + encodeURIComponent(msg);
+    if (url.length <= maxUrlLength) return url;
+    msg =
+      msg.slice(0, Math.max(180, Math.floor(msg.length * 0.72))) +
+      '\n… (see PDF in Downloads — attach with paperclip.)';
+  }
+  return base + encodeURIComponent(String(messageBody ?? '').slice(0, 160));
+}
+
+function shouldPreferNativeFileShare() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = String(navigator.userAgent || '').toLowerCase();
+  const mobileUa = /android|iphone|ipad|ipod|windows phone|mobile/i.test(ua);
+  const touchPoints = Number(navigator.maxTouchPoints || 0);
+  const likelyMobile = mobileUa || touchPoints > 1;
+  return likelyMobile;
+}
+
 /** Download PDF (browser save dialog). */
 export const generatePDF = async (reportType, data, metadata) => {
   const { blob, filename } = await getPdfBlob(reportType, data, metadata);
@@ -2205,13 +2442,18 @@ export const generatePDF = async (reportType, data, metadata) => {
 };
 
 /**
- * WhatsApp + PDF: same flow for trial-balance and ledger.
- * On mobile, uses Web Share API so the PDF can be attached directly to WhatsApp when supported.
- * Otherwise downloads the PDF and opens wa.me with instructions to attach from Downloads.
+ * WhatsApp + PDF:
+ * - On mobile-like devices with Web Share support, shares the PDF file so WhatsApp can receive
+ *   the attachment (user picks WhatsApp, then the contact). A wa.me link is included in the message
+ *   text when we have partyTel / accountTel so the right chat is one tap away.
+ * - On desktop, skips the OS share sheet (often no WhatsApp target), downloads the PDF, and opens
+ *   wa.me (with phone when known).
+ * - If mobile sharing is not available or fails: downloads the PDF and opens wa.me (with phone when known)
+ *   and explains attaching from Downloads / Files (URLs cannot attach files by themselves).
  */
 export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText) {
   const { blob, filename } = await getPdfBlob(reportType, data, metadata);
-  const file = new File([blob], filename, { type: 'application/pdf' });
+  const file = new File([blob], filename, { type: 'application/pdf', lastModified: Date.now() });
   const reportLabel =
     reportType === 'trial-balance'
       ? 'Trial Balance'
@@ -2237,12 +2479,34 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
   const text =
     shareText || `${metadata.companyName}\n${reportLabel}\n${metadata.endDate || ''}`;
 
-  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+  const waDigits = pickWhatsAppDigitsFromMetadata(metadata);
+  const hasTargetPhone = waDigits.length >= 10;
+  const phoneHint = hasTargetPhone
+    ? `Send to +${waDigits}\nOpen chat: https://wa.me/${waDigits}\n\n`
+    : '';
+
+  const attachHint = hasTargetPhone
+    ? `\n\nPDF saved as: ${filename}\nTap Attach (paperclip), choose this PDF from Downloads, then send.`
+    : `\n\nPDF saved as: ${filename}\nIn WhatsApp, tap Attach (paperclip) and select this file from your Downloads folder.`;
+  const body = text + attachHint;
+
+  let canShareFiles = false;
+  try {
+    canShareFiles =
+      typeof navigator !== 'undefined' &&
+      typeof navigator.share === 'function' &&
+      typeof navigator.canShare === 'function' &&
+      navigator.canShare({ files: [file] });
+  } catch {
+    canShareFiles = false;
+  }
+
+  if (canShareFiles && shouldPreferNativeFileShare()) {
     try {
       await navigator.share({
         files: [file],
         title: text.split('\n')[0],
-        text,
+        text: phoneHint + text,
       });
       return;
     } catch (err) {
@@ -2251,10 +2515,6 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
   }
 
   downloadBlob(blob, filename);
-  const body =
-    text +
-    '\n\nPDF saved as: ' +
-    filename +
-    '\nIn WhatsApp, tap Attach (paperclip) and select this file from your Downloads folder.';
-  window.open(`https://wa.me/?text=${encodeURIComponent(body)}`, '_blank', 'noopener,noreferrer');
+  const url = buildWhatsAppWebUrl(hasTargetPhone ? waDigits : '', body);
+  window.open(url, '_blank', 'noopener,noreferrer');
 }

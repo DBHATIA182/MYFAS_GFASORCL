@@ -640,8 +640,142 @@ body {
   font-size: 0.74rem;
 }
 
+/* Bill-ledger: fixed layout = no stretched “dead” columns; tight widths + larger type */
 .report-table--bill-ledger {
-  min-width: 980px;
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.report-table--bill-ledger-no-interest,
+.report-table--bill-ledger-with-interest {
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .report-table--bill-ledger {
+    min-width: 680px;
+  }
+}
+
+/* Mobile: keep bill-ledger wide and scrollable so columns don't overlap */
+@media (max-width: 767px) {
+  .report-table--bill-ledger-no-interest {
+    min-width: 980px;
+  }
+
+  .report-table--bill-ledger-with-interest {
+    min-width: 1240px;
+  }
+
+  .report-table--bill-ledger thead th {
+    font-size: 0.74rem;
+    padding: 6px 3px;
+  }
+
+  .report-table--bill-ledger tbody td {
+    font-size: 0.82rem;
+    padding: 5px 3px;
+  }
+
+  .report-table--bill-ledger td.col-bill-ledger-amt,
+  .report-table--bill-ledger td.col-bill-ledger-int-days,
+  .report-table--bill-ledger td.col-bill-ledger-int-amt,
+  .report-table--bill-ledger td.col-bill-ledger-int-close {
+    font-size: 0.82rem;
+  }
+}
+
+/* Column widths come from <colgroup>; cells only set alignment, padding, type — avoids stretched dead space */
+.report-table--bill-ledger thead th.col-bill-ledger-bt,
+.report-table--bill-ledger thead th.col-bill-ledger-vt,
+.report-table--bill-ledger thead th.col-bill-ledger-date,
+.report-table--bill-ledger thead th.col-bill-ledger-bill-no,
+.report-table--bill-ledger thead th.col-bill-ledger-vr-no,
+.report-table--bill-ledger thead th.col-bill-ledger-amt,
+.report-table--bill-ledger thead th.col-bill-ledger-int-days,
+.report-table--bill-ledger thead th.col-bill-ledger-int-amt,
+.report-table--bill-ledger thead th.col-bill-ledger-int-close {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.report-table--bill-ledger th.col-bill-ledger-bill-no,
+.report-table--bill-ledger th.col-bill-ledger-vr-no {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  box-sizing: border-box;
+  padding-left: 3px !important;
+  padding-right: 3px !important;
+}
+
+.report-table--bill-ledger td.col-bill-ledger-bill-no,
+.report-table--bill-ledger td.col-bill-ledger-vr-no {
+  white-space: nowrap;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-left: 3px !important;
+  padding-right: 3px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.report-table--bill-ledger th.col-bill-ledger-bt,
+.report-table--bill-ledger td.col-bill-ledger-bt,
+.report-table--bill-ledger th.col-bill-ledger-vt,
+.report-table--bill-ledger td.col-bill-ledger-vt {
+  text-align: center;
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.report-table--bill-ledger th.col-bill-ledger-date,
+.report-table--bill-ledger td.col-bill-ledger-date {
+  white-space: nowrap;
+  min-width: 0;
+  box-sizing: border-box;
+  letter-spacing: -0.02em;
+}
+
+.report-table--bill-ledger th.col-bill-ledger-amt,
+.report-table--bill-ledger td.col-bill-ledger-amt {
+  text-align: right;
+  white-space: nowrap;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-left: 2px !important;
+  padding-right: 3px !important;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.report-table--bill-ledger thead th.col-bill-ledger-amt {
+  font-size: 0.74rem;
+  letter-spacing: 0;
+  white-space: normal;
+  line-height: 1.25;
+  vertical-align: bottom;
+  hyphens: manual;
+}
+
+.report-table--bill-ledger th.col-bill-ledger-int-days,
+.report-table--bill-ledger td.col-bill-ledger-int-days,
+.report-table--bill-ledger th.col-bill-ledger-int-amt,
+.report-table--bill-ledger td.col-bill-ledger-int-amt,
+.report-table--bill-ledger th.col-bill-ledger-int-close,
+.report-table--bill-ledger td.col-bill-ledger-int-close {
+  text-align: right;
+  white-space: nowrap;
+  min-width: 0;
+  padding-left: 2px !important;
+  padding-right: 3px !important;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .report-table--broker-os {
@@ -667,6 +801,11 @@ body {
   letter-spacing: 0.04em;
 }
 
+.report-table--bill-ledger thead th {
+  font-size: 0.82rem;
+  padding: 7px 3px;
+}
+
 .report-table--ledger-compact thead th {
   padding: 6px 4px;
   font-size: 0.65rem;
@@ -680,6 +819,11 @@ body {
   border: 1px solid #94a3b8;
   padding: 8px;
   font-size: 0.8rem;
+}
+
+.report-table--bill-ledger tbody td {
+  font-size: 0.9rem;
+  padding: 6px 3px;
 }
 
 .report-table--ledger-compact tbody td {
@@ -722,7 +866,7 @@ body {
 
 .report-table--bill-ledger .bill-ledger-grand-note {
   font-weight: 500;
-  font-size: 0.68rem;
+  font-size: 0.74rem;
   opacity: 0.88;
   margin-left: 0.2rem;
 }
