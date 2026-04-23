@@ -258,7 +258,8 @@ function spawnDeployUpdateJob() {
   const logsDir = path.join(__dirname, 'logs');
   if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
   const launcherCandidates = [
-    { exe: 'cmd.exe', args: ['/c', `"${cmdWrapper}"`], label: 'cmd-wrapper' },
+    { exe: cmdWrapper, args: [], label: 'cmd-wrapper-direct', useShell: true },
+    { exe: 'cmd.exe', args: ['/d', '/c', cmdWrapper], label: 'cmd-wrapper-via-cmd' },
     {
       exe: process.env.WINDIR
         ? path.join(process.env.WINDIR, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
@@ -271,12 +272,15 @@ function spawnDeployUpdateJob() {
   let lastSpawnErr = null;
   for (const c of launcherCandidates) {
     try {
-      appendDeployLogLine(`Deploy spawn attempt using: ${c.label} -> ${c.exe}`);
+      appendDeployLogLine(
+        `Deploy spawn attempt using: ${c.label} -> ${c.exe} ${Array.isArray(c.args) ? c.args.join(' ') : ''}`
+      );
       const spawnOpts = {
         cwd: __dirname,
         detached: true,
         stdio: 'ignore',
         windowsHide: true,
+        shell: c.useShell === true,
       };
       child = spawn(c.exe, c.args, spawnOpts);
       lastSpawnErr = null;
