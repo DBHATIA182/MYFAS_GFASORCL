@@ -413,39 +413,7 @@ function App() {
           >
             Mobile View
           </button>
-          {deployUpdateEnabled ? (
-            <button
-              type="button"
-              className="view-settings-option view-settings-option--deploy"
-              onClick={() => {
-                setShowViewSettings(false);
-                setDeployMessage('');
-                setDeployMessageIsError(false);
-                setDeployProgressLabel('');
-                setDeployRecentLines([]);
-                setDeployFinished(false);
-                setDeployFailed(false);
-                setShowDeployUpdateModal(true);
-                const base = API_BASE || '';
-                void axios
-                  .get(`${base}/api/deploy-update/status`)
-                  .then((r) => {
-                    if (r.data?.enabled) {
-                      setDeployUpdateRequiresKey(r.data?.requiresDeployKey !== false);
-                      setDeployUpdateServerBusy(r.data?.busy === true);
-                      setDeployProgressPct(Number(r.data?.progressPercent ?? 0) || 0);
-                      setDeployProgressLabel(String(r.data?.statusLabel ?? '').trim());
-                      setDeployRecentLines(Array.isArray(r.data?.recentLogLines) ? r.data.recentLogLines : []);
-                      setDeployFinished(r.data?.isFinished === true);
-                      setDeployFailed(r.data?.isError === true);
-                    }
-                  })
-                  .catch(() => {});
-              }}
-            >
-              Update to latest version
-            </button>
-          ) : null}
+          {/* Update button removed from Settings. */}
         </div>
       ) : null}
     </div>
