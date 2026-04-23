@@ -248,63 +248,42 @@ function releaseDeployUpdateJobLock(reason) {
 
 function spawnDeployUpdateJob() {
   const ps1 = path.join(__dirname, 'run-deploy-update.ps1');
+  const cmdWrapper = path.join(__dirname, 'run-deploy-update.cmd');
   if (!fs.existsSync(ps1)) {
     throw new Error('run-deploy-update.ps1 is missing in the application folder.');
   }
+  if (!fs.existsSync(cmdWrapper)) {
+    throw new Error('run-deploy-update.cmd is missing in the application folder.');
+  }
   const logsDir = path.join(__dirname, 'logs');
   if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
-  const psCandidates = [
-    process.env.GFAS_DEPLOY_POWERSHELL_PATH,
-    process.env.WINDIR ? path.join(process.env.WINDIR, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : '',
-    process.env.WINDIR ? path.join(process.env.WINDIR, 'System32', 'WindowsPowerShell', 'v1.0', 'pwsh.exe') : '',
-    'powershell.exe',
-    'pwsh.exe',
-  ].filter(Boolean);
+  const launcherCandidates = [
+    { exe: 'cmd.exe', args: ['/c', `"${cmdWrapper}"`], label: 'cmd-wrapper' },
+    {
+      exe: process.env.WINDIR
+        ? path.join(process.env.WINDIR, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+        : 'powershell.exe',
+      args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ps1],
+      label: 'powershell-direct',
+    },
+  ];
   let child = null;
   let lastSpawnErr = null;
-  const childLogPath = path.join(logsDir, 'deploy-update-child.log');
-  let childLogFd = null;
-  try {
-    childLogFd = fs.openSync(childLogPath, 'a');
-    fs.writeSync(
-      childLogFd,
-      `[${new Date().toISOString()}] --- spawn cycle start --- script=${ps1}\n`
-    );
-  } catch (_) {
-    childLogFd = null;
-  }
-  for (const exe of psCandidates) {
+  for (const c of launcherCandidates) {
     try {
-      appendDeployLogLine(`Deploy spawn attempt using: ${exe}`);
-      const ps1Esc = ps1.replace(/'/g, "''");
-      const bootstrapCmd =
-        `$ErrorActionPreference='Stop';` +
-        `Write-Output ('[bootstrap] ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' running ' + [System.Security.Principal.WindowsIdentity]::GetCurrent().Name);` +
-        `& '${ps1Esc}';` +
-        `$ec=$LASTEXITCODE;` +
-        `if($ec -ne $null -and $ec -ne 0){exit $ec};` +
-        `exit 0;`;
-      const args = [
-        '-NoLogo',
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        bootstrapCmd,
-      ];
+      appendDeployLogLine(`Deploy spawn attempt using: ${c.label} -> ${c.exe}`);
       const spawnOpts = {
         cwd: __dirname,
         detached: true,
-        stdio: childLogFd != null ? ['ignore', childLogFd, childLogFd] : 'ignore',
+        stdio: 'ignore',
         windowsHide: true,
       };
-      child = spawn(exe, args, spawnOpts);
+      child = spawn(c.exe, c.args, spawnOpts);
       lastSpawnErr = null;
       break;
     } catch (err) {
       lastSpawnErr = err;
-      appendDeployLogLine(`Deploy spawn failed for ${exe}: ${err.message}`);
+      appendDeployLogLine(`Deploy spawn failed for ${c.label}: ${err.message}`);
     }
   }
   if (!child) {
@@ -318,16 +297,6 @@ function spawnDeployUpdateJob() {
     finished = true;
     child.removeListener('exit', onExit);
     child.removeListener('error', onSpawnErr);
-    if (childLogFd != null) {
-      try {
-        fs.writeSync(
-          childLogFd,
-          `[${new Date().toISOString()}] --- spawn cycle end --- ${detail || ''}\n`
-        );
-        fs.closeSync(childLogFd);
-      } catch (_) {}
-      childLogFd = null;
-    }
     releaseDeployUpdateJobLock(detail);
   }
   function onExit(code, signal) {
