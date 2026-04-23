@@ -117,11 +117,17 @@ try {
         throw "Missing update-from-git.ps1"
     }
     Log 'Running update-from-git.ps1 -Branch main ...'
-    $updateOut = & $updateScript -Branch main 2>&1
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $updateOut = & $updateScript -Branch main 2>&1
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
     foreach ($line in $updateOut) {
         Log ($line | Out-String).Trim()
     }
-    if (-not $?) { throw "update-from-git.ps1 returned failure." }
+    if ($LASTEXITCODE -ne 0) { throw "update-from-git.ps1 exited with code $LASTEXITCODE" }
     Log 'update-from-git.ps1 finished OK'
 } catch {
     Log ("ERROR in update step: " + $_.Exception.Message)
