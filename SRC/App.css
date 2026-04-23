@@ -304,42 +304,66 @@ body {
   font-size: 0.85rem;
 }
 
-/* Step 3 report list: compact so many report types fit */
+/* Step 3 report list: professional card-like menu rows */
 .slide-3 .report-options {
-  max-height: min(55vh, 520px);
+  max-height: min(58vh, 560px);
   overflow: auto;
-  padding-right: 0.2rem;
+  padding-right: 0.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
 .slide-3 .report-option {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: start;
-  gap: 0.3rem 0.45rem;
-  padding: 0.22rem 0;
-  border-bottom: 1px solid #edf2f7;
+  gap: 0.35rem 0.55rem;
+  padding: 0.48rem 0.55rem;
+  border-bottom: 1px solid #e9eef5;
+  border-left: 3px solid transparent;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+  cursor: pointer;
 }
 
 .slide-3 .report-option:last-child {
   border-bottom: none;
 }
 
+.slide-3 .report-option:hover {
+  background: #f8fafc;
+}
+
+.slide-3 .report-option.selected {
+  background: #e8eeff;
+  border-left-color: #3349d1;
+  box-shadow: inset 0 0 0 1px #c7d2fe;
+}
+
 .slide-3 .report-option input[type='radio'] {
-  margin-top: 0.1rem;
-  transform: scale(0.9);
+  margin-top: 0.12rem;
+  transform: scale(0.95);
+  accent-color: #2563eb;
 }
 
 .slide-3 .report-option label h3 {
   margin: 0;
-  font-size: 0.72rem;
-  line-height: 1.2;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.24;
+  color: #0f172a;
 }
 
 .slide-3 .report-option label p {
-  margin: 0.08rem 0 0;
-  font-size: 0.62rem;
-  line-height: 1.22;
-  color: #4a5568;
+  margin: 0.12rem 0 0;
+  font-size: 0.71rem;
+  line-height: 1.3;
+  color: #475569;
+}
+
+/* Hide verbose descriptions under report names */
+.slide-3 .report-option label p {
+  display: none;
 }
 
 /* TABLE STYLING */
@@ -2263,26 +2287,38 @@ td.sale-list-total-pad {
 
 .view-settings-btn {
   border: 1px solid #cbd5e1;
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   color: #1e3a5f;
   border-radius: 999px;
-  padding: 0.38rem 0.72rem;
-  font-size: 0.8rem;
+  padding: 0.4rem 0.78rem;
+  font-size: 0.81rem;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  transition: background 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease;
+}
+
+.view-settings-btn:hover {
+  background: #eef2ff;
+  box-shadow: 0 2px 8px rgba(30, 41, 59, 0.12);
+}
+
+.view-settings-btn:active {
+  transform: translateY(1px);
 }
 
 .view-settings-menu {
   position: absolute;
-  top: calc(100% + 0.35rem);
+  top: calc(100% + 0.45rem);
   right: 0;
-  min-width: 10rem;
+  min-width: 12rem;
   background: #fff;
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.15);
-  padding: 0.25rem;
+  border-radius: 12px;
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.18);
+  padding: 0.35rem;
   z-index: 110;
+  backdrop-filter: saturate(120%) blur(2px);
 }
 
 .view-settings-option {
@@ -2291,14 +2327,17 @@ td.sale-list-total-pad {
   border: none;
   background: transparent;
   color: #1e293b;
-  padding: 0.45rem 0.55rem;
-  border-radius: 6px;
-  font-size: 0.82rem;
+  padding: 0.55rem 0.62rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.12s ease;
 }
 
 .view-settings-option:hover {
-  background: #eff6ff;
+  background: #eef2ff;
+  color: #1e1b4b;
 }
 
 .view-settings-option.is-active {
@@ -2738,6 +2777,40 @@ td.sale-list-total-pad {
   .sticky-col { min-width: 150px; }
   .report-table td, .report-table th { padding: 10px 6px; font-size: 0.85rem; }
   .voice-command-btn { padding: 0.36rem 0.68rem; font-size: 0.74rem; }
+
+  .view-settings-menu {
+    right: 0;
+    min-width: 11rem;
+    max-width: min(92vw, 16rem);
+  }
+
+  .view-settings-option {
+    padding: 0.62rem 0.65rem;
+    font-size: 0.88rem;
+  }
+
+  .slide-3 .report-options {
+    max-height: min(60vh, 560px);
+    border-radius: 10px;
+  }
+
+  .slide-3 .report-option {
+    gap: 0.38rem 0.58rem;
+    padding: 0.56rem 0.56rem;
+  }
+
+  .slide-3 .report-option input[type='radio'] {
+    transform: scale(1.02);
+    margin-top: 0.14rem;
+  }
+
+  .slide-3 .report-option label h3 {
+    font-size: 0.92rem;
+  }
+
+  .slide-3 .report-option label p {
+    font-size: 0.76rem;
+  }
 }
 
 /* Force desktop layout even on narrow devices when user picks Desktop mode */

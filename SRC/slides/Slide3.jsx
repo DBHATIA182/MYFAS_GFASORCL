@@ -1,7 +1,63 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 export default function Slide3({ onPrev, onNext, formData }) {
   const [reportType, setReportType] = useState('trial-balance');
+  const reportMenuRef = useRef(null);
+  const reportOrder = [
+    'trial-balance',
+    'ledger',
+    'ledger-interest',
+    'customer-ledger',
+    'supplier-ledger',
+    'broker-os',
+    'sale-bill-printing',
+    'sale-list',
+    'stock-sum',
+    'stock-lot',
+    'ageing',
+    'purchase-list',
+  ];
+
+  const moveReportSelection = (delta) => {
+    const idx = reportOrder.indexOf(reportType);
+    const current = idx >= 0 ? idx : 0;
+    const next = (current + delta + reportOrder.length) % reportOrder.length;
+    setReportType(reportOrder[next]);
+  };
+
+  const handleMenuKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      e.stopPropagation();
+      moveReportSelection(1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+      moveReportSelection(-1);
+    }
+  };
+
+  useEffect(() => {
+    const el = reportMenuRef.current;
+    if (el && typeof el.focus === 'function') {
+      el.focus();
+    }
+
+    const onDocKeyDown = (e) => {
+      if (e.defaultPrevented) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        moveReportSelection(1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        moveReportSelection(-1);
+      }
+    };
+    document.addEventListener('keydown', onDocKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onDocKeyDown);
+    };
+  }, [reportType]);
 
   const handleNext = () => {
     onNext({ reportType });
@@ -15,7 +71,13 @@ export default function Slide3({ onPrev, onNext, formData }) {
         {formData.comp_name} | {formData.comp_year}
       </p>
 
-      <div className="report-options">
+      <div
+        ref={reportMenuRef}
+        className="report-options"
+        tabIndex={0}
+        onKeyDown={handleMenuKeyDown}
+        aria-label="Report type menu"
+      >
         <div 
           className={`report-option ${reportType === 'trial-balance' ? 'selected' : ''}`}
           onClick={() => setReportType('trial-balance')}
