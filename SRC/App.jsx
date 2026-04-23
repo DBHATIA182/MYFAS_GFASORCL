@@ -102,6 +102,7 @@ function App() {
   });
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
+  const [loginUserName, setLoginUserName] = useState('');
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -257,7 +258,9 @@ function App() {
     const fetchCompanies = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_BASE}/api/companies`);
+        const response = await axios.get(`${API_BASE}/api/companies`, {
+          params: loginUserName ? { user_name: loginUserName } : undefined,
+        });
         console.log('Company list received:', response.data);
         setCompanies(response.data || []);
       } catch (error) {
@@ -267,7 +270,13 @@ function App() {
       }
     };
     fetchCompanies();
-  }, [authenticated]);
+  }, [authenticated, loginUserName]);
+
+  const handleLoginSuccess = (payload) => {
+    const u = String(payload?.userName ?? payload?.user_name ?? '').trim().toUpperCase();
+    setLoginUserName(u);
+    setAuthenticated(true);
+  };
 
   const handleSlide1Next = async (data) => {
     const selectedCode = data.COMP_CODE || data.comp_code;
@@ -331,6 +340,7 @@ function App() {
   const handleExitApp = () => {
     if (!window.confirm('Exit the application?')) return;
     setAuthenticated(false);
+    setLoginUserName('');
     setCompanies([]);
     setYears([]);
     setCurrentSlide(1);
@@ -570,7 +580,7 @@ function App() {
           </div>
         </header>
         <main className="app-main">
-          <LoginSlide apiBase={API_BASE} onSuccess={() => setAuthenticated(true)} onExit={exitApp} />
+          <LoginSlide apiBase={API_BASE} onSuccess={handleLoginSuccess} onExit={exitApp} />
         </main>
       </div>
       {renderDeployUpdateModal()}

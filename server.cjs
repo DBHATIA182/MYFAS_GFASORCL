@@ -532,6 +532,81 @@ async function lookupAppLoginRows(connCfg, user_name, pw) {
   return [];
 }
 
+/** USERS.COMP_CODE lookup (USER_NAME / USERNAME variants; USERS / GRAIN.USERS). */
+async function lookupAuthorizedCompanyCode(connCfg, user_name) {
+  const u = String(user_name || '').trim().toUpperCase();
+  if (!u) return '';
+  const binds = { u };
+  const predStd = `UPPER(TRIM(USER_NAME)) = UPPER(TRIM(:u))`;
+  const predAlt = `UPPER(TRIM(USERNAME)) = UPPER(TRIM(:u))`;
+  const tables = ['USERS', 'GRAIN.USERS'];
+
+  for (const t of tables) {
+    try {
+      const rows = await runQuery(`SELECT COMP_CODE FROM ${t} WHERE ${predStd}`, binds, null, {
+        hubOverride: connCfg,
+        suppressDbErrorLog: true,
+      });
+      const cc = rows?.[0]?.COMP_CODE ?? rows?.[0]?.comp_code ?? '';
+      const s = String(cc || '').trim();
+      if (s) return s;
+      if (Array.isArray(rows) && rows.length > 0) return '';
+    } catch (err) {
+      if (!isLoginOptionalTableError(err)) throw err;
+    }
+  }
+
+  for (const t of tables) {
+    try {
+      const rows = await runQuery(`SELECT COMP_CODE FROM ${t} WHERE ${predAlt}`, binds, null, {
+        hubOverride: connCfg,
+        suppressDbErrorLog: true,
+      });
+      const cc = rows?.[0]?.COMP_CODE ?? rows?.[0]?.comp_code ?? '';
+      const s = String(cc || '').trim();
+      if (s) return s;
+      if (Array.isArray(rows) && rows.length > 0) return '';
+    } catch (err) {
+      if (!isLoginOptionalTableError(err)) throw err;
+    }
+  }
+
+  return '';
+}
+
+async function fetchCompanyListRows(compCode = '') {
+  const code = String(compCode || '').trim();
+  if (code) {
+    const sqlCandidates = [
+      `SELECT COMP_NAME, COMP_CODE FROM COMPANY WHERE COMP_CODE = :comp_code`,
+      `SELECT COMP_NAME, COMP_CODE FROM COMPDET WHERE COMP_CODE = :comp_code GROUP BY COMP_NAME, COMP_CODE`,
+    ];
+    let lastErr = null;
+    for (const sql of sqlCandidates) {
+      try {
+        return await runQuery(sql, { comp_code: code }, null, { suppressDbErrorLog: true });
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr || new Error('Company query failed');
+  }
+
+  const sqlCandidates = [
+    `SELECT COMP_NAME, COMP_CODE FROM COMPANY ORDER BY COMP_CODE`,
+    `SELECT COMP_CODE, COMP_NAME FROM COMPDET GROUP BY COMP_CODE, COMP_NAME ORDER BY COMP_CODE`,
+  ];
+  let lastErr = null;
+  for (const sql of sqlCandidates) {
+    try {
+      return await runQuery(sql, {}, null, { suppressDbErrorLog: true });
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Company list query failed');
+}
+
 /** Buffers (e.g. BLOB) → base64 strings so res.json() is safe and the client can show QR. */
 function normalizeRowBuffers(row) {
   if (!row || typeof row !== 'object') return;
@@ -1375,9 +1450,12 @@ app.post('/api/login', async (req, res) => {
 // 1. Get Company List
 app.get('/api/companies', async (req, res) => {
   try {
-    const rows = await runQuery(
-      "SELECT COMP_CODE, COMP_NAME FROM compdet GROUP BY COMP_CODE, COMP_NAME ORDER BY COMP_CODE"
-    );
+    const userName = String(req.query.user_name ?? req.query.USER_NAME ?? '').trim().toUpperCase();
+    let authorizedCompCode = '';
+    if (userName) {
+      authorizedCompCode = await lookupAuthorizedCompanyCode(activeDbConfig, userName);
+    }
+    const rows = await fetchCompanyListRows(authorizedCompCode);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
