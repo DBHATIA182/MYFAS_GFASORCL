@@ -3273,6 +3273,71 @@ app.get('/api/purchase-list', async (req, res) => {
   }
 });
 
+/** Cash/Bank/Journal voucher list from VOUCHER joined with MASTER. */
+app.get('/api/voucher-list', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, vr_type, s_date, e_date, code, dc_code, drcr_flag } = req.query;
+    if (!comp_code || !s_date || !e_date) {
+      return res.status(400).json({ error: 'comp_code, s_date, and e_date are required' });
+    }
+    const vrType = String(vr_type ?? '').trim().toUpperCase();
+    const codeVal = String(code ?? '').trim().toUpperCase();
+    const dcCodeVal = String(dc_code ?? '').trim().toUpperCase();
+    const drcr = String(drcr_flag ?? '').trim().toUpperCase();
+    let sql = `
+      SELECT
+        A.VR_TYPE,
+        A.VR_DATE,
+        A.VR_NO,
+        A.TYPE,
+        A.TRN_NO,
+        A.V_DATE,
+        A.CODE,
+        B.NAME,
+        B.CITY,
+        A.BILL_DATE,
+        A.BILL_NO,
+        A.B_TYPE,
+        A.DETAIL,
+        A.DR_AMT,
+        A.CR_AMT,
+        A.CD_AMT,
+        A.DC_CODE
+      FROM VOUCHER A
+      LEFT JOIN MASTER B
+        ON A.COMP_CODE = B.COMP_CODE
+       AND A.CODE = B.CODE
+      WHERE A.COMP_CODE = :comp_code
+        AND A.VR_DATE BETWEEN TO_DATE(:s_date, 'DD-MM-YYYY') AND TO_DATE(:e_date, 'DD-MM-YYYY')`;
+
+    if (vrType) sql += ` AND A.VR_TYPE = :vr_type`;
+    if (codeVal) sql += ` AND A.CODE = :code`;
+    if (dcCodeVal) sql += ` AND A.DC_CODE = :dc_code`;
+    if (drcr === 'D') sql += ` AND NVL(A.DR_AMT,0) <> 0`;
+    else if (drcr === 'C') sql += ` AND NVL(A.CR_AMT,0) <> 0`;
+
+    sql += ` ORDER BY A.VR_TYPE, A.VR_DATE, A.VR_NO, A.TRN_NO`;
+    const binds = {
+      comp_code,
+      s_date,
+      e_date,
+    };
+    if (vrType) binds.vr_type = vrType;
+    if (codeVal) binds.code = codeVal;
+    if (dcCodeVal) binds.dc_code = dcCodeVal;
+
+    // VOUCHER data may live in hub schema on some installs; try selected year schema first, then hub fallback.
+    let rows = await runQuery(sql, binds, comp_uid);
+    if ((!rows || rows.length === 0) && comp_uid) {
+      rows = await runQuery(sql, binds, null, { suppressDbErrorLog: true });
+    }
+    res.json(rows || []);
+  } catch (err) {
+    console.error('❌ Voucher list error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** Purchase bill / debit note — all lines for one voucher (TYPE + R_DATE + R_NO) */
 app.get('/api/purchase-bill-print', async (req, res) => {
   try {

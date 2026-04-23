@@ -15,6 +15,7 @@ import Slide10 from './slides/Slide10';
 import Slide11 from './slides/Slide11';
 import Slide12 from './slides/Slide12';
 import Slide13 from './slides/Slide13';
+import Slide14 from './slides/Slide14';
 import { exitApp, performExitWindow } from './utils/exitApp';
 import connectionConfig from '../connection.config.json';
 import './App.css';
@@ -69,7 +70,7 @@ const API_BASE = import.meta.env.DEV
   : isLocalHost
     ? connectionConfig.local?.apiBase || 'http://localhost:5001'
     : remoteApiBase;
-const TOTAL_STEPS = 13;
+const TOTAL_STEPS = 14;
 const VIEW_MODE_STORAGE_KEY = 'gfas_view_mode';
 
 if (import.meta.env.DEV && API_BASE === '') {
@@ -332,6 +333,7 @@ function App() {
     else if (data.reportType === 'purchase-list') setCurrentSlide(11);
     else if (data.reportType === 'ageing') setCurrentSlide(12);
     else if (data.reportType === 'sale-bill-printing') setCurrentSlide(13);
+    else if (data.reportType === 'voucher-list') setCurrentSlide(14);
     else setCurrentSlide(4);
   };
 
@@ -632,6 +634,9 @@ function App() {
         )}
         {currentSlide === 13 && (
           <Slide13 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+        )}
+        {currentSlide === 14 && (
+          <Slide14 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
       </main>
     </div>

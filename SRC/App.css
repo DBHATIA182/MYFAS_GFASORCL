@@ -1470,6 +1470,57 @@ mark.search-highlight {
   background: #64748b;
 }
 
+/* Voucher list report: same horizontal scrollbar behavior as sale list */
+.table-responsive--voucher-list {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(64vh, 560px);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: auto;
+  padding-bottom: 14px;
+  margin-bottom: 0.25rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.table-responsive--voucher-list::-webkit-scrollbar {
+  height: 14px;
+}
+
+.table-responsive--voucher-list::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+
+.table-responsive--voucher-list::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 6px;
+}
+
+.table-responsive--voucher-list::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.report-table--voucher-list {
+  width: max-content;
+  min-width: 100%;
+}
+
+.report-table--voucher-list th,
+.report-table--voucher-list td {
+  white-space: nowrap;
+  font-size: 0.74rem;
+}
+
 .report-table--sale-list {
   width: max-content;
   min-width: 100%;

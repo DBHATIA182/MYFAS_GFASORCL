@@ -16,6 +16,7 @@ export default function Slide3({ onPrev, onNext, formData }) {
     'stock-lot',
     'ageing',
     'purchase-list',
+    'voucher-list',
   ];
 
   const moveReportSelection = (delta) => {
@@ -279,6 +280,23 @@ export default function Slide3({ onPrev, onNext, formData }) {
           <label>
             <h3>Purchase list</h3>
             <p>PURCHASE lines (PU, DN) with supplier/item/purchase code/godown filters and DN values shown as negative</p>
+          </label>
+        </div>
+
+        <div
+          className={`report-option ${reportType === 'voucher-list' ? 'selected' : ''}`}
+          onClick={() => setReportType('voucher-list')}
+        >
+          <input
+            type="radio"
+            name="reportType"
+            value="voucher-list"
+            checked={reportType === 'voucher-list'}
+            onChange={(e) => setReportType(e.target.value)}
+          />
+          <label>
+            <h3>Cash/Bank/Journal Voucher List</h3>
+            <p>Voucher list with date range, party, cash/bank code, and debit/credit filter</p>
           </label>
         </div>
       </div>
