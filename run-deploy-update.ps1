@@ -19,6 +19,12 @@ function Log([string]$m) {
 }
 
 Log '--- deploy update started ---'
+try {
+    $who = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    Log ("Running as user: " + $who)
+} catch {
+    Log ("Running user detect failed: " + $_.Exception.Message)
+}
 
 function Stop-AppProcesses {
     Log 'Stopping app-related processes...'
@@ -64,14 +70,12 @@ try {
     if (-not (Test-Path -LiteralPath $updateScript)) {
         throw "Missing update-from-git.ps1"
     }
-    Log 'Running update-from-git.ps1...'
-    $updateOut = & $updateScript 2>&1
+    Log 'Running update-from-git.ps1 -Branch main ...'
+    $updateOut = & $updateScript -Branch main 2>&1
     foreach ($line in $updateOut) {
         Log ($line | Out-String).Trim()
     }
-    if ($LASTEXITCODE -ne 0) {
-        throw "update-from-git.ps1 exited with code $LASTEXITCODE"
-    }
+    if (-not $?) { throw "update-from-git.ps1 returned failure." }
     Log 'update-from-git.ps1 finished OK'
 } catch {
     Log ("ERROR in update step: " + $_.Exception.Message)

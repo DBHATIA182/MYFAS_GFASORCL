@@ -172,6 +172,15 @@ let deployUpdateJobLock = false;
 let deployUpdateSafetyTimer = null;
 const DEPLOY_LOG_PATH = path.join(__dirname, 'logs', 'deploy-update.log');
 
+function appendDeployLogLine(msg) {
+  try {
+    const logsDir = path.join(__dirname, 'logs');
+    if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+    const line = `[${new Date().toISOString()}] ${String(msg || '').trim()}\n`;
+    fs.appendFileSync(DEPLOY_LOG_PATH, line, 'utf8');
+  } catch (_) {}
+}
+
 function readDeployUpdateLogLines(maxLines = 12) {
   try {
     if (!fs.existsSync(DEPLOY_LOG_PATH)) return [];
@@ -244,16 +253,36 @@ function spawnDeployUpdateJob() {
   }
   const logsDir = path.join(__dirname, 'logs');
   if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
-  const child = spawn(
+  const psCandidates = [
+    process.env.GFAS_DEPLOY_POWERSHELL_PATH,
+    process.env.WINDIR ? path.join(process.env.WINDIR, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : '',
+    process.env.WINDIR ? path.join(process.env.WINDIR, 'System32', 'WindowsPowerShell', 'v1.0', 'pwsh.exe') : '',
     'powershell.exe',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1],
-    {
-      cwd: __dirname,
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
+    'pwsh.exe',
+  ].filter(Boolean);
+  let child = null;
+  let lastSpawnErr = null;
+  for (const exe of psCandidates) {
+    try {
+      appendDeployLogLine(`Deploy spawn attempt using: ${exe}`);
+      child = spawn(exe, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1], {
+        cwd: __dirname,
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      lastSpawnErr = null;
+      break;
+    } catch (err) {
+      lastSpawnErr = err;
+      appendDeployLogLine(`Deploy spawn failed for ${exe}: ${err.message}`);
     }
-  );
+  }
+  if (!child) {
+    const msg = `Could not start PowerShell for deploy update: ${lastSpawnErr?.message || 'unknown error'}`;
+    appendDeployLogLine(msg);
+    throw new Error(msg);
+  }
   let finished = false;
   function finish(detail) {
     if (finished) return;
@@ -267,6 +296,7 @@ function spawnDeployUpdateJob() {
   }
   function onSpawnErr(err) {
     console.error('deploy-update spawn error:', err.message);
+    appendDeployLogLine(`deploy-update spawn error: ${err.message}`);
     finish('spawn error');
   }
   child.once('exit', onExit);
@@ -1390,6 +1420,7 @@ app.post('/api/deploy-update', (req, res) => {
         return res.status(401).json({ error: 'Invalid deploy key.' });
       }
     }
+    appendDeployLogLine('API request accepted: /api/deploy-update');
     deployUpdateJobLock = true;
     spawnDeployUpdateJob();
     res.json({
