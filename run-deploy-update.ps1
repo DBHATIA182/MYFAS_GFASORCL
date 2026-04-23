@@ -26,6 +26,52 @@ try {
     Log ("Running user detect failed: " + $_.Exception.Message)
 }
 
+function Add-PathIfExists([string]$p) {
+    if ([string]::IsNullOrWhiteSpace($p)) { return }
+    if (-not (Test-Path -LiteralPath $p)) { return }
+    $parts = ($env:Path -split ';') | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
+    if ($parts -notcontains $p) {
+        $env:Path = "$env:Path;$p"
+    }
+}
+
+function Resolve-CommandSafe([string]$name, [string[]]$fallbacks) {
+    $cmd = Get-Command $name -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    foreach ($f in $fallbacks) {
+        if (Test-Path -LiteralPath $f) { return $f }
+    }
+    return $null
+}
+
+try {
+    Add-PathIfExists (Join-Path $env:ProgramFiles 'Git\cmd')
+    Add-PathIfExists (Join-Path $env:ProgramFiles 'Git\bin')
+    Add-PathIfExists (Join-Path $env:ProgramFiles 'nodejs')
+    Add-PathIfExists (Join-Path $env:LOCALAPPDATA 'Programs\nodejs')
+
+    $gitPath = Resolve-CommandSafe 'git.exe' @(
+        (Join-Path $env:ProgramFiles 'Git\cmd\git.exe'),
+        (Join-Path $env:ProgramFiles 'Git\bin\git.exe')
+    )
+    $npmPath = Resolve-CommandSafe 'npm.cmd' @(
+        (Join-Path $env:ProgramFiles 'nodejs\npm.cmd'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\nodejs\npm.cmd')
+    )
+    Log ("git path: " + ($gitPath ?? 'NOT FOUND'))
+    Log ("npm path: " + ($npmPath ?? 'NOT FOUND'))
+    if ($gitPath) {
+        $gv = (& $gitPath --version 2>&1 | Out-String).Trim()
+        if ($gv) { Log ("git version: " + $gv) }
+    }
+    if ($npmPath) {
+        $nv = (& $npmPath --version 2>&1 | Out-String).Trim()
+        if ($nv) { Log ("npm version: " + $nv) }
+    }
+} catch {
+    Log ("WARN command-path precheck failed: " + $_.Exception.Message)
+}
+
 function Stop-AppProcesses {
     Log 'Stopping app-related processes...'
     try {
