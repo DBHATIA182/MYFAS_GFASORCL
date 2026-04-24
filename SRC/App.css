@@ -155,10 +155,18 @@ body {
 }
 
 .btn-sort-switch {
-  min-width: 4.4rem;
+  width: 5.4rem;
+  min-width: 5.4rem;
+  max-width: 5.4rem;
+  height: 2rem;
   padding: 0.3rem 0.55rem !important;
   font-size: 0.72rem !important;
   line-height: 1.15;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
 }
 
 .btn-sort-switch.is-active {
@@ -1643,6 +1651,66 @@ tr.sale-list-row-clickable:hover {
 tr.sale-list-row-clickable:focus {
   outline: 2px solid #4c51bf;
   outline-offset: -2px;
+}
+
+/* GSTR1 table: readable font + no overlapping columns */
+.table-responsive--gstr1 {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(66vh, 620px);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: auto;
+  padding-bottom: 12px;
+  scrollbar-gutter: stable;
+}
+
+.table-responsive--gstr1::-webkit-scrollbar {
+  height: 14px;
+}
+
+.table-responsive--gstr1::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.table-responsive--gstr1::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 6px;
+}
+
+.table-responsive--gstr1::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.report-table--gstr1 {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+  font-size: 0.8rem;
+}
+
+.report-table--gstr1 th,
+.report-table--gstr1 td {
+  white-space: nowrap;
+  padding: 0.36rem 0.5rem !important;
+  line-height: 1.25;
+  overflow: visible;
+}
+
+.report-table--gstr1 th {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  font-size: 0.76rem;
+}
+
+@media (max-width: 900px) {
+  .table-responsive--gstr1 {
+    max-height: none;
+  }
 }
 
 /* Credit note (TYPE = CN) — distinct from SL/SE sale lines */

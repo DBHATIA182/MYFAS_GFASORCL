@@ -3423,6 +3423,1247 @@ app.get('/api/purchase-bill-print', async (req, res) => {
   }
 });
 
+function gstrNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+function gstrTxt(v) {
+  return String(v ?? '').trim();
+}
+function gstrHas(v) {
+  return gstrTxt(v) !== '';
+}
+function gstrRate(r) {
+  return +(gstrNum(r).toFixed(2));
+}
+function gstrDt(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return '';
+  const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${dd}-${mon[dt.getMonth()]}-${String(dt.getFullYear()).slice(-2)}`;
+}
+function fmtInvNo(row, opts) {
+  const saleInv = gstrTxt(row.SALE_INV_NO ?? row.sale_inv_no);
+  const billNoRaw = String(row.BILL_NO ?? row.bill_no ?? '').trim();
+  const bType = gstrTxt(row.B_TYPE ?? row.b_type);
+  let base = saleInv || billNoRaw;
+  if (opts.bTypeYn === 'Y' && bType) base += bType;
+  if (opts.zeroBeforeBillNo === 'Y') {
+    const onlyNum = String(row.BILL_NO ?? '').replace(/\D/g, '');
+    if (onlyNum) base = onlyNum.padStart(opts.billNoLength, '0') + (opts.bTypeYn === 'Y' && bType ? bType : '');
+  }
+  return base;
+}
+function keyOf(...parts) {
+  return parts.map((p) => gstrTxt(p)).join('|');
+}
+function gstrRound2(v) {
+  return +gstrNum(v).toFixed(2);
+}
+function gstrParseDispDate(s) {
+  const t = gstrTxt(s);
+  if (!t) return 0;
+  const m = t.match(/^(\d{2})-([A-Za-z]{3})-(\d{2})$/);
+  if (!m) return 0;
+  const monMap = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+  const dd = Number(m[1]);
+  const mm = monMap[m[2]] ?? 0;
+  const yy = Number(m[3]);
+  const yyyy = 2000 + yy;
+  return new Date(yyyy, mm, dd).getTime();
+}
+function gstrRoundAmountColumns(rows) {
+  const amtRx = /(AMT|AMOUNT|VALUE|TAXABLE|TAX|IGST|CGST|SGST|CESS|FREIGHT|LABOUR|TOTAL)/i;
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const out = { ...row };
+    Object.keys(out).forEach((k) => {
+      if (!amtRx.test(k)) return;
+      if (typeof out[k] !== 'number') return;
+      out[k] = gstrRound2(out[k]);
+    });
+    return out;
+  });
+}
+
+app.get('/api/gstr1', async (req, res) => {
+  try {
+    const {
+      comp_code,
+      comp_uid,
+      s_date,
+      e_date,
+      btype_yn,
+      zero_before_bill_no,
+      bill_no_length,
+      btob_yn,
+      btocl_yn,
+      btocs_yn,
+      b2cl_limit_mode,
+    } = req.query;
+    if (!comp_code || !comp_uid || !s_date || !e_date) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, s_date, e_date are required' });
+    }
+    const opts = {
+      bTypeYn: String(btype_yn || 'Y').trim().toUpperCase() === 'N' ? 'N' : 'Y',
+      zeroBeforeBillNo: String(zero_before_bill_no || 'Y').trim().toUpperCase() === 'N' ? 'N' : 'Y',
+      billNoLength: Math.max(1, Math.min(12, Number(bill_no_length) || 6)),
+      btobYn: String(btob_yn || 'Y').trim().toUpperCase() === 'N' ? 'N' : 'Y',
+      btoclYn: String(btocl_yn || 'Y').trim().toUpperCase() === 'N' ? 'N' : 'Y',
+      btocsYn: String(btocs_yn || 'Y').trim().toUpperCase() === 'N' ? 'N' : 'Y',
+      b2clLimit: String(b2cl_limit_mode || '1').trim() === '2' ? 100000 : 250000,
+    };
+
+    const saleSql = `
+      SELECT
+        A.TYPE, A.B_TYPE, A.BILL_DATE, A.BILL_NO, A.SALE_INV_NO,
+        A.SB_NO, A.SB_DATE, A.SB_TYPE,
+        A.CODE, M.NAME, M.GST_NO, M.L_C, M.STATE_CODE, M.STATE,
+        I.HSN_CODE, I.ITEM_NAME, I.HSN_UNIT,
+        A.QNTY, A.WEIGHT,
+        A.INPUT_YN, CAST(NULL AS VARCHAR2(1)) AS SL_C, CAST(NULL AS NUMBER) AS SCHEDULE,
+        A.TAXABLE, A.CGST_AMT, A.SGST_AMT, A.IGST_AMT,
+        A.CGST_PER, A.SGST_PER, A.IGST_PER,
+        A.BILL_AMT, A.REMARKS, A.REMARKS1, A.V_DATE
+      FROM SALE A
+      LEFT JOIN MASTER M ON A.COMP_CODE = M.COMP_CODE AND A.CODE = M.CODE
+      LEFT JOIN ITEMMAST I ON A.COMP_CODE = I.COMP_CODE AND A.ITEM_CODE = I.ITEM_CODE
+      WHERE A.COMP_CODE = :comp_code
+        AND TRUNC(A.BILL_DATE) BETWEEN TRUNC(TO_DATE(:s_date,'DD-MM-YYYY')) AND TRUNC(TO_DATE(:e_date,'DD-MM-YYYY'))`;
+    const purchaseSql = `
+      SELECT
+        A.TYPE, A.S_P, A.R_DATE, A.R_NO, A.BILL_DATE, A.BILL_NO, CAST(NULL AS VARCHAR2(1)) AS B_TYPE,
+        A.CODE, M.NAME, M.GST_NO, M.L_C, M.STATE_CODE, M.STATE,
+        I.HSN_CODE, I.ITEM_NAME, I.HSN_UNIT,
+        A.QNTY, A.WEIGHT, A.INPUT_YN, CAST(NULL AS VARCHAR2(5)) AS TAX_FORM, A.REMARKS, A.SHOW_IN_GSTR, A.TAXABLE, A.CGST_AMT, A.SGST_AMT, A.IGST_AMT,
+        A.CGST_PER, A.SGST_PER, A.IGST_PER
+      FROM PURCHASE A
+      LEFT JOIN MASTER M ON A.COMP_CODE = M.COMP_CODE AND A.CODE = M.CODE
+      LEFT JOIN ITEMMAST I ON A.COMP_CODE = I.COMP_CODE AND A.ITEM_CODE = I.ITEM_CODE
+      WHERE A.COMP_CODE = :comp_code
+        AND TRUNC(A.R_DATE) BETWEEN TRUNC(TO_DATE(:s_date,'DD-MM-YYYY')) AND TRUNC(TO_DATE(:e_date,'DD-MM-YYYY'))`;
+    const binds = { comp_code, s_date, e_date };
+    const saleRows = (await runQuery(saleSql, binds, comp_uid)) || [];
+    const purRows = (await runQuery(purchaseSql, binds, comp_uid)) || [];
+
+    const billTotals = new Map();
+    saleRows.forEach((r) => {
+      const k = keyOf(r.TYPE, r.BILL_NO, r.B_TYPE);
+      const inv = gstrNum(r.TAXABLE) + gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      billTotals.set(k, gstrNum(billTotals.get(k)) + inv);
+    });
+
+    const outwardSet = new Set(['SL', 'ST', 'SR', 'GT', 'GR', 'SX']);
+    const outwardSetCn = new Set(['SL', 'ST', 'SR', 'GT', 'GR', 'SX', 'CN', 'GN', 'CX']);
+    const b2b = [];
+    const b2bMap = new Map();
+    const b2bBillTaxableMap = new Map();
+    saleRows.forEach((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      if (!outwardSet.has(tp)) return;
+      if (!gstrHas(r.GST_NO)) return;
+      const taxTotal = gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      if (opts.btobYn !== 'Y' && taxTotal === 0) return;
+      const bk = keyOf(r.TYPE, r.BILL_NO, r.B_TYPE, r.BILL_DATE);
+      b2bBillTaxableMap.set(bk, gstrNum(b2bBillTaxableMap.get(bk)) + gstrNum(r.TAXABLE));
+    });
+    saleRows.forEach((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      if (!outwardSet.has(tp)) return;
+      if (!gstrHas(r.GST_NO)) return;
+      const taxTotal = gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      if (opts.btobYn !== 'Y' && taxTotal === 0) return;
+      const invNo = gstrTxt(r.SALE_INV_NO);
+      const rate = gstrRate(gstrNum(r.CGST_PER) + gstrNum(r.SGST_PER) + gstrNum(r.IGST_PER));
+      const k = keyOf(r.GST_NO, invNo, r.B_TYPE, r.BILL_DATE, rate);
+      const item = b2bMap.get(k) || {
+        GSTIN: gstrTxt(r.GST_NO),
+        NAME: gstrTxt(r.NAME),
+        INVOICE_NO: invNo,
+        INVOICE_DATE: gstrDt(r.BILL_DATE),
+        INVOICE_VALUE: 0,
+        PLACE_OF_SUPPLY: `${gstrTxt(r.STATE_CODE)}-${gstrTxt(r.STATE)}`.trim(),
+        REVERSE_CHARGE: tp === 'RC' ? 'Y' : 'N',
+        APPLICABLE_TAX: 0,
+        INVOICE_TYPE: 'Regular B2B',
+        E_COMMERCE_GSTIN: '',
+        RATE: rate,
+        TAXABLE_VALUE: 0,
+        CESS_AMT: 0,
+        _TYPE: tp,
+        _BILL_NO: gstrTxt(r.BILL_NO),
+        _B_TYPE: gstrTxt(r.B_TYPE),
+      };
+      item.TAXABLE_VALUE += gstrNum(r.TAXABLE);
+      item.INVOICE_VALUE = gstrNum(billTotals.get(keyOf(r.TYPE, r.BILL_NO, r.B_TYPE)));
+      item.TAXABLE_VALUE = gstrNum(b2bBillTaxableMap.get(keyOf(r.TYPE, r.BILL_NO, r.B_TYPE, r.BILL_DATE)));
+      b2bMap.set(k, item);
+    });
+    b2b.push(...Array.from(b2bMap.values()));
+    b2b.sort((a, b) => {
+      const d = gstrParseDispDate(a.INVOICE_DATE) - gstrParseDispDate(b.INVOICE_DATE);
+      if (d !== 0) return d;
+      return gstrTxt(a.INVOICE_NO).localeCompare(gstrTxt(b.INVOICE_NO), 'en', { numeric: true, sensitivity: 'base' });
+    });
+
+    const b2cl = [];
+    const b2clMap = new Map();
+    const b2clBillTotals = new Map();
+    const b2clBillTaxable = new Map();
+    saleRows.forEach((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      if (!outwardSetCn.has(tp)) return;
+      if (gstrHas(r.GST_NO)) return;
+      const sign = tp === 'CN' ? -1 : 1;
+      const billKey = keyOf(r.TYPE, r.BILL_NO, r.B_TYPE, r.BILL_DATE);
+      const lineInv = gstrNum(r.TAXABLE) + gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      b2clBillTotals.set(billKey, gstrNum(b2clBillTotals.get(billKey)) + sign * lineInv);
+      b2clBillTaxable.set(billKey, gstrNum(b2clBillTaxable.get(billKey)) + sign * gstrNum(r.TAXABLE));
+    });
+    saleRows.forEach((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      if (!outwardSetCn.has(tp)) return;
+      if (gstrHas(r.GST_NO)) return;
+      const taxTotal = gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      if (opts.btoclYn !== 'Y' && taxTotal === 0) return;
+      const billAmt = gstrNum(r.BILL_AMT);
+      if (!(billAmt > opts.b2clLimit)) return;
+      const invNo = gstrTxt(r.SALE_INV_NO) || gstrTxt(r.BILL_NO);
+      const rate = gstrRate(gstrNum(r.CGST_PER) + gstrNum(r.SGST_PER) + gstrNum(r.IGST_PER));
+      const k = keyOf(invNo, r.BILL_DATE, rate, r.TYPE, r.B_TYPE);
+      const sign = tp === 'CN' ? -1 : 1;
+      const it = b2clMap.get(k) || {
+        INVOICE_NO: invNo,
+        INVOICE_DATE: gstrDt(r.BILL_DATE),
+        INVOICE_VALUE: 0,
+        PLACE_OF_SUPPLY: `${gstrTxt(r.STATE_CODE)}-${gstrTxt(r.STATE)}`.trim(),
+        APPLICABLE_TAX: 0,
+        RATE: rate,
+        TAXABLE_VALUE: 0,
+        _TYPE: tp,
+        _BILL_NO: gstrTxt(r.BILL_NO),
+        _B_TYPE: gstrTxt(r.B_TYPE),
+      };
+      it.INVOICE_VALUE += sign * (gstrNum(r.TAXABLE) + gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT));
+      it.TAXABLE_VALUE += sign * gstrNum(r.TAXABLE);
+      it.INVOICE_VALUE = gstrNum(b2clBillTotals.get(keyOf(r.TYPE, r.BILL_NO, r.B_TYPE, r.BILL_DATE)));
+      it.TAXABLE_VALUE = gstrNum(b2clBillTaxable.get(keyOf(r.TYPE, r.BILL_NO, r.B_TYPE, r.BILL_DATE)));
+      b2clMap.set(k, it);
+    });
+    b2cl.push(...Array.from(b2clMap.values()));
+    const b2clInvoiceWise = b2cl.map((r) => ({
+      INVOICE_NO: gstrTxt(r.INVOICE_NO),
+      INVOICE_DATE: gstrTxt(r.INVOICE_DATE),
+      INVOICE_VALUE: gstrNum(r.INVOICE_VALUE),
+      PLACE_OF_SUPPLY: gstrTxt(r.PLACE_OF_SUPPLY),
+      APPLICABLE_TAX: 0,
+      RATE: gstrNum(r.RATE),
+      TAXABLE_VALUE: gstrNum(r.TAXABLE_VALUE),
+      CESS_AMT: 0,
+      E_COMMERCE_GSTIN: '',
+      _TYPE: gstrTxt(r._TYPE),
+      _BILL_NO: gstrTxt(r._BILL_NO),
+      _B_TYPE: gstrTxt(r._B_TYPE),
+    }));
+    b2cl.length = 0;
+    b2cl.push(...b2clInvoiceWise);
+    b2cl.sort((a, b) => {
+      const d = gstrParseDispDate(a.INVOICE_DATE) - gstrParseDispDate(b.INVOICE_DATE);
+      if (d !== 0) return d;
+      return gstrTxt(a.INVOICE_NO).localeCompare(gstrTxt(b.INVOICE_NO), 'en', { numeric: true, sensitivity: 'base' });
+    });
+
+    // --------- B2CS (VFP X1/X2/X3/X4/X5/X6/X7 equivalent) ---------
+    const mdetRows = saleRows.filter((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      if (!outwardSetCn.has(tp)) return false;
+      if (gstrHas(r.GST_NO)) return false;
+      if (opts.btocsYn !== 'Y') {
+        const taxTotal = gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+        if (taxTotal === 0) return false;
+      }
+      return true;
+    });
+
+    // X1: grouped invoice/rate rows
+    const x1Map = new Map();
+    mdetRows.forEach((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      const sign = ['CN', 'GN', 'CX'].includes(tp) ? -1 : 1;
+      const rate = gstrRate(gstrNum(r.CGST_PER) + gstrNum(r.SGST_PER) + gstrNum(r.IGST_PER));
+      const invNo = gstrTxt(r.BILL_NO);
+      const invDt = gstrDt(r.BILL_DATE);
+      const k = keyOf(invNo, invDt, rate, tp, r.B_TYPE);
+      const it = x1Map.get(k) || {
+        INVOICE_NO: invNo,
+        INVOICE_DATE: invDt,
+        INVOICE_VALUE: 0,
+        PLACE_OF_SUPPLY: `${gstrTxt(r.STATE_CODE)}-${gstrTxt(r.STATE)}`.trim(),
+        RATE: rate,
+        TAXABLE_VALUE: 0,
+        TYPE: tp,
+        B_TYPE: gstrTxt(r.B_TYPE),
+      };
+      it.INVOICE_VALUE += sign * (gstrNum(r.TAXABLE) + gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT));
+      it.TAXABLE_VALUE += sign * gstrNum(r.TAXABLE);
+      x1Map.set(k, it);
+    });
+    const x1 = Array.from(x1Map.values());
+
+    // X2: grouped by bill + code + l_c (and tax condition when btocsYn != 'Y')
+    const x2Map = new Map();
+    mdetRows.forEach((r) => {
+      const k = keyOf(r.TYPE, r.BILL_NO, r.B_TYPE, gstrDt(r.BILL_DATE), r.CODE, r.NAME, r.GST_NO, r.L_C);
+      const it = x2Map.get(k) || {
+        TYPE: gstrTxt(r.TYPE).toUpperCase(),
+        BILL_NO: gstrTxt(r.BILL_NO),
+        B_TYPE: gstrTxt(r.B_TYPE),
+        BILL_DATE: gstrDt(r.BILL_DATE),
+        CODE: gstrTxt(r.CODE),
+        NAME: gstrTxt(r.NAME),
+        GST_NO: gstrTxt(r.GST_NO),
+        L_C: gstrTxt(r.L_C).toUpperCase(),
+        BILL_AMT: 0,
+        TAX_TOTAL: 0,
+      };
+      it.BILL_AMT += gstrNum(r.BILL_AMT);
+      it.TAX_TOTAL += gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      x2Map.set(k, it);
+    });
+    let x2 = Array.from(x2Map.values());
+    if (opts.btocsYn === 'Y') {
+      x2 = x2.filter((r) => gstrNum(r.BILL_AMT) < opts.b2clLimit);
+    } else {
+      x2 = x2.filter((r) => gstrNum(r.TAX_TOTAL) !== 0);
+    }
+
+    // X3 + X4 => X5
+    const x3 = x2.filter((r) => r.L_C === 'C' && gstrNum(r.BILL_AMT) <= opts.b2clLimit);
+    const x4 = x2.filter((r) => r.L_C === 'L');
+    const x5 = [...x3, ...x4];
+    const x5Keys = new Set(x5.map((r) => keyOf(r.TYPE, r.BILL_NO, r.B_TYPE, r.BILL_DATE)));
+
+    // X6: pick X1 entries that EXIST in X5 (type,bill_no,b_type,bill_date)
+    const x6 = x1.filter((r) => x5Keys.has(keyOf(r.TYPE, r.INVOICE_NO, r.B_TYPE, r.INVOICE_DATE)));
+
+    // X7: final b2cs grouped by place + rate
+    const b2csMap = new Map();
+    x6.forEach((r) => {
+      const k = keyOf(r.PLACE_OF_SUPPLY, r.RATE);
+      const it = b2csMap.get(k) || {
+        TYPE: 'OE',
+        PLACE_OF_SUPPLY: gstrTxt(r.PLACE_OF_SUPPLY),
+        APPLICABLE_TAX: 0,
+        RATE: gstrRate(r.RATE),
+        TAXABLE_VALUE: 0,
+      };
+      it.TAXABLE_VALUE += gstrNum(r.TAXABLE_VALUE);
+      b2csMap.set(k, it);
+    });
+    const b2cs = Array.from(b2csMap.values());
+
+    const cdnrMap = new Map();
+    saleRows.forEach((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      if (!['CN', 'GN', 'CX'].includes(tp)) return;
+      if (!gstrHas(r.GST_NO)) return;
+      const taxTotal = gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      if (opts.btobYn !== 'Y' && taxTotal === 0) return;
+      const noteType = tp === 'CX' ? 'D' : 'C';
+      const rate = gstrRate(gstrNum(r.CGST_PER) + gstrNum(r.SGST_PER) + gstrNum(r.IGST_PER));
+      const k = keyOf(r.GST_NO, r.BILL_NO, r.BILL_DATE, noteType, rate);
+      const it = cdnrMap.get(k) || {
+        GSTIN: gstrTxt(r.GST_NO),
+        NAME: gstrTxt(r.NAME),
+        NOTE_NUMBER: gstrTxt(r.BILL_NO),
+        NOTE_DATE: gstrDt(r.BILL_DATE),
+        DOCUMENT_TYPE: noteType,
+        PLACE_OF_SUPPLY: `${gstrTxt(r.STATE_CODE)}-${gstrTxt(r.STATE)}`.trim(),
+        REV_CHARGE: 'N',
+        NOTE_SUPPLY_TYPE: 'Regular',
+        VOUCHER_VALUE: 0,
+        APPLICABLE_TAX: 0,
+        RATE: rate,
+        TAXABLE_VALUE: 0,
+        CESS: 0,
+        _SOURCE: 'SALE',
+        _TYPE: tp,
+        _NOTE_NO: gstrTxt(r.BILL_NO),
+        _NOTE_DATE: gstrDt(r.BILL_DATE),
+        _B_TYPE: gstrTxt(r.SB_TYPE || r.B_TYPE),
+      };
+      it.VOUCHER_VALUE += gstrNum(r.TAXABLE) + gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      it.TAXABLE_VALUE += gstrNum(r.TAXABLE);
+      cdnrMap.set(k, it);
+    });
+    purRows.forEach((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      if (!['DN', 'DX', 'CX'].includes(tp)) return;
+      if (!gstrHas(r.GST_NO)) return;
+      const taxTotal = gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      if (opts.btobYn !== 'Y' && taxTotal === 0) return;
+      const noteType = tp === 'CX' ? 'C' : 'D';
+      const rate = gstrRate(gstrNum(r.CGST_PER) + gstrNum(r.SGST_PER) + gstrNum(r.IGST_PER));
+      const k = keyOf(r.GST_NO, r.R_NO, r.R_DATE, noteType, rate);
+      const it = cdnrMap.get(k) || {
+        GSTIN: gstrTxt(r.GST_NO),
+        NAME: gstrTxt(r.NAME),
+        NOTE_NUMBER: gstrTxt(r.R_NO),
+        NOTE_DATE: gstrDt(r.R_DATE),
+        DOCUMENT_TYPE: noteType,
+        PLACE_OF_SUPPLY: `${gstrTxt(r.STATE_CODE)}-${gstrTxt(r.STATE)}`.trim(),
+        REV_CHARGE: 'N',
+        NOTE_SUPPLY_TYPE: 'Regular',
+        VOUCHER_VALUE: 0,
+        APPLICABLE_TAX: 0,
+        RATE: rate,
+        TAXABLE_VALUE: 0,
+        CESS: 0,
+        _SOURCE: 'PURCHASE',
+        _TYPE: tp,
+        _NOTE_NO: gstrTxt(r.R_NO),
+        _NOTE_DATE: gstrDt(r.R_DATE),
+        _B_TYPE: gstrTxt(r.B_TYPE),
+      };
+      it.VOUCHER_VALUE += gstrNum(r.TAXABLE) + gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      it.TAXABLE_VALUE += gstrNum(r.TAXABLE);
+      cdnrMap.set(k, it);
+    });
+    const cdnr = Array.from(cdnrMap.values());
+    cdnr.sort((a, b) => {
+      const d = gstrParseDispDate(a.NOTE_DATE) - gstrParseDispDate(b.NOTE_DATE);
+      if (d !== 0) return d;
+      return gstrTxt(a.NOTE_NUMBER).localeCompare(gstrTxt(b.NOTE_NUMBER), 'en', { numeric: true, sensitivity: 'base' });
+    });
+
+    const cdnur = [];
+    const cdnurMap = new Map();
+    saleRows.forEach((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      if (!['CN', 'GN', 'CX'].includes(tp)) return;
+      if (gstrHas(r.GST_NO)) return;
+      const taxTotal = gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      if (opts.btobYn !== 'Y' && taxTotal === 0) return;
+      const noteType = tp === 'CX' ? 'D' : 'C';
+      const rate = gstrRate(gstrNum(r.CGST_PER) + gstrNum(r.SGST_PER) + gstrNum(r.IGST_PER));
+      const k = keyOf(r.BILL_NO, r.BILL_DATE, noteType, rate);
+      const it = cdnurMap.get(k) || {
+        UR_TYPE: 'B2CL',
+        NOTE_NUMBER: gstrTxt(r.BILL_NO),
+        NOTE_DATE: gstrDt(r.BILL_DATE),
+        DOCUMENT_TYPE: noteType,
+        PLACE_OF_SUPPLY: `${gstrTxt(r.STATE_CODE)}-${gstrTxt(r.STATE)}`.trim(),
+        VOUCHER_VALUE: 0,
+        APPLICABLE_TAX: 0,
+        RATE: rate,
+        TAXABLE_VALUE: 0,
+        CESS: 0,
+        PRE_GST: 'N',
+        _SOURCE: 'SALE',
+        _TYPE: tp,
+        _NOTE_NO: gstrTxt(r.BILL_NO),
+        _NOTE_DATE: gstrDt(r.BILL_DATE),
+        _B_TYPE: gstrTxt(r.SB_TYPE || r.B_TYPE),
+      };
+      it.VOUCHER_VALUE += gstrNum(r.TAXABLE) + gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      it.TAXABLE_VALUE += gstrNum(r.TAXABLE);
+      cdnurMap.set(k, it);
+    });
+    cdnur.push(...Array.from(cdnurMap.values()));
+    cdnur.sort((a, b) => {
+      const d = gstrParseDispDate(a.NOTE_DATE) - gstrParseDispDate(b.NOTE_DATE);
+      if (d !== 0) return d;
+      return gstrTxt(a.NOTE_NUMBER).localeCompare(gstrTxt(b.NOTE_NUMBER), 'en', { numeric: true, sensitivity: 'base' });
+    });
+
+    const expMap = new Map();
+    saleRows.forEach((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      if (!['SE', 'ER'].includes(tp)) return;
+      const rate = gstrRate(gstrNum(r.CGST_PER) + gstrNum(r.SGST_PER) + gstrNum(r.IGST_PER));
+      const k = keyOf(r.BILL_NO, r.BILL_DATE, rate);
+      const sign = tp === 'ER' ? -1 : 1;
+      const it = expMap.get(k) || {
+        EXPORT_TYPE: rate === 0 ? 'WOPAY' : 'WPAY',
+        INVOICE_NO: fmtInvNo(r, opts),
+        INVOICE_DATE: gstrDt(r.BILL_DATE),
+        INVOICE_VALUE: 0,
+        PORT: gstrTxt(r.REMARKS1) || 'INDB91',
+        SHIPPING_BILL_NO: gstrTxt(r.REMARKS),
+        SHIPPING_BILL_DATE: gstrDt(r.V_DATE),
+        RATE: rate,
+        TAXABLE_VALUE: 0,
+        _TYPE: tp,
+        _BILL_NO: gstrTxt(r.BILL_NO),
+        _B_TYPE: gstrTxt(r.B_TYPE),
+      };
+      it.INVOICE_VALUE += sign * (gstrNum(r.TAXABLE) + gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT));
+      it.TAXABLE_VALUE += sign * gstrNum(r.TAXABLE);
+      expMap.set(k, it);
+    });
+    const exp = Array.from(expMap.values());
+    const expa = [];
+
+    // EXEMP: keep VFP parity (compute only when BTOBYN <> 'Y')
+    let exemp = [];
+    if (opts.btobYn !== 'Y') {
+      // X1
+      const x1 = saleRows.filter((r) => {
+        const tp = gstrTxt(r.TYPE).toUpperCase();
+        if (!['SL', 'ST', 'SR', 'GT', 'GR', 'SX', 'CN'].includes(tp)) return false;
+        const taxTotal = gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+        return taxTotal === 0;
+      });
+      // X2/X3
+      const x2 = x1.filter((r) => gstrHas(r.GST_NO)); // registered
+      const x3 = x1.filter((r) => !gstrHas(r.GST_NO)); // unregistered
+
+      const sumByLc = (rows) => {
+        const out = new Map();
+        rows.forEach((r) => {
+          const lc = gstrTxt(r.L_C).toUpperCase() === 'L' ? 'L' : 'C';
+          const tp = gstrTxt(r.TYPE).toUpperCase();
+          const amt = tp === 'CN' ? -gstrNum(r.TAXABLE) : gstrNum(r.TAXABLE);
+          out.set(lc, gstrNum(out.get(lc)) + amt);
+        });
+        return out;
+      };
+
+      // X4 / X5
+      const x4 = sumByLc(x2); // reg sale
+      const x5 = sumByLc(x3); // ur sale
+
+      const sumPurchaseByLc = (filterFn) => {
+        const out = new Map();
+        purRows.forEach((r) => {
+          const tp = gstrTxt(r.TYPE).toUpperCase();
+          if (!filterFn(tp, r)) return;
+          const taxTotal = gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+          if (taxTotal !== 0) return;
+          const lc = gstrTxt(r.L_C).toUpperCase() === 'L' ? 'L' : 'C';
+          out.set(lc, gstrNum(out.get(lc)) + gstrNum(r.TAXABLE));
+        });
+        return out;
+      };
+
+      // X41/X51 (CX, S_P<>'P')
+      const x41 = sumPurchaseByLc((tp, r) => tp === 'CX' && gstrTxt(r.S_P).toUpperCase() !== 'P' && gstrHas(r.GST_NO));
+      const x51 = sumPurchaseByLc((tp, r) => tp === 'CX' && gstrTxt(r.S_P).toUpperCase() !== 'P' && !gstrHas(r.GST_NO));
+      // X42/X52 (DX, S_P='S')
+      const x42 = sumPurchaseByLc((tp, r) => tp === 'DX' && gstrTxt(r.S_P).toUpperCase() === 'S' && gstrHas(r.GST_NO));
+      const x52 = sumPurchaseByLc((tp, r) => tp === 'DX' && gstrTxt(r.S_P).toUpperCase() === 'S' && !gstrHas(r.GST_NO));
+
+      let exmp_l_r = 0;
+      let exmp_c_r = 0;
+      let exmp_l_ur = 0;
+      let exmp_c_ur = 0;
+
+      exmp_l_r = gstrNum(x4.get('L'));
+      exmp_c_r = gstrNum(x4.get('C'));
+      exmp_l_r -= gstrNum(x41.get('L'));
+      exmp_c_r -= gstrNum(x41.get('C'));
+      exmp_l_r += gstrNum(x42.get('L'));
+      exmp_c_r += gstrNum(x42.get('C'));
+
+      exmp_l_ur = gstrNum(x5.get('L'));
+      exmp_c_ur = gstrNum(x5.get('C'));
+      exmp_l_ur -= gstrNum(x51.get('L'));
+      exmp_c_ur -= gstrNum(x51.get('C'));
+      exmp_l_ur += gstrNum(x52.get('L'));
+      exmp_c_ur += gstrNum(x52.get('C'));
+
+      exemp = [
+        { DESCRIPTION: 'Inter-State supplies to registered persons', NIL_RATED: 0, EXMPTED: exmp_c_r, NON_GST_SUP: 0, _KEY: 'REG_INTER' },
+        { DESCRIPTION: 'Intra-State supplies to registered persons', NIL_RATED: 0, EXMPTED: exmp_l_r, NON_GST_SUP: 0, _KEY: 'REG_INTRA' },
+        { DESCRIPTION: 'Inter-State supplies to unregistered persons', NIL_RATED: 0, EXMPTED: exmp_c_ur, NON_GST_SUP: 0, _KEY: 'UR_INTER' },
+        { DESCRIPTION: 'Intra-State supplies to unregistered persons', NIL_RATED: 0, EXMPTED: exmp_l_ur, NON_GST_SUP: 0, _KEY: 'UR_INTRA' },
+      ];
+    }
+
+    const buildHsn = (registered) => {
+      const m = new Map();
+      saleRows.forEach((r) => {
+        const isReg = gstrHas(r.GST_NO);
+        if (isReg !== registered) return;
+        const tp = gstrTxt(r.TYPE).toUpperCase();
+        const sign = ['CN', 'GN', 'CX', 'ER'].includes(tp) ? -1 : 1;
+        const rate = gstrRate(gstrNum(r.CGST_PER) + gstrNum(r.SGST_PER) + gstrNum(r.IGST_PER));
+        const k = keyOf(r.HSN_CODE, rate);
+        const it = m.get(k) || {
+          HSN_CODE: gstrTxt(r.HSN_CODE),
+          DESCRIPTION: gstrTxt(r.ITEM_NAME) || gstrTxt(r.HSN_CODE),
+          UQC: gstrTxt(r.HSN_UNIT),
+          TOTAL_QUANTITY: 0,
+          TOTAL_VALUE: 0,
+          TAX_RATE: rate,
+          TAXABLE_VALUE: 0,
+          IGST: 0,
+          CGST: 0,
+          SGST: 0,
+          CESS_AMOUNT: 0,
+        };
+        it.TOTAL_QUANTITY += sign * gstrNum(r.WEIGHT ?? r.QNTY);
+        it.TOTAL_VALUE += sign * (gstrNum(r.TAXABLE) + gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT));
+        it.TAXABLE_VALUE += sign * gstrNum(r.TAXABLE);
+        it.IGST += sign * gstrNum(r.IGST_AMT);
+        it.CGST += sign * gstrNum(r.CGST_AMT);
+        it.SGST += sign * gstrNum(r.SGST_AMT);
+        m.set(k, it);
+      });
+      return Array.from(m.values());
+    };
+    const hsn_b2b = buildHsn(true);
+    const hsn_b2c = buildHsn(false);
+
+    // DOCS: count unique documents by TYPE+B_TYPE+BILL_DATE+BILL_NO,
+    // then summarize by TYPE+B_TYPE for from/to/total.
+    const uniqueDocs = new Map();
+    saleRows.forEach((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      const bt = gstrTxt(r.B_TYPE);
+      const billNo = gstrTxt(r.BILL_NO);
+      const billDate = gstrDt(r.BILL_DATE);
+      const k = keyOf(tp, bt, billDate, billNo);
+      if (!uniqueDocs.has(k)) {
+        uniqueDocs.set(k, { TYPE: tp, B_TYPE: bt, BILL_DATE: billDate, BILL_NO: billNo });
+      }
+    });
+    const docsMap = new Map();
+    Array.from(uniqueDocs.values()).forEach((d) => {
+      const k = keyOf(d.TYPE, d.B_TYPE);
+      const it = docsMap.get(k) || { TYPE: d.TYPE, B_TYPE: d.B_TYPE, from: d.BILL_NO, to: d.BILL_NO, total: 0 };
+      it.total += 1;
+      if (!it.from || gstrTxt(d.BILL_NO).localeCompare(gstrTxt(it.from), 'en', { numeric: true, sensitivity: 'base' }) < 0) it.from = d.BILL_NO;
+      if (!it.to || gstrTxt(d.BILL_NO).localeCompare(gstrTxt(it.to), 'en', { numeric: true, sensitivity: 'base' }) > 0) it.to = d.BILL_NO;
+      docsMap.set(k, it);
+    });
+    const docs = Array.from(docsMap.values()).map((d) => ({
+      NATURE_OF_DOCUMENT:
+        d.TYPE === 'CN'
+          ? 'Credit note'
+          : (d.TYPE === 'SL' || d.TYPE === 'SE')
+            ? 'Invoice for outward supply'
+            : 'Invoice for outward supply',
+      SR_NO_FROM: d.from,
+      SR_NO_TO: d.to,
+      TOTAL_NUMBER: d.total,
+      CANCELLED: 0,
+    }));
+
+    // GSTR3B (VFP-aligned totals)
+    const saleSign = (tp) => (['CN', 'GN', 'CX', 'ER'].includes(gstrTxt(tp).toUpperCase()) ? -1 : 1);
+    const saleSignNoEr = (tp) => (['CN', 'GN', 'CX'].includes(gstrTxt(tp).toUpperCase()) ? -1 : 1);
+    const sumSigned = (rows, signFn) => rows.reduce((a, r) => {
+      const s = signFn(r.TYPE);
+      a.taxable += s * gstrNum(r.TAXABLE);
+      a.igst += s * gstrNum(r.IGST_AMT);
+      a.cgst += s * gstrNum(r.CGST_AMT);
+      a.sgst += s * gstrNum(r.SGST_AMT);
+      return a;
+    }, { taxable: 0, igst: 0, cgst: 0, sgst: 0 });
+    const sumPlain = (rows) => rows.reduce((a, r) => {
+      a.taxable += gstrNum(r.TAXABLE);
+      a.igst += gstrNum(r.IGST_AMT);
+      a.cgst += gstrNum(r.CGST_AMT);
+      a.sgst += gstrNum(r.SGST_AMT);
+      return a;
+    }, { taxable: 0, igst: 0, cgst: 0, sgst: 0 });
+    const taxTotal = (r) => gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+
+    let CGST_PAYABLE = 0;
+    let SGST_PAYABLE = 0;
+    let IGST_PAYABLE = 0;
+    let CGST_PAID = 0;
+    let SGST_PAID = 0;
+    let IGST_PAID = 0;
+
+    const aBase = sumSigned(
+      saleRows.filter((r) => gstrTxt(r.TYPE).toUpperCase() !== 'RC' && taxTotal(r) !== 0),
+      saleSign
+    );
+    const aCx = sumPlain(purRows.filter((r) => gstrTxt(r.TYPE).toUpperCase() === 'CX' && gstrTxt(r.S_P).toUpperCase() !== 'P' && taxTotal(r) !== 0));
+    const aDx = sumPlain(purRows.filter((r) => gstrTxt(r.TYPE).toUpperCase() === 'DX' && gstrTxt(r.S_P).toUpperCase() === 'S' && taxTotal(r) !== 0));
+    const row31a = {
+      taxable: aBase.taxable - aCx.taxable + aDx.taxable,
+      igst: aBase.igst - aCx.igst + aDx.igst,
+      cgst: aBase.cgst - aCx.cgst + aDx.cgst,
+      sgst: aBase.sgst - aCx.sgst + aDx.sgst,
+    };
+    CGST_PAYABLE = row31a.cgst;
+    SGST_PAYABLE = row31a.sgst;
+    IGST_PAYABLE = row31a.igst;
+
+    const row31b = sumSigned(
+      saleRows.filter((r) => ['SE', 'ER'].includes(gstrTxt(r.TYPE).toUpperCase()) && taxTotal(r) === 0),
+      saleSign
+    );
+
+    const cBase = sumSigned(
+      saleRows.filter((r) => !['RC', 'SE', 'ER'].includes(gstrTxt(r.TYPE).toUpperCase()) && taxTotal(r) === 0),
+      saleSignNoEr
+    );
+    const cCx = sumPlain(purRows.filter((r) => gstrTxt(r.TYPE).toUpperCase() === 'CX' && gstrTxt(r.S_P).toUpperCase() !== 'P' && taxTotal(r) === 0));
+    const cDx = sumPlain(purRows.filter((r) => gstrTxt(r.TYPE).toUpperCase() === 'DX' && gstrTxt(r.S_P).toUpperCase() === 'S' && taxTotal(r) === 0));
+    const row31c = {
+      taxable: cBase.taxable - cCx.taxable + cDx.taxable,
+      igst: cBase.igst - cCx.igst + cDx.igst,
+      cgst: cBase.cgst - cCx.cgst + cDx.cgst,
+      sgst: cBase.sgst - cCx.sgst + cDx.sgst,
+    };
+
+    const row31d = sumSigned(
+      saleRows.filter((r) => gstrTxt(r.TYPE).toUpperCase() === 'RC' && taxTotal(r) !== 0),
+      saleSignNoEr
+    );
+    CGST_PAYABLE += row31d.cgst;
+    SGST_PAYABLE += row31d.sgst;
+    IGST_PAYABLE += row31d.igst;
+
+    const row4a1 = sumPlain(purRows.filter((r) => gstrTxt(r.TAX_FORM).toUpperCase() === 'I'));
+    IGST_PAID = row4a1.igst;
+    SGST_PAID = row4a1.sgst;
+    CGST_PAID = row4a1.cgst;
+    const row4a2 = sumPlain(purRows.filter((r) => gstrTxt(r.TYPE).toUpperCase() === 'EV' && gstrTxt(r.REMARKS).toUpperCase().startsWith('IS') && gstrTxt(r.SHOW_IN_GSTR).toUpperCase() === 'Y'));
+    IGST_PAID += row4a2.igst;
+    SGST_PAID += row4a2.sgst;
+    CGST_PAID += row4a2.cgst;
+    const row4a3 = sumSigned(
+      saleRows.filter((r) => gstrTxt(r.TYPE).toUpperCase() === 'RC' && gstrTxt(r.INPUT_YN).toUpperCase() !== 'N' && taxTotal(r) !== 0),
+      saleSignNoEr
+    );
+    IGST_PAID += row4a3.igst;
+    SGST_PAID += row4a3.sgst;
+    CGST_PAID += row4a3.cgst;
+
+    const row4a5Base = sumPlain(purRows.filter((r) => (gstrTxt(r.TYPE).toUpperCase() === 'PU' || (gstrTxt(r.TYPE).toUpperCase() === 'EV' && !gstrTxt(r.REMARKS).toUpperCase().startsWith('IS') && gstrTxt(r.INPUT_YN).toUpperCase() !== 'N' && gstrTxt(r.SHOW_IN_GSTR).toUpperCase() === 'Y')) && gstrTxt(r.TAX_FORM).toUpperCase() !== 'I' && taxTotal(r) !== 0));
+    const row4a5Dn = sumPlain(purRows.filter((r) => (gstrTxt(r.TYPE).toUpperCase() === 'DN' || (gstrTxt(r.TYPE).toUpperCase() === 'DX' && gstrTxt(r.S_P).toUpperCase() === 'P')) && taxTotal(r) !== 0));
+    const row4a5Cx = sumPlain(purRows.filter((r) => gstrTxt(r.TYPE).toUpperCase() === 'CX' && gstrTxt(r.S_P).toUpperCase() === 'P' && taxTotal(r) !== 0));
+    const row4a5 = {
+      taxable: row4a5Base.taxable - row4a5Dn.taxable + row4a5Cx.taxable,
+      igst: row4a5Base.igst - row4a5Dn.igst + row4a5Cx.igst,
+      cgst: row4a5Base.cgst - row4a5Dn.cgst + row4a5Cx.cgst,
+      sgst: row4a5Base.sgst - row4a5Dn.sgst + row4a5Cx.sgst,
+    };
+    IGST_PAID -= row4a5Cx.igst;
+    SGST_PAID -= row4a5Cx.sgst;
+    CGST_PAID -= row4a5Cx.cgst;
+
+    const sumLc = (rows) => rows.reduce((a, r) => {
+      const isL = gstrTxt(r.L_C).toUpperCase() === 'L';
+      if (isL) a.l += gstrNum(r.TAXABLE); else a.c += gstrNum(r.TAXABLE);
+      return a;
+    }, { l: 0, c: 0 });
+    const exBase = sumLc(purRows.filter((r) => (gstrTxt(r.TYPE).toUpperCase() === 'PU' || (gstrTxt(r.TYPE).toUpperCase() === 'EV' && gstrTxt(r.INPUT_YN).toUpperCase() === 'N' && gstrTxt(r.SHOW_IN_GSTR).toUpperCase() === 'Y')) && gstrTxt(r.TAX_FORM).toUpperCase() !== 'I' && taxTotal(r) === 0));
+    const exDn = sumLc(purRows.filter((r) => ['DX', 'DN'].includes(gstrTxt(r.TYPE).toUpperCase()) && taxTotal(r) === 0));
+    const exCx = sumLc(purRows.filter((r) => gstrTxt(r.TYPE).toUpperCase() === 'CX' && gstrTxt(r.S_P).toUpperCase() === 'P' && taxTotal(r) === 0));
+    const row5 = { l: exBase.l - exDn.l + exCx.l, c: exBase.c - exDn.c + exCx.c };
+
+    const row51 = saleRows.reduce((a, r) => {
+      if (Math.trunc(gstrNum(r.SCHEDULE)) !== 11) return a;
+      const sign = gstrTxt(r.TYPE).toUpperCase() === 'CN' ? -1 : 1;
+      const isL = gstrTxt(r.SL_C).toUpperCase() === 'L';
+      if (isL) a.l += sign * gstrNum(r.TAXABLE); else a.c += sign * gstrNum(r.TAXABLE);
+      return a;
+    }, { l: 0, c: 0 });
+
+    const gstr3b = [
+      { PARTICULARS: 'OUTWARD SUPPLIES TAXABLE', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: row31a.taxable, IGST: row31a.igst, CGST: row31a.cgst, SGST: row31a.sgst, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'OUTWARD SUPPLIES ZERO RATED', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: row31b.taxable, IGST: 0, CGST: 0, SGST: 0, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'OUTWARD SUPPLIES EXEMPTED', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: row31c.taxable, IGST: 0, CGST: 0, SGST: 0, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'REVERSE CHARGE', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: row31d.taxable, IGST: row31d.igst, CGST: row31d.cgst, SGST: row31d.sgst, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'IMPORT OF GOODS', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: row4a1.taxable, IGST: row4a1.igst, CGST: row4a1.cgst, SGST: row4a1.sgst, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'IMPORT OF SERVICES', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: row4a2.taxable, IGST: row4a2.igst, CGST: row4a2.cgst, SGST: row4a2.sgst, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'REVERSE CHARGE', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: row4a3.taxable, IGST: row4a3.igst, CGST: row4a3.cgst, SGST: row4a3.sgst, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'ALL OTHER ITC', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: row4a5.taxable, IGST: row4a5.igst, CGST: row4a5.cgst, SGST: row4a5.sgst, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'NET ITC', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: 0, IGST: IGST_PAID, CGST: CGST_PAID, SGST: SGST_PAID, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'FROM SUPPLIER EXEMPT', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: 0, IGST: 0, CGST: 0, SGST: 0, INTER_STATE_SUPPLY: row5.c, INTRA_STATE_SUPPLY: row5.l, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'CONSIGNMENT PURCHASE', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: 0, IGST: 0, CGST: 0, SGST: 0, INTER_STATE_SUPPLY: row51.c, INTRA_STATE_SUPPLY: row51.l, TAX_PAYABLE: 0 },
+      { PARTICULARS: 'IGST', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: 0, IGST: IGST_PAID, CGST: 0, SGST: 0, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: IGST_PAYABLE },
+      { PARTICULARS: 'CGST', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: 0, IGST: 0, CGST: CGST_PAID, SGST: 0, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: CGST_PAYABLE },
+      { PARTICULARS: 'SGST', PLACE_OF_SUPPLY: '', TAXABLE_VALUE: 0, IGST: 0, CGST: 0, SGST: SGST_PAID, INTER_STATE_SUPPLY: 0, INTRA_STATE_SUPPLY: 0, TAX_PAYABLE: SGST_PAYABLE },
+    ];
+
+    const at = [];
+    const atadj = [];
+    const sheets = {
+      b2b: gstrRoundAmountColumns(b2b),
+      b2cl: gstrRoundAmountColumns(b2cl),
+      b2cs: gstrRoundAmountColumns(b2cs),
+      cdnr: gstrRoundAmountColumns(cdnr),
+      cdnur: gstrRoundAmountColumns(cdnur),
+      exp: gstrRoundAmountColumns(exp),
+      expa: gstrRoundAmountColumns(expa),
+      at: gstrRoundAmountColumns(at),
+      atadj: gstrRoundAmountColumns(atadj),
+      exemp: gstrRoundAmountColumns(exemp),
+      'hsn(b2b)': gstrRoundAmountColumns(hsn_b2b),
+      'hsn(b2c)': gstrRoundAmountColumns(hsn_b2c),
+      docs: gstrRoundAmountColumns(docs),
+      gstr3b: gstrRoundAmountColumns(gstr3b),
+    };
+    res.json({ ok: true, params: opts, period: { s_date, e_date }, sheets });
+  } catch (err) {
+    console.error('❌ GSTR1 report error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/gstr1-b2cs-detail', async (req, res) => {
+  try {
+    const {
+      comp_code,
+      comp_uid,
+      s_date,
+      e_date,
+      btocs_yn,
+      b2cl_limit_mode,
+      place_of_supply,
+      rate,
+    } = req.query;
+    if (!comp_code || !comp_uid || !s_date || !e_date) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, s_date, e_date are required' });
+    }
+    const targetPos = gstrTxt(place_of_supply);
+    const targetRate = gstrRate(rate);
+    const opts = {
+      btocsYn: String(btocs_yn || 'Y').trim().toUpperCase() === 'N' ? 'N' : 'Y',
+      b2clLimit: String(b2cl_limit_mode || '1').trim() === '2' ? 100000 : 250000,
+    };
+
+    const saleSql = `
+      SELECT
+        A.TYPE, A.B_TYPE, A.BILL_DATE, A.BILL_NO, A.SALE_INV_NO,
+        A.CODE, M.NAME, M.GST_NO, M.L_C, M.STATE_CODE, M.STATE,
+        A.TRN_NO, A.ITEM_CODE, I.HSN_CODE, I.ITEM_NAME,
+        A.QNTY, A.WEIGHT, A.RATE, A.AMOUNT,
+        A.TAXABLE, A.CGST_AMT, A.SGST_AMT, A.IGST_AMT, A.BILL_AMT,
+        A.CGST_PER, A.SGST_PER, A.IGST_PER
+      FROM SALE A
+      LEFT JOIN MASTER M ON A.COMP_CODE = M.COMP_CODE AND A.CODE = M.CODE
+      LEFT JOIN ITEMMAST I ON A.COMP_CODE = I.COMP_CODE AND A.ITEM_CODE = I.ITEM_CODE
+      WHERE A.COMP_CODE = :comp_code
+        AND TRUNC(A.BILL_DATE) BETWEEN TRUNC(TO_DATE(:s_date,'DD-MM-YYYY')) AND TRUNC(TO_DATE(:e_date,'DD-MM-YYYY'))
+      ORDER BY A.BILL_DATE, A.BILL_NO, A.B_TYPE, A.TRN_NO`;
+    const rows = (await runQuery(saleSql, { comp_code, s_date, e_date }, comp_uid)) || [];
+
+    const outwardSetCn = new Set(['SL', 'ST', 'SR', 'GT', 'GR', 'SX', 'CN', 'GN', 'CX']);
+    const mdetRows = rows.filter((r) => {
+      const tp = gstrTxt(r.TYPE).toUpperCase();
+      if (!outwardSetCn.has(tp)) return false;
+      if (gstrHas(r.GST_NO)) return false;
+      if (opts.btocsYn !== 'Y') {
+        const taxTotal = gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+        if (taxTotal === 0) return false;
+      }
+      return true;
+    });
+
+    const x2Map = new Map();
+    const billAmtSumMap = new Map();
+    mdetRows.forEach((r) => {
+      const billKey = keyOf(r.TYPE, r.BILL_NO, r.B_TYPE, gstrDt(r.BILL_DATE));
+      billAmtSumMap.set(billKey, gstrNum(billAmtSumMap.get(billKey)) + gstrNum(r.BILL_AMT));
+      const k = keyOf(r.TYPE, r.BILL_NO, r.B_TYPE, gstrDt(r.BILL_DATE), r.CODE, r.NAME, r.GST_NO, r.L_C);
+      const it = x2Map.get(k) || {
+        TYPE: gstrTxt(r.TYPE).toUpperCase(),
+        BILL_NO: gstrTxt(r.BILL_NO),
+        B_TYPE: gstrTxt(r.B_TYPE),
+        BILL_DATE: gstrDt(r.BILL_DATE),
+        L_C: gstrTxt(r.L_C).toUpperCase(),
+        BILL_AMT: 0,
+        TAX_TOTAL: 0,
+      };
+      it.BILL_AMT += gstrNum(r.BILL_AMT);
+      it.TAX_TOTAL += gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT);
+      x2Map.set(k, it);
+    });
+    let x2 = Array.from(x2Map.values());
+    if (opts.btocsYn === 'Y') x2 = x2.filter((r) => gstrNum(r.BILL_AMT) < opts.b2clLimit);
+    else x2 = x2.filter((r) => gstrNum(r.TAX_TOTAL) !== 0);
+    const x3 = x2.filter((r) => r.L_C === 'C' && gstrNum(r.BILL_AMT) <= opts.b2clLimit);
+    const x4 = x2.filter((r) => r.L_C === 'L');
+    const x5 = [...x3, ...x4];
+    const x5Keys = new Set(x5.map((r) => keyOf(r.TYPE, r.BILL_NO, r.B_TYPE, r.BILL_DATE)));
+
+    const detailMap = new Map();
+    mdetRows.forEach((r) => {
+      const type = gstrTxt(r.TYPE).toUpperCase();
+      const invNo = gstrTxt(r.BILL_NO);
+      const invDate = gstrDt(r.BILL_DATE);
+      const bType = gstrTxt(r.B_TYPE);
+      if (!x5Keys.has(keyOf(type, invNo, bType, invDate))) return;
+
+      const pos = `${gstrTxt(r.STATE_CODE)}-${gstrTxt(r.STATE)}`.trim();
+      const rowRate = gstrRate(gstrNum(r.CGST_PER) + gstrNum(r.SGST_PER) + gstrNum(r.IGST_PER));
+      if (targetPos && pos !== targetPos) return;
+      if (gstrRate(rowRate) !== targetRate) return;
+
+      const dk = keyOf(type, invDate, invNo, bType, pos, rowRate);
+      const sign = ['CN', 'GN', 'CX'].includes(type) ? -1 : 1;
+      const item = detailMap.get(dk) || {
+        TYPE: type,
+        BILL_DATE: invDate,
+        BILL_NO: invNo,
+        B_TYPE: bType,
+        SALE_INV_NO: gstrTxt(r.SALE_INV_NO),
+        CODE: gstrTxt(r.CODE),
+        NAME: gstrTxt(r.NAME),
+        PLACE_OF_SUPPLY: pos,
+        RATE: gstrRound2(rowRate),
+        LINE_COUNT: 0,
+        QNTY: 0,
+        WEIGHT: 0,
+        AMOUNT: 0,
+        TAXABLE: 0,
+        CGST_AMT: 0,
+        SGST_AMT: 0,
+        IGST_AMT: 0,
+        BILL_AMT: gstrRound2(sign * gstrNum(billAmtSumMap.get(keyOf(type, invNo, bType, invDate)))),
+      };
+      item.LINE_COUNT += 1;
+      item.QNTY += sign * gstrNum(r.QNTY);
+      item.WEIGHT += sign * gstrNum(r.WEIGHT);
+      item.AMOUNT += sign * gstrNum(r.AMOUNT);
+      item.TAXABLE += sign * gstrNum(r.TAXABLE);
+      item.CGST_AMT += sign * gstrNum(r.CGST_AMT);
+      item.SGST_AMT += sign * gstrNum(r.SGST_AMT);
+      item.IGST_AMT += sign * gstrNum(r.IGST_AMT);
+      detailMap.set(dk, item);
+    });
+    const details = Array.from(detailMap.values())
+      .map((r) => ({
+        ...r,
+        QNTY: gstrRound2(r.QNTY),
+        WEIGHT: gstrRound2(r.WEIGHT),
+        AMOUNT: gstrRound2(r.AMOUNT),
+        TAXABLE: gstrRound2(r.TAXABLE),
+        CGST_AMT: gstrRound2(r.CGST_AMT),
+        SGST_AMT: gstrRound2(r.SGST_AMT),
+        IGST_AMT: gstrRound2(r.IGST_AMT),
+      }))
+      .sort((a, b) => {
+        const d = gstrParseDispDate(a.BILL_DATE) - gstrParseDispDate(b.BILL_DATE);
+        if (d !== 0) return d;
+        return gstrTxt(a.BILL_NO).localeCompare(gstrTxt(b.BILL_NO), 'en', { numeric: true, sensitivity: 'base' });
+      });
+
+    res.json({ ok: true, rows: details });
+  } catch (err) {
+    console.error('❌ gstr1-b2cs-detail error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/gstr1-sale-detail', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, type, bill_no, b_type } = req.query;
+    if (!comp_code || !comp_uid || !type || bill_no == null || bill_no === '') {
+      return res.status(400).json({ error: 'comp_code, comp_uid, type, bill_no are required' });
+    }
+    const sql = `
+      SELECT
+        A.TYPE,
+        A.BILL_DATE,
+        A.BILL_NO,
+        A.B_TYPE,
+        A.SALE_INV_NO,
+        A.CODE,
+        B.NAME,
+        B.GST_NO,
+        B.STATE_CODE,
+        B.STATE,
+        A.TRN_NO,
+        A.ITEM_CODE,
+        A.HSN_CODE AS SALE_HSN_CODE,
+        C.HSN_CODE,
+        A.QNTY,
+        A.WEIGHT,
+        A.RATE,
+        A.AMOUNT,
+        A.TAXABLE,
+        A.CGST_AMT,
+        A.SGST_AMT,
+        A.IGST_AMT,
+        A.BILL_AMT
+      FROM SALE A
+      LEFT JOIN MASTER B
+        ON A.COMP_CODE = B.COMP_CODE
+       AND A.CODE = B.CODE
+      LEFT JOIN ITEMMAST C
+        ON A.COMP_CODE = C.COMP_CODE
+       AND A.ITEM_CODE = C.ITEM_CODE
+      WHERE A.COMP_CODE = :comp_code
+        AND TRIM(A.TYPE) = TRIM(:type)
+        AND TRIM(TO_CHAR(A.BILL_NO)) = TRIM(TO_CHAR(:bill_no))
+        AND TRIM(NVL(A.B_TYPE, ' ')) = TRIM(NVL(:b_type, ' '))
+      ORDER BY A.BILL_DATE, A.BILL_NO, A.B_TYPE, A.TRN_NO`;
+
+    const rows = (await runQuery(sql, { comp_code, type, bill_no, b_type: b_type ?? ' ' }, comp_uid)) || [];
+    const total = {
+      line_count: rows.length,
+      taxable_total: gstrRound2(rows.reduce((s, r) => s + gstrNum(r.TAXABLE), 0)),
+      amount_total: gstrRound2(rows.reduce((s, r) => s + gstrNum(r.AMOUNT), 0)),
+      cgst_total: gstrRound2(rows.reduce((s, r) => s + gstrNum(r.CGST_AMT), 0)),
+      sgst_total: gstrRound2(rows.reduce((s, r) => s + gstrNum(r.SGST_AMT), 0)),
+      igst_total: gstrRound2(rows.reduce((s, r) => s + gstrNum(r.IGST_AMT), 0)),
+      bill_total: gstrRound2(rows.reduce((m, r) => Math.max(m, gstrNum(r.BILL_AMT)), 0)),
+    };
+
+    const outRows = rows.map((r) => ({
+      TYPE: gstrTxt(r.TYPE),
+      BILL_DATE: gstrDt(r.BILL_DATE),
+      BILL_NO: gstrTxt(r.BILL_NO),
+      B_TYPE: gstrTxt(r.B_TYPE),
+      SALE_INV_NO: gstrTxt(r.SALE_INV_NO),
+      CODE: gstrTxt(r.CODE),
+      NAME: gstrTxt(r.NAME),
+      GST_NO: gstrTxt(r.GST_NO),
+      STATE_CODE: gstrTxt(r.STATE_CODE),
+      STATE: gstrTxt(r.STATE),
+      TRN_NO: gstrNum(r.TRN_NO),
+      ITEM_CODE: gstrTxt(r.ITEM_CODE),
+      SALE_HSN_CODE: gstrTxt(r.SALE_HSN_CODE),
+      HSN_CODE: gstrTxt(r.HSN_CODE),
+      QNTY: gstrRound2(gstrNum(r.QNTY)),
+      WEIGHT: gstrRound2(gstrNum(r.WEIGHT)),
+      RATE: gstrRound2(gstrNum(r.RATE)),
+      AMOUNT: gstrRound2(gstrNum(r.AMOUNT)),
+      TAXABLE: gstrRound2(gstrNum(r.TAXABLE)),
+      CGST_AMT: gstrRound2(gstrNum(r.CGST_AMT)),
+      SGST_AMT: gstrRound2(gstrNum(r.SGST_AMT)),
+      IGST_AMT: gstrRound2(gstrNum(r.IGST_AMT)),
+      BILL_AMT: gstrRound2(gstrNum(r.BILL_AMT)),
+    }));
+
+    res.json({ ok: true, rows: outRows, total });
+  } catch (err) {
+    console.error('❌ gstr1-sale-detail error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/gstr1-note-detail', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, source, type, note_no, note_date, b_type } = req.query;
+    if (!comp_code || !comp_uid || !source || !type || note_no == null || note_no === '' || !note_date) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, source, type, note_no, note_date are required' });
+    }
+
+    const src = String(source).trim().toUpperCase();
+    if (src === 'SALE') {
+      const sql = `
+        SELECT
+          A.TYPE, A.BILL_DATE, A.BILL_NO, A.B_TYPE, A.SALE_INV_NO,
+          A.CODE, B.NAME, B.GST_NO, B.STATE_CODE, B.STATE,
+          A.TRN_NO, A.ITEM_CODE, A.HSN_CODE AS SALE_HSN_CODE, C.HSN_CODE,
+          A.QNTY, A.WEIGHT, A.RATE, A.AMOUNT, A.TAXABLE, A.CGST_AMT, A.SGST_AMT, A.IGST_AMT, A.BILL_AMT
+        FROM SALE A
+        LEFT JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.CODE = B.CODE
+        LEFT JOIN ITEMMAST C ON A.COMP_CODE = C.COMP_CODE AND A.ITEM_CODE = C.ITEM_CODE
+        WHERE A.COMP_CODE = :comp_code
+          AND TRIM(A.TYPE) = TRIM(:type)
+          AND TRIM(TO_CHAR(A.BILL_NO)) = TRIM(TO_CHAR(:note_no))
+          AND TRUNC(A.BILL_DATE) = TRUNC(TO_DATE(:note_date,'DD-MON-YY'))
+          AND TRIM(NVL(A.B_TYPE,' ')) = TRIM(NVL(:b_type,' '))
+        ORDER BY A.BILL_DATE, A.BILL_NO, A.B_TYPE, A.TRN_NO`;
+      const rows = (await runQuery(sql, { comp_code, type, note_no, note_date, b_type: b_type ?? ' ' }, comp_uid)) || [];
+      const outRows = rows.map((r) => ({
+        SOURCE: 'SALE',
+        TYPE: gstrTxt(r.TYPE),
+        NOTE_DATE: gstrDt(r.BILL_DATE),
+        NOTE_NO: gstrTxt(r.BILL_NO),
+        B_TYPE: gstrTxt(r.B_TYPE),
+        SALE_INV_NO: gstrTxt(r.SALE_INV_NO),
+        CODE: gstrTxt(r.CODE),
+        NAME: gstrTxt(r.NAME),
+        GST_NO: gstrTxt(r.GST_NO),
+        STATE_CODE: gstrTxt(r.STATE_CODE),
+        STATE: gstrTxt(r.STATE),
+        TRN_NO: gstrNum(r.TRN_NO),
+        ITEM_CODE: gstrTxt(r.ITEM_CODE),
+        SALE_HSN_CODE: gstrTxt(r.SALE_HSN_CODE),
+        HSN_CODE: gstrTxt(r.HSN_CODE),
+        QNTY: gstrRound2(gstrNum(r.QNTY)),
+        WEIGHT: gstrRound2(gstrNum(r.WEIGHT)),
+        RATE: gstrRound2(gstrNum(r.RATE)),
+        AMOUNT: gstrRound2(gstrNum(r.AMOUNT)),
+        TAXABLE: gstrRound2(gstrNum(r.TAXABLE)),
+        CGST_AMT: gstrRound2(gstrNum(r.CGST_AMT)),
+        SGST_AMT: gstrRound2(gstrNum(r.SGST_AMT)),
+        IGST_AMT: gstrRound2(gstrNum(r.IGST_AMT)),
+        BILL_AMT: gstrRound2(gstrNum(r.BILL_AMT)),
+      }));
+      const total = {
+        line_count: outRows.length,
+        taxable_total: gstrRound2(outRows.reduce((s, r) => s + gstrNum(r.TAXABLE), 0)),
+        bill_total: gstrRound2(outRows.reduce((m, r) => Math.max(m, gstrNum(r.BILL_AMT)), 0)),
+      };
+      return res.json({ ok: true, rows: outRows, total });
+    }
+
+    const sql = `
+      SELECT
+        A.TYPE, A.R_DATE, A.R_NO, A.B_TYPE, A.BILL_DATE, A.BILL_NO,
+        A.CODE, B.NAME, B.GST_NO, B.STATE_CODE, B.STATE,
+        A.ITEM_CODE, C.HSN_CODE, A.QNTY, A.WEIGHT, A.RATE, A.AMOUNT,
+        A.TAXABLE, A.CGST_AMT, A.SGST_AMT, A.IGST_AMT, A.BILL_AMT
+      FROM PURCHASE A
+      LEFT JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.CODE = B.CODE
+      LEFT JOIN ITEMMAST C ON A.COMP_CODE = C.COMP_CODE AND A.ITEM_CODE = C.ITEM_CODE
+      WHERE A.COMP_CODE = :comp_code
+        AND TRIM(A.TYPE) = TRIM(:type)
+        AND TRIM(TO_CHAR(A.R_NO)) = TRIM(TO_CHAR(:note_no))
+        AND TRUNC(A.R_DATE) = TRUNC(TO_DATE(:note_date,'DD-MON-YY'))
+      ORDER BY A.BILL_DATE, A.BILL_NO, A.B_TYPE, A.TRN_NO`;
+    const rows = (await runQuery(sql, { comp_code, type, note_no, note_date }, comp_uid)) || [];
+    const outRows = rows.map((r) => ({
+      SOURCE: 'PURCHASE',
+      TYPE: gstrTxt(r.TYPE),
+      NOTE_DATE: gstrDt(r.R_DATE),
+      NOTE_NO: gstrTxt(r.R_NO),
+      B_TYPE: gstrTxt(r.B_TYPE),
+      BILL_DATE: gstrDt(r.BILL_DATE),
+      BILL_NO: gstrTxt(r.BILL_NO),
+      CODE: gstrTxt(r.CODE),
+      NAME: gstrTxt(r.NAME),
+      GST_NO: gstrTxt(r.GST_NO),
+      STATE_CODE: gstrTxt(r.STATE_CODE),
+      STATE: gstrTxt(r.STATE),
+      ITEM_CODE: gstrTxt(r.ITEM_CODE),
+      HSN_CODE: gstrTxt(r.HSN_CODE),
+      QNTY: gstrRound2(gstrNum(r.QNTY)),
+      WEIGHT: gstrRound2(gstrNum(r.WEIGHT)),
+      RATE: gstrRound2(gstrNum(r.RATE)),
+      AMOUNT: gstrRound2(gstrNum(r.AMOUNT)),
+      TAXABLE: gstrRound2(gstrNum(r.TAXABLE)),
+      CGST_AMT: gstrRound2(gstrNum(r.CGST_AMT)),
+      SGST_AMT: gstrRound2(gstrNum(r.SGST_AMT)),
+      IGST_AMT: gstrRound2(gstrNum(r.IGST_AMT)),
+      BILL_AMT: gstrRound2(gstrNum(r.BILL_AMT)),
+    }));
+    const total = {
+      line_count: outRows.length,
+      taxable_total: gstrRound2(outRows.reduce((s, r) => s + gstrNum(r.TAXABLE), 0)),
+      bill_total: gstrRound2(outRows.reduce((m, r) => Math.max(m, gstrNum(r.BILL_AMT)), 0)),
+    };
+    res.json({ ok: true, rows: outRows, total });
+  } catch (err) {
+    console.error('❌ gstr1-note-detail error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/gstr1-exemp-detail', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, s_date, e_date, row_key } = req.query;
+    if (!comp_code || !comp_uid || !s_date || !e_date || !row_key) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, s_date, e_date, row_key are required' });
+    }
+    const saleSql = `
+      SELECT A.TYPE, A.BILL_DATE, A.BILL_NO, A.B_TYPE, A.SALE_INV_NO, A.CODE, M.NAME, M.GST_NO, M.L_C,
+             A.TAXABLE, A.CGST_AMT, A.SGST_AMT, A.IGST_AMT, A.BILL_AMT
+      FROM SALE A
+      LEFT JOIN MASTER M ON A.COMP_CODE=M.COMP_CODE AND A.CODE=M.CODE
+      WHERE A.COMP_CODE=:comp_code
+        AND TRUNC(A.BILL_DATE) BETWEEN TRUNC(TO_DATE(:s_date,'DD-MM-YYYY')) AND TRUNC(TO_DATE(:e_date,'DD-MM-YYYY'))
+      ORDER BY A.BILL_DATE, A.BILL_NO, A.B_TYPE, A.TRN_NO`;
+    const rows = (await runQuery(saleSql, { comp_code, s_date, e_date }, comp_uid)) || [];
+    const key = String(row_key).trim().toUpperCase();
+    const isReg = key.startsWith('REG_');
+    const isIntra = key.endsWith('_INTRA');
+    const details = rows
+      .filter((r) => ['SL', 'ST', 'SR', 'GT', 'GR', 'SX', 'CN'].includes(gstrTxt(r.TYPE).toUpperCase()))
+      .filter((r) => (gstrNum(r.CGST_AMT) + gstrNum(r.SGST_AMT) + gstrNum(r.IGST_AMT)) === 0)
+      .filter((r) => (isReg ? gstrHas(r.GST_NO) : !gstrHas(r.GST_NO)))
+      .filter((r) => (isIntra ? gstrTxt(r.L_C).toUpperCase() === 'L' : gstrTxt(r.L_C).toUpperCase() !== 'L'))
+      .map((r) => {
+        const tp = gstrTxt(r.TYPE).toUpperCase();
+        const sign = tp === 'CN' ? -1 : 1;
+        return {
+          TYPE: gstrTxt(r.TYPE),
+          BILL_DATE: gstrDt(r.BILL_DATE),
+          BILL_NO: gstrTxt(r.BILL_NO),
+          B_TYPE: gstrTxt(r.B_TYPE),
+          SALE_INV_NO: gstrTxt(r.SALE_INV_NO),
+          CODE: gstrTxt(r.CODE),
+          NAME: gstrTxt(r.NAME),
+          GST_NO: gstrTxt(r.GST_NO),
+          L_C: gstrTxt(r.L_C),
+          TAXABLE: gstrRound2(sign * gstrNum(r.TAXABLE)),
+          BILL_AMT: gstrRound2(sign * gstrNum(r.BILL_AMT)),
+        };
+      });
+    const total = {
+      line_count: details.length,
+      taxable_total: gstrRound2(details.reduce((s, r) => s + gstrNum(r.TAXABLE), 0)),
+      bill_total: gstrRound2(details.reduce((s, r) => s + gstrNum(r.BILL_AMT), 0)),
+    };
+    res.json({ ok: true, rows: details, total });
+  } catch (err) {
+    console.error('❌ gstr1-exemp-detail error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/gstr1-hsn-detail', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, s_date, e_date, registered, hsn_code, tax_rate } = req.query;
+    if (!comp_code || !comp_uid || !s_date || !e_date || hsn_code == null || tax_rate == null) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, s_date, e_date, hsn_code, tax_rate are required' });
+    }
+    const isReg = String(registered).trim().toUpperCase() === 'Y';
+    const targetHsn = gstrTxt(hsn_code);
+    const targetRate = gstrRate(tax_rate);
+    const saleSql = `
+      SELECT A.TYPE,A.BILL_DATE,A.BILL_NO,A.B_TYPE,A.SALE_INV_NO,A.CODE,M.NAME,M.GST_NO,
+             A.TRN_NO,A.ITEM_CODE,I.ITEM_NAME,I.HSN_CODE,I.HSN_UNIT,
+             A.QNTY,A.WEIGHT,A.RATE,A.AMOUNT,A.TAXABLE,A.CGST_AMT,A.SGST_AMT,A.IGST_AMT,A.CGST_PER,A.SGST_PER,A.IGST_PER
+      FROM SALE A
+      LEFT JOIN MASTER M ON A.COMP_CODE=M.COMP_CODE AND A.CODE=M.CODE
+      LEFT JOIN ITEMMAST I ON A.COMP_CODE=I.COMP_CODE AND A.ITEM_CODE=I.ITEM_CODE
+      WHERE A.COMP_CODE=:comp_code
+        AND TRUNC(A.BILL_DATE) BETWEEN TRUNC(TO_DATE(:s_date,'DD-MM-YYYY')) AND TRUNC(TO_DATE(:e_date,'DD-MM-YYYY'))
+      ORDER BY A.BILL_DATE, A.BILL_NO, A.B_TYPE, A.TRN_NO`;
+    const rows = (await runQuery(saleSql, { comp_code, s_date, e_date }, comp_uid)) || [];
+    const details = rows
+      .filter((r) => (isReg ? gstrHas(r.GST_NO) : !gstrHas(r.GST_NO)))
+      .filter((r) => gstrTxt(r.HSN_CODE) === targetHsn)
+      .filter((r) => gstrRate(gstrNum(r.CGST_PER) + gstrNum(r.SGST_PER) + gstrNum(r.IGST_PER)) === targetRate)
+      .map((r) => {
+        const tp = gstrTxt(r.TYPE).toUpperCase();
+        const sign = ['CN', 'GN', 'CX', 'ER'].includes(tp) ? -1 : 1;
+        return {
+          TYPE: gstrTxt(r.TYPE),
+          BILL_DATE: gstrDt(r.BILL_DATE),
+          BILL_NO: gstrTxt(r.BILL_NO),
+          B_TYPE: gstrTxt(r.B_TYPE),
+          TRN_NO: gstrNum(r.TRN_NO),
+          ITEM_CODE: gstrTxt(r.ITEM_CODE),
+          ITEM_NAME: gstrTxt(r.ITEM_NAME),
+          HSN_CODE: gstrTxt(r.HSN_CODE),
+          TAX_RATE: gstrRound2(targetRate),
+          QNTY: gstrRound2(sign * gstrNum(r.QNTY)),
+          WEIGHT: gstrRound2(sign * gstrNum(r.WEIGHT)),
+          AMOUNT: gstrRound2(sign * gstrNum(r.AMOUNT)),
+          TAXABLE: gstrRound2(sign * gstrNum(r.TAXABLE)),
+          IGST_AMT: gstrRound2(sign * gstrNum(r.IGST_AMT)),
+          CGST_AMT: gstrRound2(sign * gstrNum(r.CGST_AMT)),
+          SGST_AMT: gstrRound2(sign * gstrNum(r.SGST_AMT)),
+        };
+      });
+    const total = {
+      line_count: details.length,
+      taxable_total: gstrRound2(details.reduce((s, r) => s + gstrNum(r.TAXABLE), 0)),
+      amount_total: gstrRound2(details.reduce((s, r) => s + gstrNum(r.AMOUNT), 0)),
+    };
+    res.json({ ok: true, rows: details, total });
+  } catch (err) {
+    console.error('❌ gstr1-hsn-detail error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 resolveActiveDbConfig()
   .then((cfg) => {
     activeDbConfig = cfg;

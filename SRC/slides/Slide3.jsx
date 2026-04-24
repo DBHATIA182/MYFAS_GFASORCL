@@ -17,6 +17,7 @@ export default function Slide3({ onPrev, onNext, formData }) {
     'ageing',
     'purchase-list',
     'voucher-list',
+    'gstr1',
   ];
 
   const moveReportSelection = (delta) => {
@@ -297,6 +298,23 @@ export default function Slide3({ onPrev, onNext, formData }) {
           <label>
             <h3>Cash/Bank/Journal Voucher List</h3>
             <p>Voucher list with date range, party, cash/bank code, and debit/credit filter</p>
+          </label>
+        </div>
+
+        <div
+          className={`report-option ${reportType === 'gstr1' ? 'selected' : ''}`}
+          onClick={() => setReportType('gstr1')}
+        >
+          <input
+            type="radio"
+            name="reportType"
+            value="gstr1"
+            checked={reportType === 'gstr1'}
+            onChange={(e) => setReportType(e.target.value)}
+          />
+          <label>
+            <h3>GSTR-1 (sheet-wise)</h3>
+            <p>Generate GSTR-1 in screen, PDF, and Excel with B2B/B2CL/B2CS/CDNR/CDNUR/EXP/HSN/DOCS tabs</p>
           </label>
         </div>
       </div>
