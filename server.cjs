@@ -3585,7 +3585,7 @@ app.get('/api/gstr1', async (req, res) => {
         INVOICE_VALUE: 0,
         PLACE_OF_SUPPLY: `${gstrTxt(r.STATE_CODE)}-${gstrTxt(r.STATE)}`.trim(),
         REVERSE_CHARGE: tp === 'RC' ? 'Y' : 'N',
-        APPLICABLE_TAX: 0,
+        APPLICABLE_TAX: null,
         INVOICE_TYPE: 'Regular B2B',
         E_COMMERCE_GSTIN: '',
         RATE: rate,

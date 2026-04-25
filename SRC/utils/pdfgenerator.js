@@ -1415,6 +1415,8 @@ function buildSaleBillReportHtml(data, metadata) {
   const sbDateEsc = escHtml(formatLedgerDateDisplay(f.SB_DATE ?? f.sb_date) || '—');
   const isBillOfSupplyNoTax =
     taxSumPdf < 0.0001 && (docUpper === 'BILL OF SUPPLY' || docUpper === 'CREDIT NOTE');
+  /** Line-level discount column only when CGST+SGST+IGST ≠ 0; else discount only in summary after total amount. */
+  const showDiscountColPdf = !isBillOfSupplyNoTax;
   const companyNameBasePx = isBillOfSupplyNoTax ? 24 : 22;
   const companyNameFontPx = (() => {
     const len = companyRaw.length;
@@ -1446,9 +1448,11 @@ function buildSaleBillReportHtml(data, metadata) {
 
   let bodyRows = '';
   (lines || []).forEach((row, i) => {
-    const taxCells = !isBillOfSupplyNoTax
+    const discountCell = showDiscountColPdf
+      ? `<td class="num">${formatAmtPdf(row.DIS_AMT ?? row.dis_amt)}</td>`
+      : '';
+    const taxCellsAfterDisc = !isBillOfSupplyNoTax
       ? `
-              <td class="num">${formatAmtPdf(row.DIS_AMT ?? row.dis_amt)}</td>
               <td class="num">${formatAmtPdf(row.TAXABLE ?? row.taxable)}</td>
               <td class="num">${formatAmtPdf(row.CGST_AMT ?? row.cgst_amt)}</td>
               <td class="num">${formatAmtPdf(row.SGST_AMT ?? row.sgst_amt)}</td>
@@ -1463,7 +1467,7 @@ function buildSaleBillReportHtml(data, metadata) {
               <td class="num">${formatQtyPdf(row.WEIGHT ?? row.weight)}</td>
               <td class="num">${formatAmtPdf(row.RATE ?? row.rate)}</td>
               <td class="num">${formatAmtPdf(row.AMOUNT ?? row.amount)}</td>
-              ${taxCells}
+              ${discountCell}${taxCellsAfterDisc}
             </tr>`;
   });
 
@@ -1633,9 +1637,10 @@ function buildSaleBillReportHtml(data, metadata) {
             <th class="num">Wt</th>
             <th class="num">Rate</th>
             <th class="num">Amt</th>
+            ${showDiscountColPdf ? `<th class="num">Disc</th>` : ''}
             ${
               !isBillOfSupplyNoTax
-              ? `<th class="num">Disc</th><th class="num">Taxable</th><th class="num">${escHtml(cgstLabel)}</th><th class="num">${escHtml(sgstLabel)}</th><th class="num">${escHtml(igstLabel)}</th>`
+                ? `<th class="num">Taxable</th><th class="num">${escHtml(cgstLabel)}</th><th class="num">${escHtml(sgstLabel)}</th><th class="num">${escHtml(igstLabel)}</th>`
                 : ''
             }
           </tr>
@@ -1649,10 +1654,10 @@ function buildSaleBillReportHtml(data, metadata) {
           <table class="sb-pdf-sum">
             <tbody>
               <tr><td>Total amount</td><td class="num">${formatAmtPdf(t.sumAmt)}</td></tr>
+              ${Math.abs(Number(t.disAmt || 0)) > 0.0001 ? `<tr><td>Discount</td><td class="num">${formatAmtPdf(t.disAmt)}</td></tr>` : ''}
               ${
                 !isBillOfSupplyNoTax
-                  ? `${Math.abs(Number(t.disAmt || 0)) > 0.0001 ? `<tr><td>Discount</td><td class="num">${formatAmtPdf(t.disAmt)}</td></tr>` : ''}
-              ${Math.abs(Number(t.sumTax || 0)) > 0.0001 ? `<tr><td>Total taxable</td><td class="num">${formatAmtPdf(t.sumTax)}</td></tr>` : ''}
+                  ? `${Math.abs(Number(t.sumTax || 0)) > 0.0001 ? `<tr><td>Total taxable</td><td class="num">${formatAmtPdf(t.sumTax)}</td></tr>` : ''}
               ${Math.abs(Number(t.sumC || 0)) > 0.0001 ? `<tr><td>${escHtml(cgstLabel)}</td><td class="num">${formatAmtPdf(t.sumC)}</td></tr>` : ''}
               ${Math.abs(Number(t.sumS || 0)) > 0.0001 ? `<tr><td>${escHtml(sgstLabel)}</td><td class="num">${formatAmtPdf(t.sumS)}</td></tr>` : ''}
               ${Math.abs(Number(t.sumI || 0)) > 0.0001 ? `<tr><td>${escHtml(igstLabel)}</td><td class="num">${formatAmtPdf(t.sumI)}</td></tr>` : ''}`

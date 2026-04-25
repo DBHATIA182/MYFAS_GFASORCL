@@ -32,6 +32,8 @@ function pickAndRenameRows(rows, columns) {
 
 const GSTR1_EXCEL_COLUMNS = {
   b2b: [
+    { key: 'GSTIN', header: 'GSTIN/UIN of Recipient' },
+    { key: 'NAME', header: 'Receiver Name' },
     { key: 'INVOICE_NO', header: 'Invoice Number' },
     { key: 'INVOICE_DATE', header: 'Invoice date' },
     { key: 'INVOICE_VALUE', header: 'Invoice Value' },
@@ -169,7 +171,7 @@ const GSTR1_EXCEL_COLUMNS = {
 };
 
 const GSTR1_EXCEL_TITLES = {
-  b2b: '',
+  b2b: 'Summary For B2B(4)',
   b2cl: 'Summary For B2CL(5)',
   b2cs: 'Summary For B2CS(7)',
   cdnr: 'Summary For CDNR(9B)',
@@ -187,8 +189,9 @@ const GSTR1_EXCEL_TITLES = {
 
 const GSTR1_EXCEL_HEADER_ROWS = {
   b2b: [
-    { origin: 'A2', values: [['No. of Invoices']] },
-    { origin: 'C2', values: [['Total Invoice Value']] },
+    { origin: 'A2', values: [['No. of Recipients']] },
+    { origin: 'D2', values: [['No. of Invoices']] },
+    { origin: 'E2', values: [['Total Invoice Value']] },
     { origin: 'L2', values: [['Total Taxable Value']] },
     { origin: 'M2', values: [['Total Cess']] },
   ],
@@ -442,7 +445,7 @@ export default function Slide15({ apiBase, formData, onPrev, onReset }) {
   const exportExcel = () => {
     if (!report?.sheets) return;
     const emptySheetHeaders = {};
-    const sheets = Object.entries(report.sheets)
+    const dataSheets = Object.entries(report.sheets)
       .filter(([name]) => name !== 'gstr3b')
       .map(([name, data]) => {
       const cols = GSTR1_EXCEL_COLUMNS[name];
@@ -456,8 +459,10 @@ export default function Slide15({ apiBase, formData, onPrev, onReset }) {
       }) };
       return { name, data: pickAndRenameRows(data, cols) };
     });
+    const sheets = [{ name: 'Main', data: [] }, ...dataSheets];
     downloadExcelWorkbook(sheets, `${compName}_GSTR1`, {
       startRow: 4,
+      sheetStartRows: { Main: 1 },
       includeHeaders: true,
       sheetTitles: GSTR1_EXCEL_TITLES,
       sheetHeaderRows: GSTR1_EXCEL_HEADER_ROWS,

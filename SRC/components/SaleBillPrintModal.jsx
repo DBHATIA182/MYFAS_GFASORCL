@@ -227,6 +227,9 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
     return docTitle === 'BILL OF SUPPLY' || docTitle === 'CREDIT NOTE';
   }, [docTitle, totals]);
 
+  /** Discount column in line grid only when bill has tax (CGST+SGST+IGST ≠ 0); if tax is zero, discount appears in summary only. */
+  const showDiscountColumn = !isBillOfSupplyNoTax;
+
   const amountInWords = useMemo(() => rupeesToWords(totals.billAmt || totals.sumAmt), [totals]);
 
   const qrSourceRow = useMemo(() => {
@@ -608,7 +611,7 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
                     <th className="num">Weight</th>
                     <th className="num">Rate</th>
                     <th className="num">Amount</th>
-                    {!isBillOfSupplyNoTax ? <th className="num">Discount</th> : null}
+                    {showDiscountColumn ? <th className="num">Discount</th> : null}
                     {!isBillOfSupplyNoTax ? <th className="num">Taxable</th> : null}
                     {!isBillOfSupplyNoTax ? <th className="num">{cgstLabel}</th> : null}
                     {!isBillOfSupplyNoTax ? <th className="num">{sgstLabel}</th> : null}
@@ -625,7 +628,7 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
                       <td className="num">{fmtQty(row.WEIGHT ?? row.weight)}</td>
                       <td className="num">{fmtAmt(row.RATE ?? row.rate)}</td>
                       <td className="num">{fmtAmt(row.AMOUNT ?? row.amount)}</td>
-                      {!isBillOfSupplyNoTax ? <td className="num">{fmtAmt(row.DIS_AMT ?? row.dis_amt)}</td> : null}
+                      {showDiscountColumn ? <td className="num">{fmtAmt(row.DIS_AMT ?? row.dis_amt)}</td> : null}
                       {!isBillOfSupplyNoTax ? <td className="num">{fmtAmt(row.TAXABLE ?? row.taxable)}</td> : null}
                       {!isBillOfSupplyNoTax ? <td className="num">{fmtAmt(row.CGST_AMT ?? row.cgst_amt)}</td> : null}
                       {!isBillOfSupplyNoTax ? <td className="num">{fmtAmt(row.SGST_AMT ?? row.sgst_amt)}</td> : null}
@@ -650,7 +653,7 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
                         <td>Total amount</td>
                         <td className="num">{fmtAmt(totals.sumAmt)}</td>
                       </tr>
-                      {!isBillOfSupplyNoTax && Math.abs(totals.disAmt) > 0.0001 ? (
+                      {Math.abs(totals.disAmt) > 0.0001 ? (
                         <tr>
                           <td>Discount</td>
                           <td className="num">{fmtAmt(totals.disAmt)}</td>
