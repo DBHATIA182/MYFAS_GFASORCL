@@ -175,6 +175,24 @@ body {
   color: #fff !important;
 }
 
+.report-sort-switch--hsn-sales {
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  padding-bottom: 0.2rem;
+}
+
+.btn-sort-switch--hsn {
+  width: 10.8rem;
+  min-width: 10.8rem;
+  max-width: 10.8rem;
+}
+
+.table-responsive--hsn-sales {
+  overflow-x: auto;
+}
+
 .btn-toolbar-back {
   background: #edf2f7 !important;
   color: #2d3748 !important;

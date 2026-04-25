@@ -2356,6 +2356,50 @@ function buildGstr1ReportHtml(payload, metadata) {
   `;
 }
 
+function buildHsnSalesReportHtml(payload, metadata) {
+  const data = payload && typeof payload === 'object' ? payload : {};
+  const rows = Array.isArray(data.rows) ? data.rows : [];
+  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const company = escHtml(metadata?.companyName || '');
+  const fy = escHtml(metadata?.year || '');
+  const period = escHtml(metadata?.period || '');
+  const title = escHtml(metadata?.reportTitle || 'HSN Sales');
+  const view = escHtml(metadata?.activeView || '');
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+  const thead = columns.map((c) => `<th>${escHtml(c)}</th>`).join('');
+  const tbody = rows
+    .map((r) => {
+      const tds = columns
+        .map((c) => {
+          const v = r[c];
+          const isNum = typeof v === 'number';
+          return `<td class="${isNum ? 'amount' : ''}">${escHtml(v == null ? '' : String(v))}</td>`;
+        })
+        .join('');
+      return `<tr>${tds}</tr>`;
+    })
+    .join('');
+  return `
+    <div class="report-doc">
+      <style>${PDF_REPORT_STYLES}</style>
+      <div class="report-topbar">
+        <div class="kicker">HSN SALES</div>
+        <h1>${title}</h1>
+        <div class="company">${company}</div>
+        <table class="report-grid">
+          <tr><td class="lbl">FY</td><td class="val">${fy}</td><td class="lbl">Period</td><td class="val">${period}</td></tr>
+          <tr><td class="lbl">View</td><td class="val" colspan="3">${view || '—'} (${rows.length} rows)</td></tr>
+        </table>
+        <div class="report-period">Generated: ${generated}</div>
+      </div>
+      <table class="table-report">
+        <thead><tr>${thead}</tr></thead>
+        <tbody>${tbody || '<tr><td>(No rows)</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'ledger') return buildLedgerReportHtml(data, metadata);
   if (reportType === 'bill-ledger') return buildBillLedgerReportHtml(data, metadata);
@@ -2369,6 +2413,7 @@ export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'purchase-list') return buildPurchaseListReportHtml(data, metadata);
   if (reportType === 'purchase-bill') return buildPurchaseBillReportHtml(data, metadata);
   if (reportType === 'gstr1') return buildGstr1ReportHtml(data, metadata);
+  if (reportType === 'hsn-sales') return buildHsnSalesReportHtml(data, metadata);
   return buildTrialBalanceReportHtml(data, metadata);
 }
 
@@ -2527,6 +2572,8 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
                         ? 'Purchase list'
                         : reportType === 'gstr1'
                           ? 'GSTR-1'
+                          : reportType === 'hsn-sales'
+                            ? 'HSN Sales'
                         : 'Ledger';
   const text =
     shareText || `${metadata.companyName}\n${reportLabel}\n${metadata.endDate || ''}`;

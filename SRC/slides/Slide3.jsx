@@ -18,6 +18,7 @@ export default function Slide3({ onPrev, onNext, formData }) {
     'purchase-list',
     'voucher-list',
     'gstr1',
+    'hsn-sales',
   ];
 
   const moveReportSelection = (delta) => {
@@ -315,6 +316,22 @@ export default function Slide3({ onPrev, onNext, formData }) {
           <label>
             <h3>GSTR-1 (sheet-wise)</h3>
             <p>Generate GSTR-1 in screen, PDF, and Excel with B2B/B2CL/B2CS/CDNR/CDNUR/EXP/HSN/DOCS tabs</p>
+          </label>
+        </div>
+        <div
+          className={`report-option ${reportType === 'hsn-sales' ? 'selected' : ''}`}
+          onClick={() => setReportType('hsn-sales')}
+        >
+          <input
+            type="radio"
+            name="reportType"
+            value="hsn-sales"
+            checked={reportType === 'hsn-sales'}
+            onChange={(e) => setReportType(e.target.value)}
+          />
+          <label>
+            <h3>HsnSales</h3>
+            <p>HSN Sales with Date Wise, Monthly HSN Wise, and HSN Wise Monthly tabs</p>
           </label>
         </div>
       </div>
