@@ -142,6 +142,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
   const [detailTitle, setDetailTitle] = useState('');
   const [screen, setScreen] = useState('main');
   const [mainFilters, setMainFilters] = useState({});
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const mainTopScrollRef = useRef(null);
   const mainTopInnerRef = useRef(null);
   const mainGridScrollRef = useRef(null);
@@ -205,6 +206,10 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
     });
     return out;
   }, [columns, tabRows]);
+  const activeFilterCount = useMemo(
+    () => Object.values(mainFilters || {}).filter((v) => String(v || '').trim() !== '').length,
+    [mainFilters]
+  );
 
   const detailColumns = detailRows.length > 0 ? Object.keys(detailRows[0]).filter((k) => !k.startsWith('_')) : [];
   const detailTotalCols = ['QNTY', 'WEIGHT', 'TAXABLE', 'CGST_AMT', 'SGST_AMT', 'IGST_AMT'].filter((c) =>
@@ -334,6 +339,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
       setDetailTitle('');
       setScreen('main');
       setMainFilters({});
+      setMobileFiltersOpen(false);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to run report');
     } finally {
@@ -566,6 +572,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
                 setDetailRows([]);
                 setDetailTitle('');
                 setMainFilters({});
+                setMobileFiltersOpen(false);
               }}
             >
               {TAB_LABELS[tab]} ({(report.sheets?.[tab] || []).length})
@@ -588,6 +595,37 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
           </p>
         </div>
 
+        <div className="hsn-mobile-filter-wrap">
+          <button
+            type="button"
+            className="btn btn-secondary hsn-mobile-filter-toggle"
+            onClick={() => setMobileFiltersOpen((v) => !v)}
+          >
+            {mobileFiltersOpen ? 'Hide Filters' : 'Show Filters'} {activeFilterCount ? `(${activeFilterCount})` : ''}
+          </button>
+          {mobileFiltersOpen ? (
+            <div className="hsn-mobile-filter-panel">
+              {columns.map((c) => (
+                <label key={`mobile_filter_${c}`} className="hsn-mobile-filter-item">
+                  <span>{c}</span>
+                  <input
+                    className="form-input hsn-filter-input"
+                    list={`hsn-filter-${activeTab}-${c}`}
+                    value={mainFilters[c] || ''}
+                    onChange={(e) =>
+                      setMainFilters((prev) => ({
+                        ...prev,
+                        [c]: e.target.value,
+                      }))
+                    }
+                    placeholder={`Filter ${c}`}
+                  />
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
         <div className="report-display table-responsive table-responsive--hsn-sales table-responsive--sale-list">
           <div className="sale-list-scroll-sync sale-list-scroll-sync--top" ref={mainTopScrollRef}>
             <div className="sale-list-scroll-sync-inner" ref={mainTopInnerRef} />
@@ -596,11 +634,11 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
           <table className="report-table">
             <thead>
               <tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr>
-              <tr>
+              <tr className="hsn-main-filter-row">
                 {columns.map((c) => (
                   <th key={`${c}_filter`}>
                     <input
-                      className="form-input"
+                      className="form-input hsn-filter-input"
                       style={{ minWidth: 120 }}
                       list={`hsn-filter-${activeTab}-${c}`}
                       value={mainFilters[c] || ''}

@@ -193,6 +193,42 @@ body {
   overflow-x: auto;
 }
 
+.hsn-mobile-filter-wrap {
+  display: none;
+  margin-bottom: 0.65rem;
+}
+
+.hsn-mobile-filter-toggle {
+  width: 100%;
+}
+
+.hsn-mobile-filter-panel {
+  margin-top: 0.5rem;
+  padding: 0.55rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.hsn-mobile-filter-item {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.hsn-mobile-filter-item span {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.hsn-filter-input {
+  min-width: 120px;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.8rem;
+}
+
 .btn-toolbar-back {
   background: #edf2f7 !important;
   color: #2d3748 !important;
@@ -2788,6 +2824,14 @@ td.sale-list-total-pad {
 
   .sale-bill-print-doc {
     padding: 0.7rem 0.75rem;
+  }
+
+  .hsn-mobile-filter-wrap {
+    display: block;
+  }
+
+  .report-table .hsn-main-filter-row {
+    display: none;
   }
 
   .sale-bill-print-doc-banner {
