@@ -33,6 +33,93 @@ const TAB_LABELS = {
   hsnWiseMonthly: 'Hsn Wise Monthly',
 };
 
+const DATE_WISE_TOTAL_COLS = ['QNTY', 'WEIGHT', 'TAXABLE', 'CGST_AMT', 'SGST_AMT', 'IGST_AMT'];
+
+function toHsnKey(value) {
+  const text = String(value ?? '').trim();
+  return text || '(BLANK HSN)';
+}
+
+function getOrderedColumns(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  const cols = Object.keys(rows[0]).filter((k) => !k.startsWith('_'));
+  if (!cols.includes('HSN_CODE')) return cols;
+  return ['HSN_CODE', ...cols.filter((c) => c !== 'HSN_CODE')];
+}
+
+function buildDateWiseGroupedRows(rows) {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  if (!sourceRows.length) {
+    return { rows: [], totalCols: [], grandTotals: {} };
+  }
+
+  const totalCols = DATE_WISE_TOTAL_COLS.filter((c) => sourceRows.some((r) => c in (r || {})));
+  const groups = new Map();
+
+  sourceRows.forEach((row) => {
+    const key = toHsnKey(row?.HSN_CODE);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  });
+
+  const outputRows = [];
+  const grandTotals = {};
+  totalCols.forEach((c) => {
+    grandTotals[c] = 0;
+  });
+
+  for (const [hsnCode, groupRows] of groups.entries()) {
+    outputRows.push({
+      _rowType: 'hsnHeader',
+      HSN_CODE: hsnCode,
+    });
+
+    groupRows.forEach((row) => {
+      outputRows.push({ ...row, _rowType: 'transaction' });
+      totalCols.forEach((c) => {
+        grandTotals[c] += num(row?.[c]);
+      });
+    });
+
+    const hsnTotals = {};
+    totalCols.forEach((c) => {
+      hsnTotals[c] = groupRows.reduce((sum, row) => sum + num(row?.[c]), 0);
+    });
+    outputRows.push({
+      _rowType: 'hsnTotal',
+      HSN_CODE: `${hsnCode} TOTAL`,
+      ...hsnTotals,
+    });
+  }
+
+  outputRows.push({
+    _rowType: 'grandTotal',
+    HSN_CODE: 'GRAND TOTAL',
+    ...grandTotals,
+  });
+
+  return { rows: outputRows, totalCols, grandTotals };
+}
+
+function stripPrivateFields(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const next = {};
+    Object.keys(row || {}).forEach((k) => {
+      if (!k.startsWith('_')) next[k] = row[k];
+    });
+    return next;
+  });
+}
+
+function rowMatchesFilters(row, columns, filters) {
+  return columns.every((col) => {
+    const want = String(filters?.[col] ?? '').trim().toLowerCase();
+    if (!want) return true;
+    const got = String(row?.[col] ?? '').trim().toLowerCase();
+    return got.includes(want);
+  });
+}
+
 export default function Slide16({ apiBase, formData, onPrev, onReset }) {
   const compCode = formData.comp_code ?? formData.COMP_CODE;
   const compUid = formData.comp_uid ?? formData.COMP_UID;
@@ -54,6 +141,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
   const [detailRows, setDetailRows] = useState([]);
   const [detailTitle, setDetailTitle] = useState('');
   const [screen, setScreen] = useState('main');
+  const [mainFilters, setMainFilters] = useState({});
   const mainTopScrollRef = useRef(null);
   const mainTopInnerRef = useRef(null);
   const mainGridScrollRef = useRef(null);
@@ -81,18 +169,42 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
   }, [apiBase, compCode, compUid]);
 
   const tabRows = report?.sheets?.[activeTab] || [];
-  const columns = tabRows.length > 0 ? Object.keys(tabRows[0]).filter((k) => !k.startsWith('_')) : [];
+  const columns = getOrderedColumns(tabRows);
+  const filteredTabRows = useMemo(
+    () => (tabRows || []).filter((row) => rowMatchesFilters(row, columns, mainFilters)),
+    [tabRows, columns, mainFilters]
+  );
+  const dateWiseGrouped = useMemo(() => buildDateWiseGroupedRows(filteredTabRows), [filteredTabRows]);
+  const dateWiseExportRows = useMemo(() => stripPrivateFields(dateWiseGrouped.rows), [dateWiseGrouped.rows]);
+  const displayRows = activeTab === 'dateWise' ? dateWiseGrouped.rows : filteredTabRows;
   const totalCols = useMemo(
-    () => ['QNTY', 'WEIGHT', 'TAXABLE', 'CGST_AMT', 'SGST_AMT', 'IGST_AMT'].filter((c) => columns.includes(c)),
-    [columns]
+    () =>
+      activeTab === 'dateWise'
+        ? dateWiseGrouped.totalCols
+        : ['QNTY', 'WEIGHT', 'TAXABLE', 'CGST_AMT', 'SGST_AMT', 'IGST_AMT'].filter((c) => columns.includes(c)),
+    [activeTab, columns, dateWiseGrouped.totalCols]
   );
   const totals = useMemo(() => {
+    if (activeTab === 'dateWise') return dateWiseGrouped.grandTotals;
     const out = {};
     totalCols.forEach((c) => {
-      out[c] = tabRows.reduce((sum, row) => sum + num(row?.[c]), 0);
+      out[c] = filteredTabRows.reduce((sum, row) => sum + num(row?.[c]), 0);
     });
     return out;
-  }, [totalCols, tabRows]);
+  }, [activeTab, dateWiseGrouped.grandTotals, totalCols, filteredTabRows]);
+
+  const filterOptions = useMemo(() => {
+    const out = {};
+    columns.forEach((col) => {
+      const uniq = new Set();
+      (tabRows || []).forEach((row) => {
+        const val = String(row?.[col] ?? '').trim();
+        if (val) uniq.add(val);
+      });
+      out[col] = Array.from(uniq).sort((a, b) => a.localeCompare(b));
+    });
+    return out;
+  }, [columns, tabRows]);
 
   const detailColumns = detailRows.length > 0 ? Object.keys(detailRows[0]).filter((k) => !k.startsWith('_')) : [];
   const detailTotalCols = ['QNTY', 'WEIGHT', 'TAXABLE', 'CGST_AMT', 'SGST_AMT', 'IGST_AMT'].filter((c) =>
@@ -221,6 +333,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
       setDetailRows([]);
       setDetailTitle('');
       setScreen('main');
+      setMainFilters({});
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to run report');
     } finally {
@@ -282,12 +395,15 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
 
   const exportMainExcel = () => {
     if (!report?.sheets) return;
-    const sheets = Object.entries(report.sheets).map(([name, data]) => ({ name: TAB_LABELS[name] || name, data }));
+    const sheets = Object.entries(report.sheets).map(([name, data]) => {
+      if (name === 'dateWise') return { name: TAB_LABELS[name] || name, data: dateWiseExportRows };
+      return { name: TAB_LABELS[name] || name, data };
+    });
     downloadExcelWorkbook(sheets, `${compName}_HsnSales`);
   };
 
   const exportMainPdf = () => {
-    const rows = tabRows || [];
+    const rows = activeTab === 'dateWise' ? dateWiseExportRows : tabRows || [];
     generatePDF(
       'hsn-sales',
       { rows },
@@ -300,7 +416,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
   };
 
   const shareMainWa = () => {
-    const rows = tabRows || [];
+    const rows = activeTab === 'dateWise' ? dateWiseExportRows : tabRows || [];
     sharePdfWithWhatsApp(
       'hsn-sales',
       { rows },
@@ -449,6 +565,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
                 setActiveTab(tab);
                 setDetailRows([]);
                 setDetailTitle('');
+                setMainFilters({});
               }}
             >
               {TAB_LABELS[tab]} ({(report.sheets?.[tab] || []).length})
@@ -464,6 +581,11 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
           <p>
             {compName} | FY {compYear}
           </p>
+          <p>
+            <button type="button" className="btn btn-secondary" onClick={() => setMainFilters({})}>
+              Clear Filters
+            </button>
+          </p>
         </div>
 
         <div className="report-display table-responsive table-responsive--hsn-sales table-responsive--sale-list">
@@ -474,34 +596,66 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
           <table className="report-table">
             <thead>
               <tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr>
+              <tr>
+                {columns.map((c) => (
+                  <th key={`${c}_filter`}>
+                    <input
+                      className="form-input"
+                      style={{ minWidth: 120 }}
+                      list={`hsn-filter-${activeTab}-${c}`}
+                      value={mainFilters[c] || ''}
+                      onChange={(e) =>
+                        setMainFilters((prev) => ({
+                          ...prev,
+                          [c]: e.target.value,
+                        }))
+                      }
+                      placeholder={`Filter ${c}`}
+                    />
+                    <datalist id={`hsn-filter-${activeTab}-${c}`}>
+                      {(filterOptions[c] || []).map((opt) => (
+                        <option key={opt} value={opt} />
+                      ))}
+                    </datalist>
+                  </th>
+                ))}
+              </tr>
             </thead>
             <tbody>
-              {tabRows.map((row, i) => (
+              {displayRows.map((row, i) => (
                 <tr
                   key={i}
-                  className="sale-list-row-clickable"
-                  onClick={() => openSummaryDetail(row)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      openSummaryDetail(row);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
+                  className={
+                    row?._rowType === 'hsnHeader' || row?._rowType === 'hsnTotal' || row?._rowType === 'grandTotal'
+                      ? 'stock-sum-grand'
+                      : 'sale-list-row-clickable'
+                  }
+                  onClick={row?._rowType === 'transaction' || !row?._rowType ? () => openSummaryDetail(row) : undefined}
+                  onKeyDown={
+                    row?._rowType === 'transaction' || !row?._rowType
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            openSummaryDetail(row);
+                          }
+                        }
+                      : undefined
+                  }
+                  role={row?._rowType === 'transaction' || !row?._rowType ? 'button' : undefined}
+                  tabIndex={row?._rowType === 'transaction' || !row?._rowType ? 0 : undefined}
                 >
                   {columns.map((c) => (
                     <td
                       key={c}
-                      className={typeof row[c] === 'number' ? 'text-right' : ''}
+                      className={typeof row[c] === 'number' ? 'text-right' : row?._rowType === 'hsnHeader' && c === 'HSN_CODE' ? 'text-left' : ''}
                       style={isDateColumn(c) ? { whiteSpace: 'nowrap' } : undefined}
                     >
-                      {fmtCell(c, row[c])}
+                      {row?._rowType === 'hsnHeader' && c === 'HSN_CODE' ? <strong>HSN: {fmtCell(c, row[c])}</strong> : fmtCell(c, row[c])}
                     </td>
                   ))}
                 </tr>
               ))}
-              {tabRows.length > 0 ? (
+              {activeTab !== 'dateWise' && filteredTabRows.length > 0 ? (
                 <tr className="stock-sum-grand">
                   {columns.map((c, i) => {
                     if (i === 0) return <td key={c}><strong>Grand total</strong></td>;
@@ -523,7 +677,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
               <strong>Grand Total:</strong> {totalCols.map((c) => `${c}: ${fmt(totals[c] || 0)}`).join(' | ')}
             </p>
           </div>
-          {tabRows.length === 0 ? <p className="stock-sum-empty">No rows in this tab.</p> : null}
+          {displayRows.length === 0 ? <p className="stock-sum-empty">No rows in this tab.</p> : null}
         </div>
 
         <div className="report-info">
