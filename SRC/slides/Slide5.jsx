@@ -46,6 +46,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
   const [graceDrDays, setGraceDrDays] = useState('0');
   const [graceCrDays, setGraceCrDays] = useState('0');
   const [interestCalcDate, setInterestCalcDate] = useState('');
+  const [voucherWiseTotal, setVoucherWiseTotal] = useState('N');
   const isLedgerInterest = String(formData.reportType || '').toLowerCase() === 'ledger-interest';
 
   // Period from compdet (passed via Slide2 → App as comp_s_dt / comp_e_dt)
@@ -166,6 +167,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
         s_date: sDate,
         e_date: eDate,
         comp_uid: formData.comp_uid || formData.COMP_UID,
+        voucher_wise_total: voucherWiseTotal,
       };
       if (isLedgerInterest) {
         params.int_date = toOracleDate(interestCalcDate);
@@ -420,7 +422,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
               ? `Interest date ${toDisplayDate(interestCalcDate)} · Rate ${String(interestRate).trim() || '0'}% · Grace DR ${String(
                   graceDrDays
                 ).trim() || '0'} · Grace CR ${String(graceCrDays).trim() || '0'}`
-              : 'Tap a row for voucher detail; sale bill print opens where mapping is available.'
+              : `Tap a row for voucher detail; sale bill print opens where mapping is available. · Voucher Wise Total: ${voucherWiseTotal}`
           }
         />
 
@@ -583,6 +585,34 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
             className="form-input"
           />
         </div>
+
+        {!isLedgerInterest ? (
+          <div className="form-group">
+            <span className="form-label-block">Voucher Wise Total</span>
+            <div className="radio-row">
+              <label className="radio-inline">
+                <input
+                  type="radio"
+                  name="voucher-wise-total"
+                  value="N"
+                  checked={voucherWiseTotal === 'N'}
+                  onChange={() => setVoucherWiseTotal('N')}
+                />
+                No (N)
+              </label>
+              <label className="radio-inline">
+                <input
+                  type="radio"
+                  name="voucher-wise-total"
+                  value="Y"
+                  checked={voucherWiseTotal === 'Y'}
+                  onChange={() => setVoucherWiseTotal('Y')}
+                />
+                Yes (Y)
+              </label>
+            </div>
+          </div>
+        ) : null}
 
         {isLedgerInterest ? (
           <>

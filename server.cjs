@@ -1285,7 +1285,10 @@ function buildSaleBillPrintSql(qrSelectFragment, disOthMode) {
         A.ITEM_CODE,
         D.ITEM_NAME,
         D.HSN_CODE,
+        A.PACKING,
         A.QNTY,
+        A.G_WEIGHT,
+        A.D_WEIGHT,
         A.WEIGHT,
         A.RATE,
         A.AMOUNT,
@@ -1533,7 +1536,7 @@ app.get('/api/trial-balance', async (req, res) => {
                  MAX(c.name) as sch_name, 
                  a.code, 
                  CASE 
-                   WHEN a.code IS NULL AND b.schedule IS NOT NULL THEN 'TOTAL SCHEDULE ' || b.schedule
+                   WHEN a.code IS NULL AND b.schedule IS NOT NULL THEN 'TOTAL ' || NVL(MAX(c.name), 'SCHEDULE') || ' ' || TO_CHAR(b.schedule)
                    WHEN a.code IS NULL AND b.schedule IS NULL THEN '*** GRAND TOTAL ***'
                    ELSE MAX(b.name) 
                  END AS name,
@@ -1569,7 +1572,50 @@ app.get('/api/trial-balance', async (req, res) => {
 // 4. Ledger Account Report
 app.get('/api/ledger', async (req, res) => {
   try {
-    const { comp_code, code, s_date, e_date, comp_uid } = req.query;
+    const { comp_code, code, s_date, e_date, comp_uid, voucher_wise_total } = req.query;
+    const voucherWiseTotal = String(voucher_wise_total || 'N').trim().toUpperCase() === 'Y';
+
+    const txnSelect = voucherWiseTotal
+      ? `
+        SELECT
+               A.CODE,
+               MAX(B.NAME) AS NAME,
+               MAX(B.CITY) AS CITY,
+               MAX(B.GST_NO) AS GST_NO,
+               MAX(B.PAN) AS PAN,
+               MAX(B.ADD1) AS ADD1,
+               MAX(B.ADD2) AS ADD2,
+               MAX(B.TEL_NO_O) AS TEL_NO_O,
+               A.VR_DATE,
+               A.V_DATE,
+               A.VR_NO,
+               A.VR_TYPE,
+               A.TYPE,
+               0 AS TRN_NO,
+               A.DETAIL,
+               SUM(NVL(A.DR_AMT, 0)) AS DR_AMT,
+               SUM(NVL(A.CR_AMT, 0)) AS CR_AMT,
+               NULL AS DC_CODE,
+               NULL AS DC_NAME
+        FROM LEDGER A, MASTER B
+        WHERE A.COMP_CODE = :comp_code
+          AND A.CODE = :code
+          AND A.VR_DATE BETWEEN TO_DATE(:s_date, 'DD-MM-YYYY') AND TO_DATE(:e_date, 'DD-MM-YYYY')
+          AND A.COMP_CODE = B.COMP_CODE
+          AND A.CODE = B.CODE
+        GROUP BY A.CODE, A.VR_DATE, A.VR_NO, A.VR_TYPE, A.TYPE, A.CHQ_NO, A.DETAIL, A.V_DATE
+      `
+      : `
+        SELECT A.CODE, B.NAME, B.CITY, B.GST_NO, B.PAN, B.ADD1, B.ADD2, B.TEL_NO_O,
+               A.VR_DATE, A.V_DATE, A.VR_NO, A.VR_TYPE, A.TYPE, A.TRN_NO,
+               A.DETAIL, A.DR_AMT, A.CR_AMT, A.DC_CODE, NULL AS DC_NAME
+        FROM LEDGER A, MASTER B
+        WHERE A.COMP_CODE = :comp_code
+          AND A.CODE = :code
+          AND A.VR_DATE BETWEEN TO_DATE(:s_date, 'DD-MM-YYYY') AND TO_DATE(:e_date, 'DD-MM-YYYY')
+          AND A.COMP_CODE = B.COMP_CODE
+          AND A.CODE = B.CODE
+      `;
 
     const sql = `
       WITH OP AS (
@@ -1591,15 +1637,7 @@ app.get('/api/ledger', async (req, res) => {
         WHERE B.COMP_CODE = :comp_code
           AND B.CODE = :code
         UNION ALL
-        SELECT A.CODE, B.NAME, B.CITY, B.GST_NO, B.PAN, B.ADD1, B.ADD2, B.TEL_NO_O,
-               A.VR_DATE, A.V_DATE, A.VR_NO, A.VR_TYPE, A.TYPE, A.TRN_NO,
-               A.DETAIL, A.DR_AMT, A.CR_AMT, A.DC_CODE, NULL AS DC_NAME
-        FROM LEDGER A, MASTER B
-        WHERE A.COMP_CODE = :comp_code
-          AND A.CODE = :code
-          AND A.VR_DATE BETWEEN TO_DATE(:s_date, 'DD-MM-YYYY') AND TO_DATE(:e_date, 'DD-MM-YYYY')
-          AND A.COMP_CODE = B.COMP_CODE
-          AND A.CODE = B.CODE
+        ${txnSelect}
       )
       SELECT DATA.*,
              SUM(NVL(DR_AMT,0) - NVL(CR_AMT,0)) OVER (
@@ -2600,7 +2638,8 @@ app.get('/api/sale-bill-printing-list', async (req, res) => {
         A.CODE,
         B.NAME,
         B.CITY,
-        MAX(NVL(A.BILL_AMT, 0)) AS BILL_AMT
+        MAX(NVL(A.BILL_AMT, 0)) AS BILL_AMT,
+        SUM(NVL(A.CGST_AMT, 0) + NVL(A.SGST_AMT, 0) + NVL(A.IGST_AMT, 0)) AS TOTAL_TAX
       FROM SALE A
       JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND TRIM(A.CODE) = TRIM(B.CODE)
       WHERE A.COMP_CODE = :comp_code
@@ -2617,7 +2656,7 @@ app.get('/api/sale-bill-printing-list', async (req, res) => {
         A.CODE,
         B.NAME,
         B.CITY
-      ORDER BY A.BILL_DATE DESC, A.BILL_NO DESC, A.B_TYPE, A.CODE`;
+      ORDER BY TRUNC(A.BILL_DATE) DESC, A.BILL_NO DESC, A.B_TYPE, A.CODE`;
 
     const binds = { comp_code, type: t };
     if (bn) binds.bill_no = bn;
@@ -2771,7 +2810,7 @@ app.get('/api/sale-bill-print', async (req, res) => {
         AND NVL(TRIM(god_code), ' ') = NVL(TRIM(:god_code), ' ')
         AND ROWNUM = 1`;
     const defValueSql = `
-      SELECT god_print_in_sale, sale_logo, sale_logo2, signature_file
+      SELECT god_print_in_sale, sale_logo, sale_logo2, signature_file, g_weight AS print_g_weight, wgt_k_q, g_weight_header, d_weight_header, g_rate_header
       FROM defvalue
       WHERE comp_code = :comp_code
         AND ROWNUM = 1`;
@@ -3965,6 +4004,289 @@ app.get('/api/hsn-sales-parties', async (req, res) => {
     res.json(rows || []);
   } catch (err) {
     console.error('❌ HSN sales parties error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+async function buildHsnPurchaseFullRows({ comp_code, comp_uid, s_date, e_date, code, m_r_u_c, schedule }) {
+  const codeFilter = hsnTxt(code);
+  const { sql: murcSchSql, scheduleBind } = hsnMurcScheduleSqlFragment({ m_r_u_c, schedule });
+  const sql = `
+    SELECT
+      A.TYPE,
+      A.R_DATE AS BILL_DATE,
+      A.R_NO AS BILL_NO,
+      'N' AS B_TYPE,
+      A.CODE,
+      NVL(B.NAME, '') AS NAME,
+      NVL(B.GST_NO, '') AS GST_NO,
+      NVL(B.STATE_CODE, '') AS STATE_CODE,
+      NVL(B.STATE, '') AS STATE,
+      NVL(C.ITEM_CODE, '') AS ITEM_CODE,
+      NVL(C.ITEM_NAME, '') AS ITEM_NAME,
+      NVL(C.HSN_CODE, '') AS IHSN_CODE,
+      NVL(C.HSN_UNIT, '') AS HSN_UNIT,
+      NVL(D.SCHEDULE, 0) AS SCHEDULE,
+      NVL(C.HSN_CODE, '') AS HSN_CODE,
+      NVL(A.TAXABLE, 0) AS TAXABLE,
+      NVL(A.CGST_AMT, 0) AS CGST_AMT,
+      NVL(A.SGST_AMT, 0) AS SGST_AMT,
+      NVL(A.IGST_AMT, 0) AS IGST_AMT,
+      NVL(A.CGST_PER, 0) AS CGST_PER,
+      NVL(A.SGST_PER, 0) AS SGST_PER,
+      NVL(A.IGST_PER, 0) AS IGST_PER,
+      NVL(A.QNTY, 0) AS QNTY,
+      NVL(A.WEIGHT, 0) AS WEIGHT,
+      NVL(A.S_P, '') AS S_P
+    FROM PURCHASE A
+    LEFT JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND TRIM(A.CODE) = TRIM(B.CODE)
+    LEFT JOIN ITEMMAST C ON A.COMP_CODE = C.COMP_CODE AND A.ITEM_CODE = C.ITEM_CODE
+    LEFT JOIN MASTER D ON A.COMP_CODE = D.COMP_CODE AND TRIM(A.PUR_CODE) = TRIM(D.CODE)
+    WHERE A.COMP_CODE = :comp_code
+      AND A.R_DATE >= TO_DATE(:s_date,'DD-MM-YYYY')
+      AND A.R_DATE < TO_DATE(:e_date,'DD-MM-YYYY') + 1
+      AND (
+        UPPER(TRIM(A.TYPE)) = 'PU'
+        OR (UPPER(TRIM(A.TYPE)) = 'EV' AND NVL(A.INPUT_YN,'Y') = 'Y' AND NVL(A.SHOW_IN_GSTR,'Y') = 'Y')
+        OR UPPER(TRIM(A.TYPE)) = 'DN'
+        OR (UPPER(TRIM(A.TYPE)) = 'DX' AND NVL(A.INPUT_YN,'Y') <> 'N')
+        OR (UPPER(TRIM(A.TYPE)) = 'CX' AND NVL(A.INPUT_YN,'Y') <> 'N')
+      )
+      ${codeFilter ? 'AND TRIM(A.CODE) = TRIM(:code)' : ''}${murcSchSql}`;
+  const binds = { comp_code, s_date, e_date };
+  if (codeFilter) binds.code = codeFilter;
+  if (scheduleBind !== undefined) binds.hsn_sch_no = scheduleBind;
+  const rows = await runQuery(sql, binds, comp_uid);
+  return (rows || []).map((r) => {
+    const type = hsnTxt(r.TYPE).toUpperCase();
+    const sp = hsnTxt(r.S_P).toUpperCase();
+    const qtySign = type === 'DN' || type === 'DX' ? -1 : 1;
+    const taxableSign = (type !== 'DN' && type !== 'DX') || (type === 'CX' && sp === 'P') ? 1 : -1;
+    const hsn = hsnTxt(r.HSN_CODE) || hsnTxt(r.IHSN_CODE);
+    const dt = new Date(r.BILL_DATE);
+    return {
+      TYPE: type,
+      BILL_DATE: Number.isNaN(dt.getTime()) ? '' : hsnYmdLocal(dt),
+      BILL_NO: hsnTxt(r.BILL_NO),
+      B_TYPE: hsnTxt(r.B_TYPE || 'N'),
+      CODE: hsnTxt(r.CODE),
+      NAME: hsnTxt(r.NAME),
+      GST_NO: hsnTxt(r.GST_NO),
+      STATE_CODE: hsnTxt(r.STATE_CODE),
+      STATE: hsnTxt(r.STATE),
+      ITEM_CODE: hsnTxt(r.ITEM_CODE),
+      ITEM_NAME: hsnTxt(r.ITEM_NAME),
+      HSN_CODE: hsn,
+      HSN_UNIT: hsnTxt(r.HSN_UNIT),
+      SCHEDULE: hsnNum(r.SCHEDULE),
+      QNTY: qtySign * hsnNum(r.QNTY),
+      WEIGHT: qtySign * hsnNum(r.WEIGHT),
+      TAXABLE: taxableSign * hsnNum(r.TAXABLE),
+      CGST_AMT: qtySign * hsnNum(r.CGST_AMT),
+      SGST_AMT: qtySign * hsnNum(r.SGST_AMT),
+      IGST_AMT: qtySign * hsnNum(r.IGST_AMT),
+      CGST_PER: hsnNum(r.CGST_PER),
+      SGST_PER: hsnNum(r.SGST_PER),
+      IGST_PER: hsnNum(r.IGST_PER),
+      TAX_RATE: hsnRate(r),
+      MONTH_KEY: Number.isNaN(dt.getTime()) ? '' : hsnMonthKey(dt),
+      MONTH: Number.isNaN(dt.getTime()) ? '' : hsnMonthNameFromKey(hsnMonthKey(dt)),
+    };
+  });
+}
+
+async function buildHsnPurchaseSummaryRows({ comp_code, comp_uid, s_date, e_date, code, m_r_u_c, schedule }) {
+  const full = await buildHsnPurchaseFullRows({ comp_code, comp_uid, s_date, e_date, code, m_r_u_c, schedule });
+  return full.map((r) => ({
+    TYPE: r.TYPE,
+    BILL_DATE: r.BILL_DATE,
+    HSN_CODE: r.HSN_CODE,
+    SCHEDULE: r.SCHEDULE,
+    GST_NO: r.GST_NO,
+    QNTY: r.QNTY,
+    WEIGHT: r.WEIGHT,
+    TAXABLE: r.TAXABLE,
+    CGST_AMT: r.CGST_AMT,
+    SGST_AMT: r.SGST_AMT,
+    IGST_AMT: r.IGST_AMT,
+    CGST_PER: r.CGST_PER,
+    SGST_PER: r.SGST_PER,
+    IGST_PER: r.IGST_PER,
+    TAX_RATE: r.TAX_RATE,
+    MONTH_KEY: r.MONTH_KEY,
+    MONTH: r.MONTH,
+  }));
+}
+
+/** HSN Purchase report with 3 tab views: date-wise, monthly hsn-wise, hsn-wise monthly. */
+app.get('/api/hsn-purchase', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, s_date, e_date, m_r_u_c, schedule, code } = req.query;
+    if (!comp_code || !comp_uid || !s_date || !e_date) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, s_date, e_date are required' });
+    }
+    const base = await buildHsnPurchaseSummaryRows({ comp_code, comp_uid, s_date, e_date, code, m_r_u_c, schedule });
+    const filtered = applyHsnBaseFilters(base, { m_r_u_c, schedule });
+    const monthlyHsnMap = new Map();
+    const hsnMonthlyMap = new Map();
+    filtered.forEach((r) => {
+      const mKey = hsnTxt(r.MONTH_KEY);
+      if (!mKey) return;
+      const mhKey = `${mKey}|${r.HSN_CODE}|${r.TAX_RATE}`;
+      const mhRow = monthlyHsnMap.get(mhKey) || {
+        MONTH: hsnMonthNameFromKey(mKey),
+        MONTH_KEY: mKey,
+        HSN_CODE: r.HSN_CODE,
+        TAX_RATE: r.TAX_RATE,
+        QNTY: 0,
+        WEIGHT: 0,
+        TAXABLE: 0,
+        CGST_AMT: 0,
+        SGST_AMT: 0,
+        IGST_AMT: 0,
+      };
+      mhRow.QNTY += r.QNTY;
+      mhRow.WEIGHT += r.WEIGHT;
+      mhRow.TAXABLE += r.TAXABLE;
+      mhRow.CGST_AMT += r.CGST_AMT;
+      mhRow.SGST_AMT += r.SGST_AMT;
+      mhRow.IGST_AMT += r.IGST_AMT;
+      monthlyHsnMap.set(mhKey, mhRow);
+
+      const hmKey = `${r.HSN_CODE}|${mKey}|${r.TAX_RATE}`;
+      const hmRow = hsnMonthlyMap.get(hmKey) || {
+        HSN_CODE: r.HSN_CODE,
+        MONTH: hsnMonthNameFromKey(mKey),
+        MONTH_KEY: mKey,
+        TAX_RATE: r.TAX_RATE,
+        QNTY: 0,
+        WEIGHT: 0,
+        TAXABLE: 0,
+        CGST_AMT: 0,
+        SGST_AMT: 0,
+        IGST_AMT: 0,
+      };
+      hmRow.QNTY += r.QNTY;
+      hmRow.WEIGHT += r.WEIGHT;
+      hmRow.TAXABLE += r.TAXABLE;
+      hmRow.CGST_AMT += r.CGST_AMT;
+      hmRow.SGST_AMT += r.SGST_AMT;
+      hmRow.IGST_AMT += r.IGST_AMT;
+      hsnMonthlyMap.set(hmKey, hmRow);
+    });
+    const roundRows = (rows) =>
+      rows.map((r) => ({
+        ...r,
+        QNTY: +hsnNum(r.QNTY).toFixed(3),
+        WEIGHT: +hsnNum(r.WEIGHT).toFixed(3),
+        TAXABLE: +hsnNum(r.TAXABLE).toFixed(2),
+        CGST_AMT: +hsnNum(r.CGST_AMT).toFixed(2),
+        SGST_AMT: +hsnNum(r.SGST_AMT).toFixed(2),
+        IGST_AMT: +hsnNum(r.IGST_AMT).toFixed(2),
+        TAX_RATE: +hsnNum(r.TAX_RATE).toFixed(2),
+      }));
+    const monthlyHsnWise = roundRows(Array.from(monthlyHsnMap.values())).sort(
+      (a, b) =>
+        hsnFastCmp(a.MONTH_KEY, b.MONTH_KEY) ||
+        hsnFastCmp(a.HSN_CODE, b.HSN_CODE) ||
+        hsnNum(a.TAX_RATE) - hsnNum(b.TAX_RATE)
+    );
+    const hsnWiseMonthly = roundRows(Array.from(hsnMonthlyMap.values())).sort(
+      (a, b) =>
+        hsnFastCmp(a.HSN_CODE, b.HSN_CODE) ||
+        hsnFastCmp(a.MONTH_KEY, b.MONTH_KEY) ||
+        hsnNum(a.TAX_RATE) - hsnNum(b.TAX_RATE)
+    );
+    res.json({
+      ok: true,
+      sheets: {
+        dateWise: [],
+        monthlyHsnWise: monthlyHsnWise.map(({ MONTH_KEY, ...x }) => ({ ...x, _MONTH_KEY: MONTH_KEY })),
+        hsnWiseMonthly: hsnWiseMonthly.map(({ MONTH_KEY, ...x }) => ({ ...x, _MONTH_KEY: MONTH_KEY })),
+      },
+      dateWiseDeferred: true,
+    });
+  } catch (err) {
+    console.error('❌ HSN purchase error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/hsn-purchase-datewise', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, s_date, e_date, m_r_u_c, schedule, code } = req.query;
+    if (!comp_code || !comp_uid || !s_date || !e_date) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, s_date, e_date are required' });
+    }
+    const base = await buildHsnPurchaseFullRows({ comp_code, comp_uid, s_date, e_date, code, m_r_u_c, schedule });
+    const filtered = applyHsnBaseFilters(base, { m_r_u_c, schedule });
+    const rows = filtered
+      .map(hsnRoundLineRow)
+      .sort(
+        (a, b) =>
+          hsnFastCmp(a.BILL_DATE, b.BILL_DATE) ||
+          hsnFastCmp(a.BILL_NO, b.BILL_NO) ||
+          hsnFastCmp(a.B_TYPE, b.B_TYPE) ||
+          hsnFastCmp(a.ITEM_CODE, b.ITEM_CODE)
+      );
+    res.json({ ok: true, rows });
+  } catch (err) {
+    console.error('❌ HSN purchase datewise error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/hsn-purchase-detail', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, s_date, e_date, m_r_u_c, schedule, code, tab, month, hsn_code, tax_rate } = req.query;
+    if (!comp_code || !comp_uid || !s_date || !e_date) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, s_date, e_date are required' });
+    }
+    const tabName = hsnTxt(tab);
+    if (!['monthlyHsnWise', 'hsnWiseMonthly'].includes(tabName)) {
+      return res.status(400).json({ error: "tab must be 'monthlyHsnWise' or 'hsnWiseMonthly'" });
+    }
+    const monthKey = hsnTxt(month);
+    const hsnCode = hsnTxt(hsn_code);
+    const taxRate = hsnNum(tax_rate);
+    if (!monthKey || !hsnCode) {
+      return res.status(400).json({ error: 'month and hsn_code are required' });
+    }
+    const base = await buildHsnPurchaseFullRows({ comp_code, comp_uid, s_date, e_date, code, m_r_u_c, schedule });
+    const filtered = applyHsnBaseFilters(base, { m_r_u_c, schedule }).filter(
+      (r) =>
+        hsnTxt(r.MONTH_KEY) === monthKey &&
+        hsnTxt(r.HSN_CODE) === hsnCode &&
+        Math.abs(hsnNum(r.TAX_RATE) - taxRate) < 0.0001
+    );
+    const rows = filtered
+      .map(hsnRoundLineRow)
+      .sort(
+        (a, b) =>
+          hsnFastCmp(a.BILL_DATE, b.BILL_DATE) ||
+          hsnFastCmp(a.BILL_NO, b.BILL_NO) ||
+          hsnFastCmp(a.B_TYPE, b.B_TYPE) ||
+          hsnFastCmp(a.ITEM_CODE, b.ITEM_CODE)
+      );
+    res.json({ ok: true, rows });
+  } catch (err) {
+    console.error('❌ HSN purchase detail error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/hsn-purchase-parties', async (req, res) => {
+  try {
+    const { comp_code, comp_uid } = req.query;
+    if (!comp_code || !comp_uid) return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    const rows = await runQuery(
+      `SELECT CODE, NAME, CITY FROM MASTER WHERE COMP_CODE = :comp_code ORDER BY NAME, CITY, CODE`,
+      { comp_code },
+      comp_uid
+    );
+    res.json(rows || []);
+  } catch (err) {
+    console.error('❌ HSN purchase parties error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

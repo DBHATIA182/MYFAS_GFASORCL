@@ -1417,6 +1417,21 @@ function buildSaleBillReportHtml(data, metadata) {
     taxSumPdf < 0.0001 && (docUpper === 'BILL OF SUPPLY' || docUpper === 'CREDIT NOTE');
   /** Line-level discount column only when CGST+SGST+IGST ≠ 0; else discount only in summary after total amount. */
   const showDiscountColPdf = !isBillOfSupplyNoTax;
+  const askGrossDane = String(metadata?.printGrossDane || '').trim().toUpperCase();
+  const askPacking = String(metadata?.printPacking || '').trim().toUpperCase();
+  const printGWeightDefaultPdf =
+    String(rowFieldCI(f, 'print_g_weight') || rowFieldCI(f, 'g_weight') || '')
+      .trim()
+      .toUpperCase() === 'Y';
+  const printGWeightPdf = askGrossDane === 'Y' ? true : askGrossDane === 'N' ? false : printGWeightDefaultPdf;
+  const printPackingDefaultPdf = String(rowFieldCI(f, 'print_packing') || '').trim().toUpperCase() === 'Y';
+  const printPackingPdf = askPacking === 'Y' ? true : askPacking === 'N' ? false : printPackingDefaultPdf || printGWeightPdf;
+  const gWgtKqPdf = String(rowFieldCI(f, 'wgt_k_q') || 'K').trim().toUpperCase() || 'K';
+  const gWeightHeaderPdf = escHtml(
+    String(rowFieldCI(f, 'g_weight_header') || (gWgtKqPdf === 'K' ? 'In Kg.' : 'In Qtl.')).trim()
+  );
+  const dWeightHeaderPdf = escHtml(String(rowFieldCI(f, 'd_weight_header') || (gWgtKqPdf === 'K' ? 'In Kg.' : 'In Qtl.')).trim());
+  const rateHeaderPdf = escHtml(String(rowFieldCI(f, 'g_rate_header') || 'In Qtl.').trim());
   const companyNameBasePx = isBillOfSupplyNoTax ? 24 : 22;
   const companyNameFontPx = (() => {
     const len = companyRaw.length;
@@ -1462,8 +1477,11 @@ function buildSaleBillReportHtml(data, metadata) {
             <tr>
               <td>${i + 1}</td>
               <td>${escHtml(sbCell(row, 'ITEM_NAME', 'item_name'))}</td>
-              <td>${escHtml(sbCell(row, 'HSN_CODE', 'hsn_code'))}</td>
+              ${printPackingPdf ? `<td>${escHtml(String(sbCell(row, 'PACKING', 'packing') || '').slice(0, 3))}</td>` : ''}
+              <td>${escHtml(String(sbCell(row, 'HSN_CODE', 'hsn_code') || '').slice(0, 8))}</td>
               <td class="num">${formatQtyPdf(row.QNTY ?? row.qnty)}</td>
+              ${printGWeightPdf ? `<td class="num">${formatQtyPdf(row.G_WEIGHT ?? row.g_weight)}</td>` : ''}
+              ${printGWeightPdf ? `<td class="num">${formatQtyPdf(row.D_WEIGHT ?? row.d_weight)}</td>` : ''}
               <td class="num">${formatQtyPdf(row.WEIGHT ?? row.weight)}</td>
               <td class="num">${formatAmtPdf(row.RATE ?? row.rate)}</td>
               <td class="num">${formatAmtPdf(row.AMOUNT ?? row.amount)}</td>
@@ -1632,11 +1650,14 @@ function buildSaleBillReportHtml(data, metadata) {
           <tr>
             <th>Sno</th>
             <th>Particulars</th>
-            <th>HSN</th>
+            ${printPackingPdf ? '<th style="width:54px; white-space:nowrap;">Packing</th>' : ''}
+            <th style="width:76px; white-space:nowrap;">Hsn Code</th>
             <th class="num">Qty</th>
-            <th class="num">Wt</th>
-            <th class="num">Rate</th>
-            <th class="num">Amt</th>
+            ${printGWeightPdf ? `<th class="num">G.Wt<br><small>${gWeightHeaderPdf}</small></th>` : ''}
+            ${printGWeightPdf ? `<th class="num">Dane<br><small>${dWeightHeaderPdf}</small></th>` : ''}
+            <th class="num">Wt<br><small>${gWeightHeaderPdf}</small></th>
+            <th class="num">Rate<br><small>${rateHeaderPdf}</small></th>
+            <th class="num">Amount<br><small>In Rs.</small></th>
             ${showDiscountColPdf ? `<th class="num">Disc</th>` : ''}
             ${
               !isBillOfSupplyNoTax
@@ -2418,6 +2439,7 @@ export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'purchase-bill') return buildPurchaseBillReportHtml(data, metadata);
   if (reportType === 'gstr1') return buildGstr1ReportHtml(data, metadata);
   if (reportType === 'hsn-sales') return buildHsnSalesReportHtml(data, metadata);
+  if (reportType === 'hsn-purchase') return buildHsnSalesReportHtml(data, metadata);
   return buildTrialBalanceReportHtml(data, metadata);
 }
 

@@ -226,7 +226,13 @@ function buildHsnWiseMonthlyRowsWithHsnTotals(rows, totalCols) {
   return out;
 }
 
-export default function Slide16({ apiBase, formData, onPrev, onReset }) {
+export default function Slide16({ apiBase, formData, onPrev, onReset, reportMode = 'sales' }) {
+  const isPurchase = String(reportMode || '').toLowerCase() === 'purchase';
+  const apiPrefix = isPurchase ? 'hsn-purchase' : 'hsn-sales';
+  const titleBase = isPurchase ? 'HSN Purchase' : 'HSN Sales';
+  const runButtonText = isPurchase ? 'Run HsnPurchase' : 'Run HsnSales';
+  const datalistId = `${apiPrefix}-parties`;
+  const pdfReportType = isPurchase ? 'hsn-purchase' : 'hsn-sales';
   const compCode = formData.comp_code ?? formData.COMP_CODE;
   const compUid = formData.comp_uid ?? formData.COMP_UID;
   const compName = formData.comp_name ?? formData.COMP_NAME ?? 'Company';
@@ -270,13 +276,13 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
     if (!compCode || !compUid) return;
     setLookupError('');
     axios
-      .get(`${apiBase}/api/hsn-sales-parties`, {
+      .get(`${apiBase}/api/${apiPrefix}-parties`, {
         params: { comp_code: compCode, comp_uid: compUid },
         withCredentials: true,
       })
       .then((r) => setPartyList(Array.isArray(r.data) ? r.data : []))
       .catch((e) => setLookupError(e.response?.data?.error || e.message || 'Failed to load parties'));
-  }, [apiBase, compCode, compUid]);
+  }, [apiBase, apiPrefix, compCode, compUid]);
 
   const rawTabRows = report?.sheets?.[activeTab] || [];
   const tabRows = useMemo(() => omitHsnUnit(rawTabRows), [rawTabRows]);
@@ -454,7 +460,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
     setLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(`${apiBase}/api/hsn-sales`, {
+      const { data } = await axios.get(`${apiBase}/api/${apiPrefix}`, {
         params: {
           comp_code: compCode,
           comp_uid: compUid,
@@ -493,7 +499,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
     if (!s || !ed) return;
     setDateWiseLoading(true);
     try {
-      const { data } = await axios.get(`${apiBase}/api/hsn-sales-datewise`, {
+      const { data } = await axios.get(`${apiBase}/api/${apiPrefix}-datewise`, {
         params: {
           comp_code: compCode,
           comp_uid: compUid,
@@ -547,7 +553,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
       setDetailTitle(`${TAB_LABELS[activeTab]} detail — ${row?.HSN_CODE || ''} ${row?.MONTH || ''}`.trim());
       const s = toOracleDate(sDate);
       const ed = toOracleDate(eDate);
-      const { data } = await axios.get(`${apiBase}/api/hsn-sales-detail`, {
+      const { data } = await axios.get(`${apiBase}/api/${apiPrefix}-detail`, {
         params: {
           comp_code: compCode,
           comp_uid: compUid,
@@ -580,7 +586,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
       if (name === 'dateWise') return { name: TAB_LABELS[name] || name, data: dateWiseExportRows };
       return { name: TAB_LABELS[name] || name, data };
     });
-    downloadExcelWorkbook(sheets, `${compName}_HsnSales`, { autoOpen: true });
+    downloadExcelWorkbook(sheets, `${compName}_${isPurchase ? 'HsnPurchase' : 'HsnSales'}`, { autoOpen: true });
   };
 
   const exportMainPdf = () => {
@@ -596,11 +602,11 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
     }
     setPdfBusy(true);
     generatePDF(
-      'hsn-sales',
+      pdfReportType,
       { rows },
       {
         ...pdfMetaBase,
-        reportTitle: 'HSN Sales',
+        reportTitle: titleBase,
         activeView: TAB_LABELS[activeTab] || activeTab,
         autoOpen: true,
       }
@@ -612,30 +618,32 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
   const shareMainWa = () => {
     const rows = activeTab === 'dateWise' ? dateWiseExportRows : tabRows || [];
     sharePdfWithWhatsApp(
-      'hsn-sales',
+      pdfReportType,
       { rows },
       {
         ...pdfMetaBase,
-        reportTitle: 'HSN Sales',
+        reportTitle: titleBase,
         activeView: TAB_LABELS[activeTab] || activeTab,
       },
-      [`HSN Sales`, compName, periodLabel, `View: ${TAB_LABELS[activeTab] || activeTab}`].join('\n')
+      [titleBase, compName, periodLabel, `View: ${TAB_LABELS[activeTab] || activeTab}`].join('\n')
     ).catch((e) => alert(String(e?.message || e)));
   };
 
   const exportDetailExcel = () => {
     if (!detailRows.length) return;
-    downloadExcelWorkbook([{ name: 'Detail', data: detailRows }], `${compName}_HsnSales_Detail`, { autoOpen: true });
+    downloadExcelWorkbook([{ name: 'Detail', data: detailRows }], `${compName}_${isPurchase ? 'HsnPurchase' : 'HsnSales'}_Detail`, {
+      autoOpen: true,
+    });
   };
 
   const exportDetailPdf = () => {
     if (!detailRows.length) return;
     generatePDF(
-      'hsn-sales',
+      pdfReportType,
       { rows: detailRows },
       {
         ...pdfMetaBase,
-        reportTitle: 'HSN Sales Detail',
+        reportTitle: `${titleBase} Detail`,
         activeView: detailTitle || 'Detail',
         autoOpen: true,
       }
@@ -645,14 +653,14 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
   const shareDetailWa = () => {
     if (!detailRows.length) return;
     sharePdfWithWhatsApp(
-      'hsn-sales',
+      pdfReportType,
       { rows: detailRows },
       {
         ...pdfMetaBase,
-        reportTitle: 'HSN Sales Detail',
+        reportTitle: `${titleBase} Detail`,
         activeView: detailTitle || 'Detail',
       },
-      [`HSN Sales Detail`, compName, periodLabel, detailTitle || 'Detail'].join('\n')
+      [`${titleBase} Detail`, compName, periodLabel, detailTitle || 'Detail'].join('\n')
     ).catch((e) => alert(String(e?.message || e)));
   };
 
@@ -661,7 +669,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
       return (
         <div className="slide slide-report slide-16">
           <div className="report-toolbar">
-            <h2>HSN Sales Detail</h2>
+            <h2>{titleBase} Detail</h2>
             <div className="toolbar-actions">
               <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen('main')}>
                 ← Back
@@ -734,7 +742,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
     return (
       <div className="slide slide-report slide-16">
         <div className="report-toolbar">
-          <h2>HSN Sales</h2>
+          <h2>{titleBase}</h2>
           <div className="toolbar-actions">
             <button type="button" className="btn btn-toolbar-back" onClick={() => setReport(null)}>
               ← Back
@@ -750,7 +758,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
             </button>
           </div>
         </div>
-        <div className="report-sort-switch report-sort-switch--hsn-sales" role="group" aria-label="HSN Sales tabs">
+        <div className="report-sort-switch report-sort-switch--hsn-sales" role="group" aria-label={`${titleBase} tabs`}>
           {Object.keys(TAB_LABELS).map((tab) => (
             <button
               key={tab}
@@ -970,7 +978,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
 
   return (
     <div className="slide slide-16">
-      <h2>HSN Sales</h2>
+      <h2>{titleBase}</h2>
       <p className="company-info">
         {compName} | FY {compYear}
       </p>
@@ -1007,8 +1015,8 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
         </div>
         <div className="form-group">
           <label>Specific Party</label>
-          <input className="form-input" list="hsn-sales-parties" value={code} onChange={(e) => setCode(e.target.value)} />
-          <datalist id="hsn-sales-parties">
+          <input className="form-input" list={datalistId} value={code} onChange={(e) => setCode(e.target.value)} />
+          <datalist id={datalistId}>
             {partyList.map((p) => (
               <option key={String(p.CODE ?? p.code)} value={String(p.CODE ?? p.code)}>
                 {`${String(p.NAME ?? p.name ?? '')} ${String(p.CITY ?? p.city ?? '')}`.trim()}
@@ -1022,7 +1030,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
             ← Back
           </button>
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Loading…' : 'Run HsnSales'}
+            {loading ? 'Loading…' : runButtonText}
           </button>
           <button type="button" className="btn btn-primary" onClick={onReset}>
             🏠 Start Over

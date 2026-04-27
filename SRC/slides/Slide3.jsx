@@ -19,6 +19,7 @@ export default function Slide3({ onPrev, onNext, formData }) {
     'voucher-list',
     'gstr1',
     'hsn-sales',
+    'hsn-purchase',
   ];
 
   const moveReportSelection = (delta) => {
@@ -60,6 +61,15 @@ export default function Slide3({ onPrev, onNext, formData }) {
     return () => {
       document.removeEventListener('keydown', onDocKeyDown);
     };
+  }, [reportType]);
+
+  useEffect(() => {
+    const root = reportMenuRef.current;
+    if (!root) return;
+    const selected = root.querySelector('.report-option.selected');
+    if (selected && typeof selected.scrollIntoView === 'function') {
+      selected.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
   }, [reportType]);
 
   const handleNext = () => {
@@ -332,6 +342,22 @@ export default function Slide3({ onPrev, onNext, formData }) {
           <label>
             <h3>HsnSales</h3>
             <p>HSN Sales with Date Wise, Monthly HSN Wise, and HSN Wise Monthly tabs</p>
+          </label>
+        </div>
+        <div
+          className={`report-option ${reportType === 'hsn-purchase' ? 'selected' : ''}`}
+          onClick={() => setReportType('hsn-purchase')}
+        >
+          <input
+            type="radio"
+            name="reportType"
+            value="hsn-purchase"
+            checked={reportType === 'hsn-purchase'}
+            onChange={(e) => setReportType(e.target.value)}
+          />
+          <label>
+            <h3>HsnPurchase</h3>
+            <p>HSN Purchase with Date Wise, Monthly HSN Wise, and HSN Wise Monthly tabs</p>
           </label>
         </div>
       </div>

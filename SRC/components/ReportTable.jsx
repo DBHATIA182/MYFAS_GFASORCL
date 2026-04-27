@@ -161,11 +161,21 @@ export default function ReportTable({
                 codeVal == null ||
                 codeVal === '' ||
                 (nameVal && String(nameVal).toUpperCase().includes('TOTAL'));
+              const nameUpper = String(nameVal ?? '').toUpperCase();
+              const isGrandTotal = nameUpper.includes('GRAND TOTAL');
+              const isScheduleTotal = isTotal && !isGrandTotal;
+              const rowClassName = isGrandTotal
+                ? 'trial-grand-total'
+                : isScheduleTotal
+                  ? 'trial-schedule-total-row'
+                  : isTotal
+                    ? 'trial-subtotal-row'
+                    : 'clickable-row';
 
               return (
                 <tr
                   key={idx}
-                  className={isTotal ? 'trial-subtotal-row' : 'clickable-row'}
+                  className={rowClassName}
                   onClick={() => !isTotal && onLedgerClick && onLedgerClick(codeVal, nameVal)}
                 >
                   <td className="trial-sch">{schVal != null && schVal !== '' ? schVal : '—'}</td>
@@ -173,7 +183,9 @@ export default function ReportTable({
                     <span className="name-text">{nameVal}</span>
                   </td>
                   <td className="trial-code">{codeVal != null && codeVal !== '' ? codeVal : '—'}</td>
-                  <td className="trial-city">{cityVal != null && cityVal !== '' ? cityVal : '—'}</td>
+                  <td className="trial-city">
+                    {isScheduleTotal ? '—' : cityVal != null && cityVal !== '' ? cityVal : '—'}
+                  </td>
                   <td className={`text-right ${cdr > 0 ? 'dr-amt' : ''}`}>{cdr > 0 ? fmt(cdr) : '—'}</td>
                   <td className={`text-right ${ccr > 0 ? 'cr-amt' : ''}`}>{ccr > 0 ? fmt(ccr) : '—'}</td>
                   <td className={`text-right ${drAmt > 0 ? 'dr-amt' : ''}`}>{drAmt > 0 ? fmt(drAmt) : '—'}</td>

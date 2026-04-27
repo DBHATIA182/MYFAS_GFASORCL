@@ -593,6 +593,22 @@ body {
   border-top: 2px solid #6366f1;
 }
 
+.report-table--trial .trial-schedule-total-row td {
+  background: #dbeafe !important;
+  font-weight: 800;
+  color: #1e40af !important;
+  border-top: 2px solid #3b82f6;
+  border-bottom: 1px solid #93c5fd;
+}
+
+.report-table--trial .trial-schedule-total-row .trial-name .name-text,
+.report-table--trial .trial-schedule-total-row .trial-sch,
+.report-table--trial .trial-schedule-total-row .trial-code,
+.report-table--trial .trial-schedule-total-row .trial-city {
+  color: #1e40af !important;
+  font-weight: 800;
+}
+
 .report-table--trial .trial-grand-total td {
   background: #1e3a5f !important;
   color: #fff !important;
@@ -2326,6 +2342,14 @@ td.sale-list-total-pad {
 
 .sale-bill-print-table .num {
   text-align: right;
+  white-space: nowrap;
+}
+
+.sale-bill-print-table th:first-child,
+.sale-bill-print-table td:first-child {
+  width: 40px;
+  min-width: 40px;
+  max-width: 44px;
   white-space: nowrap;
 }
 

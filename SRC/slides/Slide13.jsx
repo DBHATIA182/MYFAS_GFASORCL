@@ -26,6 +26,8 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
   const [billNo, setBillNo] = useState('');
   const [bType, setBType] = useState('');
   const [billDate, setBillDate] = useState('');
+  const [printGrossDane, setPrintGrossDane] = useState('N');
+  const [printPacking, setPrintPacking] = useState('N');
 
   const [parties, setParties] = useState([]);
   const [lookupError, setLookupError] = useState('');
@@ -98,11 +100,23 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
       alert('Cannot open bill: missing type, bill no, or date.');
       return;
     }
+    let askGrossDane = printGrossDane;
+    let askPacking = printPacking;
+    // Explicit ask at open-time so user never misses these options.
+    const qGross = window.confirm('Print Gross Weight & Dane Weight? Click OK for Yes, Cancel for No.');
+    askGrossDane = qGross ? 'Y' : 'N';
+    const qPacking = window.confirm('Print Packing? Click OK for Yes, Cancel for No.');
+    askPacking = qPacking ? 'Y' : 'N';
+    setPrintGrossDane(askGrossDane);
+    setPrintPacking(askPacking);
+
     setBillPrintParams({
       type: String(typ).trim(),
       billNo: String(billNoFromRow).trim(),
       bType: String(bTypeFromRow).trim(),
       oracleDt,
+      printGrossDane: askGrossDane,
+      printPacking: askPacking,
       label: `Sale bill — ${typ} / ${billNoFromRow} / ${toDisplayDate(ymd)}`,
     });
     setBillPrintOpen(true);
@@ -192,6 +206,10 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
                 <strong>Bill date</strong> {toDisplayDate(billDate)}
               </>
             ) : null}
+            {' · '}
+            <strong>Print Gross/Dane</strong> {printGrossDane}
+            {' · '}
+            <strong>Print Packing</strong> {printPacking}
           </p>
           <p>
             {compName} | FY {compYear}
@@ -212,6 +230,7 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
                   <th>Code</th>
                   <th>Name</th>
                   <th>City</th>
+                  <th className="text-right">Total tax</th>
                   <th className="text-right">Bill amt</th>
                 </tr>
               </thead>
@@ -237,6 +256,11 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
                     <td>{row.CODE ?? row.code ?? '—'}</td>
                     <td>{row.NAME ?? row.name ?? '—'}</td>
                     <td>{row.CITY ?? row.city ?? '—'}</td>
+                    <td className="text-right">
+                      {(parseFloat(row.TOTAL_TAX ?? row.total_tax ?? 0) || 0).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                      })}
+                    </td>
                     <td className="text-right">
                       {(parseFloat(row.BILL_AMT ?? row.bill_amt ?? 0) || 0).toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
@@ -298,6 +322,23 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
               onChange={(e) => setBillNo(e.target.value)}
               placeholder="Optional"
             />
+          </div>
+        </div>
+
+        <div className="form-row-broker">
+          <div className="form-group">
+            <label htmlFor="sbp-print-gross-dane">Print Gross Weight &amp; Dane Weight</label>
+            <select id="sbp-print-gross-dane" value={printGrossDane} onChange={(e) => setPrintGrossDane(e.target.value)}>
+              <option value="N">No</option>
+              <option value="Y">Yes</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="sbp-print-packing">Print Packing</label>
+            <select id="sbp-print-packing" value={printPacking} onChange={(e) => setPrintPacking(e.target.value)}>
+              <option value="N">No</option>
+              <option value="Y">Yes</option>
+            </select>
           </div>
         </div>
 

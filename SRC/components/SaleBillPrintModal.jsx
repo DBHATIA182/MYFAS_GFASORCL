@@ -229,6 +229,22 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
 
   /** Discount column in line grid only when bill has tax (CGST+SGST+IGST ≠ 0); if tax is zero, discount appears in summary only. */
   const showDiscountColumn = !isBillOfSupplyNoTax;
+  const printGWeightFromAsk = String(billParams?.printGrossDane || '').trim().toUpperCase();
+  const printPackingFromAsk = String(billParams?.printPacking || '').trim().toUpperCase();
+  const printGWeightDefault =
+    String(rowFieldCI(first || {}, 'print_g_weight') || rowFieldCI(first || {}, 'g_weight') || '')
+      .trim()
+      .toUpperCase() === 'Y';
+  const printGWeight = printGWeightFromAsk === 'Y' ? true : printGWeightFromAsk === 'N' ? false : printGWeightDefault;
+  const printPackingDefault = String(rowFieldCI(first || {}, 'print_packing') || '').trim().toUpperCase() === 'Y';
+  const printPacking =
+    printPackingFromAsk === 'Y' ? true : printPackingFromAsk === 'N' ? false : printPackingDefault || printGWeight;
+  const gWgtKq = String(rowFieldCI(first || {}, 'wgt_k_q') || 'K').trim().toUpperCase() || 'K';
+  const gWeightHeader = String(
+    rowFieldCI(first || {}, 'g_weight_header') || (gWgtKq === 'K' ? 'In Kg.' : 'In Qtl.')
+  ).trim();
+  const dWeightHeader = String(rowFieldCI(first || {}, 'd_weight_header') || gWeightHeader).trim();
+  const rateHeader = String(rowFieldCI(first || {}, 'g_rate_header') || 'In Qtl.').trim();
 
   const amountInWords = useMemo(() => rupeesToWords(totals.billAmt || totals.sumAmt), [totals]);
 
@@ -287,13 +303,15 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
     () => ({
       companyName: compDisplayName,
       apiBase,
+      printGrossDane: billParams?.printGrossDane,
+      printPacking: billParams?.printPacking,
       invoiceNo: first
         ? isCreditNoteSale
           ? rowFieldCI(first, 'bill_no') || rowFieldCI(first, 'sale_inv_no') || 'bill'
           : rowFieldCI(first, 'sale_inv_no') || rowFieldCI(first, 'bill_no') || 'bill'
         : 'bill',
     }),
-    [apiBase, compDisplayName, first, isCreditNoteSale]
+    [apiBase, billParams?.printGrossDane, billParams?.printPacking, compDisplayName, first, isCreditNoteSale]
   );
 
   const handleDownloadPdf = useCallback(() => {
@@ -604,13 +622,40 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
               <table className="sale-bill-print-table">
                 <thead>
                   <tr>
-                    <th>Sno</th>
+                    <th style={{ width: 40, whiteSpace: 'nowrap' }}>Sno</th>
                     <th>Particulars</th>
-                    <th>HSN</th>
+                    {printPacking ? <th style={{ width: 54, whiteSpace: 'nowrap' }}>Packing</th> : null}
+                    <th style={{ width: 76, whiteSpace: 'nowrap' }}>Hsn Code</th>
                     <th className="num">Qty</th>
-                    <th className="num">Weight</th>
-                    <th className="num">Rate</th>
-                    <th className="num">Amount</th>
+                    {printGWeight ? (
+                      <th className="num">
+                        G.Weight
+                        <br />
+                        <small>{gWeightHeader}</small>
+                      </th>
+                    ) : null}
+                    {printGWeight ? (
+                      <th className="num">
+                        Dane
+                        <br />
+                        <small>{dWeightHeader}</small>
+                      </th>
+                    ) : null}
+                    <th className="num">
+                      Weight
+                      <br />
+                      <small>{gWeightHeader}</small>
+                    </th>
+                    <th className="num">
+                      Rate
+                      <br />
+                      <small>{rateHeader}</small>
+                    </th>
+                    <th className="num">
+                      Amount
+                      <br />
+                      <small>In Rs.</small>
+                    </th>
                     {showDiscountColumn ? <th className="num">Discount</th> : null}
                     {!isBillOfSupplyNoTax ? <th className="num">Taxable</th> : null}
                     {!isBillOfSupplyNoTax ? <th className="num">{cgstLabel}</th> : null}
@@ -623,8 +668,11 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
                     <tr key={i}>
                       <td>{i + 1}</td>
                       <td>{v(row, 'ITEM_NAME', 'item_name')}</td>
-                      <td>{v(row, 'HSN_CODE', 'hsn_code')}</td>
+                      {printPacking ? <td>{String(v(row, 'PACKING', 'packing') || '').slice(0, 3)}</td> : null}
+                      <td>{String(v(row, 'HSN_CODE', 'hsn_code') || '').slice(0, 8)}</td>
                       <td className="num">{fmtQty(row.QNTY ?? row.qnty)}</td>
+                      {printGWeight ? <td className="num">{fmtQty(row.G_WEIGHT ?? row.g_weight)}</td> : null}
+                      {printGWeight ? <td className="num">{fmtQty(row.D_WEIGHT ?? row.d_weight)}</td> : null}
                       <td className="num">{fmtQty(row.WEIGHT ?? row.weight)}</td>
                       <td className="num">{fmtAmt(row.RATE ?? row.rate)}</td>
                       <td className="num">{fmtAmt(row.AMOUNT ?? row.amount)}</td>

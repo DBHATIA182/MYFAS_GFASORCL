@@ -72,7 +72,7 @@ const API_BASE = import.meta.env.DEV
   : isLocalHost
     ? connectionConfig.local?.apiBase || 'http://localhost:5001'
     : remoteApiBase;
-const TOTAL_STEPS = 16;
+const TOTAL_STEPS = 17;
 const VIEW_MODE_STORAGE_KEY = 'gfas_view_mode';
 const AUTH_STORAGE_KEY = 'gfas_auth_state_v1';
 
@@ -382,6 +382,7 @@ function App() {
     else if (reportType === 'voucher-list') setCurrentSlide(14);
     else if (reportType === 'gstr1') setCurrentSlide(15);
     else if (reportType === 'hsn-sales') setCurrentSlide(16);
+    else if (reportType === 'hsn-purchase') setCurrentSlide(17);
     else setCurrentSlide(4);
   };
 
@@ -695,7 +696,10 @@ function App() {
           <Slide15 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
         {currentSlide === 16 && (
-          <Slide16 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+          <Slide16 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} reportMode="sales" />
+        )}
+        {currentSlide === 17 && (
+          <Slide16 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} reportMode="purchase" />
         )}
       </main>
     </div>
