@@ -95,6 +95,24 @@ export function downloadExcelWorkbook(sheets, baseFilename, options = {}) {
     XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(name));
   }
   const fname = `${sanitizeFilenamePart(baseFilename)}_${stamp()}.xlsx`;
+  const autoOpen = options?.autoOpen === true;
+  if (autoOpen) {
+    const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([out], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fname;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
   XLSX.writeFile(wb, fname);
 }
 

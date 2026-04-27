@@ -74,6 +74,7 @@ const API_BASE = import.meta.env.DEV
     : remoteApiBase;
 const TOTAL_STEPS = 16;
 const VIEW_MODE_STORAGE_KEY = 'gfas_view_mode';
+const AUTH_STORAGE_KEY = 'gfas_auth_state_v1';
 
 if (import.meta.env.DEV && API_BASE === '') {
   console.info('API → Vite proxy → http://localhost:5001 — start backend: npm run server');
@@ -106,6 +107,20 @@ function App() {
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
   const [loginUserName, setLoginUserName] = useState('');
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      const user = String(saved?.userName || '').trim().toUpperCase();
+      if (!saved?.authenticated || !user) return;
+      setLoginUserName(user);
+      setAuthenticated(true);
+    } catch {
+      /* ignore invalid storage payload */
+    }
+  }, []);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -279,6 +294,18 @@ function App() {
     const u = String(payload?.userName ?? payload?.user_name ?? '').trim().toUpperCase();
     setLoginUserName(u);
     setAuthenticated(true);
+    try {
+      window.localStorage.setItem(
+        AUTH_STORAGE_KEY,
+        JSON.stringify({
+          authenticated: true,
+          userName: u,
+          at: Date.now(),
+        })
+      );
+    } catch {
+      /* ignore storage write failures */
+    }
   };
 
   const handleSlide1Next = async (data) => {
@@ -351,6 +378,11 @@ function App() {
     setCompanies([]);
     setYears([]);
     setCurrentSlide(1);
+    try {
+      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
     performExitWindow();
   };
 

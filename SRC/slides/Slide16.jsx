@@ -21,6 +21,11 @@ function isDateColumn(name) {
   return k.includes('DATE');
 }
 
+function isNoWrapColumn(name) {
+  const k = String(name || '').toUpperCase();
+  return k === 'MONTH' || k.includes('DATE');
+}
+
 function fmtCell(col, val) {
   if (typeof val === 'number') return fmt(val);
   if (isDateColumn(col)) return toDisplayDate(String(val || ''));
@@ -28,12 +33,16 @@ function fmtCell(col, val) {
 }
 
 const TAB_LABELS = {
-  dateWise: 'Date Wise',
   monthlyHsnWise: 'Monthly Hsn Wise',
   hsnWiseMonthly: 'Hsn Wise Monthly',
+  dateWise: 'Date Wise',
 };
 
 const DATE_WISE_TOTAL_COLS = ['QNTY', 'WEIGHT', 'TAXABLE', 'CGST_AMT', 'SGST_AMT', 'IGST_AMT'];
+const DATE_WISE_GRID_MAX_ROWS = 3000;
+const DATE_WISE_PDF_MAX_ROWS = 1500;
+const FILTER_OPTIONS_MAX = 200;
+const ALLOWED_FILTER_COLUMNS = ['HSN_CODE', 'TYPE', 'BILL_DATE', 'CODE', 'ITEM_CODE', 'CGST_PER', 'SGST_PER', 'IGST_PER'];
 
 function toHsnKey(value) {
   const text = String(value ?? '').trim();
@@ -45,6 +54,21 @@ function getOrderedColumns(rows) {
   const cols = Object.keys(rows[0]).filter((k) => !k.startsWith('_'));
   if (!cols.includes('HSN_CODE')) return cols;
   return ['HSN_CODE', ...cols.filter((c) => c !== 'HSN_CODE')];
+}
+
+function orderColumnsByTab(cols, activeTab) {
+  const list = Array.isArray(cols) ? cols : [];
+  if (activeTab === 'monthlyHsnWise') {
+    const first = ['MONTH', 'HSN_CODE'];
+    const present = first.filter((c) => list.includes(c));
+    return [...present, ...list.filter((c) => !present.includes(c))];
+  }
+  if (activeTab === 'hsnWiseMonthly') {
+    const first = ['HSN_CODE', 'MONTH'];
+    const present = first.filter((c) => list.includes(c));
+    return [...present, ...list.filter((c) => !present.includes(c))];
+  }
+  return list;
 }
 
 function buildDateWiseGroupedRows(rows) {
@@ -120,6 +144,88 @@ function rowMatchesFilters(row, columns, filters) {
   });
 }
 
+function omitHsnUnit(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    if (!row || typeof row !== 'object') return row;
+    const next = { ...row };
+    delete next.HSN_UNIT;
+    delete next.hsn_unit;
+    return next;
+  });
+}
+
+function buildMonthlyHsnRowsWithMonthTotals(rows, totalCols) {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  if (!sourceRows.length) return [];
+  const out = [];
+  let currentMonth = '';
+  let monthTotals = {};
+  totalCols.forEach((c) => {
+    monthTotals[c] = 0;
+  });
+
+  const flushMonthTotal = () => {
+    if (!currentMonth) return;
+    out.push({
+      _rowType: 'monthTotal',
+      MONTH: `${currentMonth} TOTAL`,
+      ...monthTotals,
+    });
+    totalCols.forEach((c) => {
+      monthTotals[c] = 0;
+    });
+  };
+
+  sourceRows.forEach((row) => {
+    const m = String(row?.MONTH ?? '').trim() || 'N/A';
+    if (currentMonth && currentMonth !== m) flushMonthTotal();
+    currentMonth = m;
+    out.push({ ...row, _rowType: 'transaction' });
+    totalCols.forEach((c) => {
+      monthTotals[c] += num(row?.[c]);
+    });
+  });
+
+  flushMonthTotal();
+  return out;
+}
+
+function buildHsnWiseMonthlyRowsWithHsnTotals(rows, totalCols) {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  if (!sourceRows.length) return [];
+  const out = [];
+  let currentHsn = '';
+  let hsnTotals = {};
+  totalCols.forEach((c) => {
+    hsnTotals[c] = 0;
+  });
+
+  const flushHsnTotal = () => {
+    if (!currentHsn) return;
+    out.push({
+      _rowType: 'hsnTabTotal',
+      HSN_CODE: `${currentHsn} TOTAL`,
+      ...hsnTotals,
+    });
+    totalCols.forEach((c) => {
+      hsnTotals[c] = 0;
+    });
+  };
+
+  sourceRows.forEach((row) => {
+    const h = String(row?.HSN_CODE ?? '').trim() || '(BLANK HSN)';
+    if (currentHsn && currentHsn !== h) flushHsnTotal();
+    currentHsn = h;
+    out.push({ ...row, _rowType: 'transaction' });
+    totalCols.forEach((c) => {
+      hsnTotals[c] += num(row?.[c]);
+    });
+  });
+
+  flushHsnTotal();
+  return out;
+}
+
 export default function Slide16({ apiBase, formData, onPrev, onReset }) {
   const compCode = formData.comp_code ?? formData.COMP_CODE;
   const compUid = formData.comp_uid ?? formData.COMP_UID;
@@ -143,6 +249,9 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
   const [screen, setScreen] = useState('main');
   const [mainFilters, setMainFilters] = useState({});
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [dateWiseLoading, setDateWiseLoading] = useState(false);
+  const [dateWiseLoaded, setDateWiseLoaded] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const mainTopScrollRef = useRef(null);
   const mainTopInnerRef = useRef(null);
   const mainGridScrollRef = useRef(null);
@@ -169,15 +278,23 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
       .catch((e) => setLookupError(e.response?.data?.error || e.message || 'Failed to load parties'));
   }, [apiBase, compCode, compUid]);
 
-  const tabRows = report?.sheets?.[activeTab] || [];
-  const columns = getOrderedColumns(tabRows);
+  const rawTabRows = report?.sheets?.[activeTab] || [];
+  const tabRows = useMemo(() => omitHsnUnit(rawTabRows), [rawTabRows]);
+  const columns = useMemo(() => orderColumnsByTab(getOrderedColumns(tabRows), activeTab), [tabRows, activeTab]);
+  const filterColumns = useMemo(() => ALLOWED_FILTER_COLUMNS.filter((c) => columns.includes(c)), [columns]);
   const filteredTabRows = useMemo(
-    () => (tabRows || []).filter((row) => rowMatchesFilters(row, columns, mainFilters)),
-    [tabRows, columns, mainFilters]
+    () => (tabRows || []).filter((row) => rowMatchesFilters(row, filterColumns, mainFilters)),
+    [tabRows, filterColumns, mainFilters]
   );
-  const dateWiseGrouped = useMemo(() => buildDateWiseGroupedRows(filteredTabRows), [filteredTabRows]);
-  const dateWiseExportRows = useMemo(() => stripPrivateFields(dateWiseGrouped.rows), [dateWiseGrouped.rows]);
-  const displayRows = activeTab === 'dateWise' ? dateWiseGrouped.rows : filteredTabRows;
+  const isDateWiseGridBypassed = activeTab === 'dateWise' && filteredTabRows.length > DATE_WISE_GRID_MAX_ROWS;
+  const dateWiseGrouped = useMemo(
+    () => (isDateWiseGridBypassed ? { rows: [], totalCols: [], grandTotals: {} } : buildDateWiseGroupedRows(filteredTabRows)),
+    [filteredTabRows, isDateWiseGridBypassed]
+  );
+  const dateWiseExportRows = useMemo(
+    () => stripPrivateFields(isDateWiseGridBypassed ? filteredTabRows : dateWiseGrouped.rows),
+    [filteredTabRows, dateWiseGrouped.rows, isDateWiseGridBypassed]
+  );
   const totalCols = useMemo(
     () =>
       activeTab === 'dateWise'
@@ -193,19 +310,36 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
     });
     return out;
   }, [activeTab, dateWiseGrouped.grandTotals, totalCols, filteredTabRows]);
+  const monthlyHsnDisplayRows = useMemo(() => {
+    if (activeTab !== 'monthlyHsnWise') return [];
+    return buildMonthlyHsnRowsWithMonthTotals(filteredTabRows, totalCols);
+  }, [activeTab, filteredTabRows, totalCols]);
+  const hsnWiseMonthlyDisplayRows = useMemo(() => {
+    if (activeTab !== 'hsnWiseMonthly') return [];
+    return buildHsnWiseMonthlyRowsWithHsnTotals(filteredTabRows, totalCols);
+  }, [activeTab, filteredTabRows, totalCols]);
+  const displayRows =
+    activeTab === 'dateWise'
+      ? dateWiseGrouped.rows
+      : activeTab === 'monthlyHsnWise'
+        ? monthlyHsnDisplayRows
+        : activeTab === 'hsnWiseMonthly'
+          ? hsnWiseMonthlyDisplayRows
+          : filteredTabRows;
 
   const filterOptions = useMemo(() => {
     const out = {};
-    columns.forEach((col) => {
+    filterColumns.forEach((col) => {
       const uniq = new Set();
       (tabRows || []).forEach((row) => {
+        if (uniq.size >= FILTER_OPTIONS_MAX) return;
         const val = String(row?.[col] ?? '').trim();
         if (val) uniq.add(val);
       });
       out[col] = Array.from(uniq).sort((a, b) => a.localeCompare(b));
     });
     return out;
-  }, [columns, tabRows]);
+  }, [filterColumns, tabRows]);
   const activeFilterCount = useMemo(
     () => Object.values(mainFilters || {}).filter((v) => String(v || '').trim() !== '').length,
     [mainFilters]
@@ -333,17 +467,58 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
         withCredentials: true,
         timeout: 180000,
       });
-      setReport(data || { sheets: {} });
-      setActiveTab('dateWise');
+      const incoming = data || { sheets: {} };
+      const nextSheets = incoming?.sheets && typeof incoming.sheets === 'object'
+        ? Object.fromEntries(Object.entries(incoming.sheets).map(([k, v]) => [k, omitHsnUnit(v)]))
+        : {};
+      setReport({ ...incoming, sheets: nextSheets });
+      setActiveTab('monthlyHsnWise');
       setDetailRows([]);
       setDetailTitle('');
       setScreen('main');
       setMainFilters({});
       setMobileFiltersOpen(false);
+      setDateWiseLoaded(!data?.dateWiseDeferred);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to run report');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDateWiseIfNeeded = async () => {
+    if (dateWiseLoaded || dateWiseLoading || !report?.sheets) return;
+    const s = toOracleDate(sDate);
+    const ed = toOracleDate(eDate);
+    if (!s || !ed) return;
+    setDateWiseLoading(true);
+    try {
+      const { data } = await axios.get(`${apiBase}/api/hsn-sales-datewise`, {
+        params: {
+          comp_code: compCode,
+          comp_uid: compUid,
+          s_date: s,
+          e_date: ed,
+          m_r_u_c: mRUC,
+          schedule: schedule === '' ? 0 : Number(schedule),
+          code,
+        },
+        withCredentials: true,
+        timeout: 180000,
+      });
+      const rows = omitHsnUnit(Array.isArray(data?.rows) ? data.rows : []);
+      setReport((prev) => ({
+        ...(prev || {}),
+        sheets: {
+          ...(prev?.sheets || {}),
+          dateWise: rows,
+        },
+      }));
+      setDateWiseLoaded(true);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to load date-wise rows');
+    } finally {
+      setDateWiseLoading(false);
     }
   };
 
@@ -389,7 +564,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
         withCredentials: true,
         timeout: 120000,
       });
-      setDetailRows(Array.isArray(data?.rows) ? data.rows : []);
+      setDetailRows(omitHsnUnit(Array.isArray(data?.rows) ? data.rows : []));
       setScreen('detail');
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to load detail');
@@ -405,11 +580,21 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
       if (name === 'dateWise') return { name: TAB_LABELS[name] || name, data: dateWiseExportRows };
       return { name: TAB_LABELS[name] || name, data };
     });
-    downloadExcelWorkbook(sheets, `${compName}_HsnSales`);
+    downloadExcelWorkbook(sheets, `${compName}_HsnSales`, { autoOpen: true });
   };
 
   const exportMainPdf = () => {
-    const rows = activeTab === 'dateWise' ? dateWiseExportRows : tabRows || [];
+    const allRows = activeTab === 'dateWise' ? dateWiseExportRows : tabRows || [];
+    const rows =
+      activeTab === 'dateWise' && allRows.length > DATE_WISE_PDF_MAX_ROWS ? allRows.slice(0, DATE_WISE_PDF_MAX_ROWS) : allRows;
+    if (activeTab === 'dateWise' && allRows.length > DATE_WISE_PDF_MAX_ROWS) {
+      alert(
+        `Date-wise has ${allRows.length.toLocaleString('en-IN')} rows. PDF is limited to first ${DATE_WISE_PDF_MAX_ROWS.toLocaleString(
+          'en-IN'
+        )} rows so it can render correctly. Use Excel for full data.`
+      );
+    }
+    setPdfBusy(true);
     generatePDF(
       'hsn-sales',
       { rows },
@@ -417,8 +602,11 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
         ...pdfMetaBase,
         reportTitle: 'HSN Sales',
         activeView: TAB_LABELS[activeTab] || activeTab,
+        autoOpen: true,
       }
-    ).catch((e) => alert(String(e?.message || e)));
+    )
+      .catch((e) => alert(String(e?.message || e)))
+      .finally(() => setPdfBusy(false));
   };
 
   const shareMainWa = () => {
@@ -437,7 +625,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
 
   const exportDetailExcel = () => {
     if (!detailRows.length) return;
-    downloadExcelWorkbook([{ name: 'Detail', data: detailRows }], `${compName}_HsnSales_Detail`);
+    downloadExcelWorkbook([{ name: 'Detail', data: detailRows }], `${compName}_HsnSales_Detail`, { autoOpen: true });
   };
 
   const exportDetailPdf = () => {
@@ -449,6 +637,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
         ...pdfMetaBase,
         reportTitle: 'HSN Sales Detail',
         activeView: detailTitle || 'Detail',
+        autoOpen: true,
       }
     ).catch((e) => alert(String(e?.message || e)));
   };
@@ -510,7 +699,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
                       <td
                         key={c}
                         className={typeof row[c] === 'number' ? 'text-right' : ''}
-                        style={isDateColumn(c) ? { whiteSpace: 'nowrap' } : undefined}
+                        style={isNoWrapColumn(c) ? { whiteSpace: 'nowrap' } : undefined}
                       >
                         {fmtCell(c, row[c])}
                       </td>
@@ -553,8 +742,8 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
             <button type="button" className="btn btn-excel" onClick={exportMainExcel}>
               📊 Excel
             </button>
-            <button type="button" className="btn btn-export" onClick={exportMainPdf}>
-              📥 PDF
+            <button type="button" className="btn btn-export" onClick={exportMainPdf} disabled={pdfBusy}>
+              {pdfBusy ? 'Preparing PDF…' : '📥 PDF'}
             </button>
             <button type="button" className="btn btn-whatsapp" onClick={shareMainWa}>
               💬 WhatsApp
@@ -573,9 +762,10 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
                 setDetailTitle('');
                 setMainFilters({});
                 setMobileFiltersOpen(false);
+                if (tab === 'dateWise') loadDateWiseIfNeeded();
               }}
             >
-              {TAB_LABELS[tab]} ({(report.sheets?.[tab] || []).length})
+              {TAB_LABELS[tab]} ({tab === 'dateWise' && !dateWiseLoaded ? 'Load' : (report.sheets?.[tab] || []).length})
             </button>
           ))}
         </div>
@@ -605,7 +795,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
           </button>
           {mobileFiltersOpen ? (
             <div className="hsn-mobile-filter-panel">
-              {columns.map((c) => (
+              {filterColumns.map((c) => (
                 <label key={`mobile_filter_${c}`} className="hsn-mobile-filter-item">
                   <span>{c}</span>
                   <input
@@ -627,104 +817,145 @@ export default function Slide16({ apiBase, formData, onPrev, onReset }) {
         </div>
 
         <div className="report-display table-responsive table-responsive--hsn-sales table-responsive--sale-list">
-          <div className="sale-list-scroll-sync sale-list-scroll-sync--top" ref={mainTopScrollRef}>
-            <div className="sale-list-scroll-sync-inner" ref={mainTopInnerRef} />
-          </div>
-          <div ref={mainGridScrollRef}>
-          <table className="report-table">
-            <thead>
-              <tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr>
-              <tr className="hsn-main-filter-row">
-                {columns.map((c) => (
-                  <th key={`${c}_filter`}>
-                    <input
-                      className="form-input hsn-filter-input"
-                      style={{ minWidth: 120 }}
-                      list={`hsn-filter-${activeTab}-${c}`}
-                      value={mainFilters[c] || ''}
-                      onChange={(e) =>
-                        setMainFilters((prev) => ({
-                          ...prev,
-                          [c]: e.target.value,
-                        }))
+          {isDateWiseGridBypassed ? (
+            <>
+              <div className="report-info">
+                <p>
+                  Date-wise has {filteredTabRows.length.toLocaleString('en-IN')} rows. Grid rendering is skipped above{' '}
+                  {DATE_WISE_GRID_MAX_ROWS.toLocaleString('en-IN')} rows to keep the page responsive.
+                </p>
+                <p>
+                  Use PDF / Excel from the toolbar. Apply filters (M_R_U_C, Schedule, Party, date range) to reduce rows and reopen tab for grid view.
+                </p>
+              </div>
+              <hr className="sale-bill-print-footer-rule" />
+              <div className="report-info">
+                <p>
+                  <strong>Grand Total:</strong> {totalCols.map((c) => `${c}: ${fmt(totals[c] || 0)}`).join(' | ')}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="sale-list-scroll-sync sale-list-scroll-sync--top" ref={mainTopScrollRef}>
+                <div className="sale-list-scroll-sync-inner" ref={mainTopInnerRef} />
+              </div>
+              <div ref={mainGridScrollRef}>
+              <table className="report-table">
+                <thead>
+                  <tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr>
+                  <tr className="hsn-main-filter-row">
+                    {columns.map((c) => (
+                      <th key={`${c}_filter`}>
+                        {filterColumns.includes(c) ? (
+                          <>
+                            <input
+                              className="form-input hsn-filter-input"
+                              style={{ minWidth: 120 }}
+                              list={`hsn-filter-${activeTab}-${c}`}
+                              value={mainFilters[c] || ''}
+                              onChange={(e) =>
+                                setMainFilters((prev) => ({
+                                  ...prev,
+                                  [c]: e.target.value,
+                                }))
+                              }
+                              placeholder={`Filter ${c}`}
+                            />
+                            <datalist id={`hsn-filter-${activeTab}-${c}`}>
+                              {(filterOptions[c] || []).map((opt) => (
+                                <option key={opt} value={opt} />
+                              ))}
+                            </datalist>
+                          </>
+                        ) : null}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayRows.map((row, i) => (
+                    <tr
+                      key={i}
+                      className={
+                        row?._rowType === 'hsnHeader' ||
+                        row?._rowType === 'hsnTotal' ||
+                        row?._rowType === 'grandTotal' ||
+                        row?._rowType === 'monthTotal' ||
+                        row?._rowType === 'hsnTabTotal'
+                          ? 'stock-sum-grand'
+                          : 'sale-list-row-clickable'
                       }
-                      placeholder={`Filter ${c}`}
-                    />
-                    <datalist id={`hsn-filter-${activeTab}-${c}`}>
-                      {(filterOptions[c] || []).map((opt) => (
-                        <option key={opt} value={opt} />
-                      ))}
-                    </datalist>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {displayRows.map((row, i) => (
-                <tr
-                  key={i}
-                  className={
-                    row?._rowType === 'hsnHeader' || row?._rowType === 'hsnTotal' || row?._rowType === 'grandTotal'
-                      ? 'stock-sum-grand'
-                      : 'sale-list-row-clickable'
-                  }
-                  onClick={row?._rowType === 'transaction' || !row?._rowType ? () => openSummaryDetail(row) : undefined}
-                  onKeyDown={
-                    row?._rowType === 'transaction' || !row?._rowType
-                      ? (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            openSummaryDetail(row);
-                          }
-                        }
-                      : undefined
-                  }
-                  role={row?._rowType === 'transaction' || !row?._rowType ? 'button' : undefined}
-                  tabIndex={row?._rowType === 'transaction' || !row?._rowType ? 0 : undefined}
-                >
-                  {columns.map((c) => (
-                    <td
-                      key={c}
-                      className={typeof row[c] === 'number' ? 'text-right' : row?._rowType === 'hsnHeader' && c === 'HSN_CODE' ? 'text-left' : ''}
-                      style={isDateColumn(c) ? { whiteSpace: 'nowrap' } : undefined}
+                      onClick={row?._rowType === 'transaction' || !row?._rowType ? () => openSummaryDetail(row) : undefined}
+                      onKeyDown={
+                        row?._rowType === 'transaction' || !row?._rowType
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                openSummaryDetail(row);
+                              }
+                            }
+                          : undefined
+                      }
+                      role={row?._rowType === 'transaction' || !row?._rowType ? 'button' : undefined}
+                      tabIndex={row?._rowType === 'transaction' || !row?._rowType ? 0 : undefined}
                     >
-                      {row?._rowType === 'hsnHeader' && c === 'HSN_CODE' ? <strong>HSN: {fmtCell(c, row[c])}</strong> : fmtCell(c, row[c])}
-                    </td>
+                      {columns.map((c) => (
+                        <td
+                          key={c}
+                          className={typeof row[c] === 'number' ? 'text-right' : row?._rowType === 'hsnHeader' && c === 'HSN_CODE' ? 'text-left' : ''}
+                          style={isNoWrapColumn(c) ? { whiteSpace: 'nowrap' } : undefined}
+                        >
+                          {row?._rowType === 'hsnHeader' && c === 'HSN_CODE' ? (
+                            <strong>HSN: {fmtCell(c, row[c])}</strong>
+                          ) : row?._rowType === 'monthTotal' && c === 'MONTH' ? (
+                            <strong>{fmtCell(c, row[c])}</strong>
+                          ) : row?._rowType === 'hsnTabTotal' && c === 'HSN_CODE' ? (
+                            <strong>{fmtCell(c, row[c])}</strong>
+                          ) : (
+                            fmtCell(c, row[c])
+                          )}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-              {activeTab !== 'dateWise' && filteredTabRows.length > 0 ? (
-                <tr className="stock-sum-grand">
-                  {columns.map((c, i) => {
-                    if (i === 0) return <td key={c}><strong>Grand total</strong></td>;
-                    if (!totalCols.includes(c)) return <td key={c}>—</td>;
-                    return (
-                      <td key={c} className="text-right">
-                        <strong>{fmt(totals[c])}</strong>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-          </div>
-          <hr className="sale-bill-print-footer-rule" />
+                  {activeTab !== 'dateWise' && filteredTabRows.length > 0 ? (
+                    <tr className="stock-sum-grand">
+                      {columns.map((c, i) => {
+                        if (i === 0) return <td key={c}><strong>Grand total</strong></td>;
+                        if (!totalCols.includes(c)) return <td key={c}>—</td>;
+                        return (
+                          <td key={c} className="text-right">
+                            <strong>{fmt(totals[c])}</strong>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+              </div>
+              <hr className="sale-bill-print-footer-rule" />
+              <div className="report-info">
+                <p>
+                  <strong>Grand Total:</strong> {totalCols.map((c) => `${c}: ${fmt(totals[c] || 0)}`).join(' | ')}
+                </p>
+              </div>
+              {displayRows.length === 0 ? <p className="stock-sum-empty">No rows in this tab.</p> : null}
+            </>
+          )}
+        </div>
+
+        {!isDateWiseGridBypassed ? (
           <div className="report-info">
             <p>
-              <strong>Grand Total:</strong> {totalCols.map((c) => `${c}: ${fmt(totals[c] || 0)}`).join(' | ')}
+              Click any row to open detail screen.
             </p>
           </div>
-          {displayRows.length === 0 ? <p className="stock-sum-empty">No rows in this tab.</p> : null}
-        </div>
-
-        <div className="report-info">
-          <p>
-            Click any row to open detail screen.
-          </p>
-        </div>
+        ) : null}
 
         {detailLoading ? <p className="stock-sum-empty">Loading detail...</p> : null}
+        {activeTab === 'dateWise' && dateWiseLoading ? <p className="stock-sum-empty">Loading full date-wise rows...</p> : null}
         <div className="button-group">
           <button type="button" className="btn btn-secondary" onClick={() => setReport(null)}>
             ← Modify

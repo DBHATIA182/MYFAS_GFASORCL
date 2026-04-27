@@ -2359,21 +2359,25 @@ function buildGstr1ReportHtml(payload, metadata) {
 function buildHsnSalesReportHtml(payload, metadata) {
   const data = payload && typeof payload === 'object' ? payload : {};
   const rows = Array.isArray(data.rows) ? data.rows : [];
-  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const normalizeColKey = (c) => String(c || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const columns = (rows.length > 0 ? Object.keys(rows[0]) : []).filter((c) => normalizeColKey(c) !== 'HSNUNIT');
   const company = escHtml(metadata?.companyName || '');
   const fy = escHtml(metadata?.year || '');
   const period = escHtml(metadata?.period || '');
   const title = escHtml(metadata?.reportTitle || 'HSN Sales');
   const view = escHtml(metadata?.activeView || '');
   const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
-  const thead = columns.map((c) => `<th>${escHtml(c)}</th>`).join('');
+  const thead = columns
+    .map((c) => `<th${normalizeColKey(c).includes('BILLDATE') ? ' style="white-space: nowrap !important;"' : ''}>${escHtml(c)}</th>`)
+    .join('');
   const tbody = rows
     .map((r) => {
       const tds = columns
         .map((c) => {
           const v = r[c];
           const isNum = typeof v === 'number';
-          return `<td class="${isNum ? 'amount' : ''}">${escHtml(v == null ? '' : String(v))}</td>`;
+          const billDateNoWrap = normalizeColKey(c).includes('BILLDATE') ? ' style="white-space: nowrap !important;"' : '';
+          return `<td class="${isNum ? 'amount' : ''}"${billDateNoWrap}>${escHtml(v == null ? '' : String(v))}</td>`;
         })
         .join('');
       return `<tr>${tds}</tr>`;
@@ -2439,6 +2443,15 @@ function getPdfOptions(metadata, reportType) {
           scrollX: 0,
           scrollY: 0,
         }
+      : reportType === 'hsn-sales'
+        ? {
+            scale: 1,
+            useCORS: true,
+            logging: false,
+            windowWidth: 1800,
+            scrollX: 0,
+            scrollY: 0,
+          }
       : { scale: 2, useCORS: true };
 
   return {
@@ -2474,6 +2487,13 @@ function downloadBlob(blob, filename) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function openBlobInNewTab(blob) {
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!win) return;
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 /**
@@ -2533,6 +2553,7 @@ function shouldPreferNativeFileShare() {
 /** Download PDF (browser save dialog). */
 export const generatePDF = async (reportType, data, metadata) => {
   const { blob, filename } = await getPdfBlob(reportType, data, metadata);
+  if (metadata?.autoOpen) openBlobInNewTab(blob);
   downloadBlob(blob, filename);
 };
 
