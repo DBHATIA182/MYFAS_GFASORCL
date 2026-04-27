@@ -76,6 +76,19 @@ const TOTAL_STEPS = 16;
 const VIEW_MODE_STORAGE_KEY = 'gfas_view_mode';
 const AUTH_STORAGE_KEY = 'gfas_auth_state_v1';
 
+function readPersistedAuth() {
+  try {
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return { authenticated: false, userName: '' };
+    const saved = JSON.parse(raw);
+    const userName = String(saved?.userName || '').trim().toUpperCase();
+    if (!saved?.authenticated || !userName) return { authenticated: false, userName: '' };
+    return { authenticated: true, userName };
+  } catch {
+    return { authenticated: false, userName: '' };
+  }
+}
+
 if (import.meta.env.DEV && API_BASE === '') {
   console.info('API → Vite proxy → http://localhost:5001 — start backend: npm run server');
 }
@@ -85,12 +98,13 @@ if (!import.meta.env.DEV && !isLocalHost && !API_BASE) {
 console.log('Current API Base:', API_BASE || '(same origin /api proxy)');
 
 function App() {
+  const initialAuth = readPersistedAuth();
   const [viewMode, setViewMode] = useState(() => {
     const saved = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
     return saved === 'desktop' || saved === 'mobile' ? saved : null;
   }); // 'desktop' | 'mobile'
   const [showViewSettings, setShowViewSettings] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(initialAuth.authenticated);
   const [currentSlide, setCurrentSlide] = useState(1);
   const [companies, setCompanies] = useState([]);
   const [years, setYears] = useState([]);
@@ -106,21 +120,23 @@ function App() {
   });
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
-  const [loginUserName, setLoginUserName] = useState('');
+  const [loginUserName, setLoginUserName] = useState(initialAuth.userName);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      const user = String(saved?.userName || '').trim().toUpperCase();
-      if (!saved?.authenticated || !user) return;
-      setLoginUserName(user);
+    const restoreIfNeeded = () => {
+      if (authenticated) return;
+      const saved = readPersistedAuth();
+      if (!saved.authenticated || !saved.userName) return;
+      setLoginUserName(saved.userName);
       setAuthenticated(true);
-    } catch {
-      /* ignore invalid storage payload */
-    }
-  }, []);
+    };
+    window.addEventListener('pageshow', restoreIfNeeded);
+    document.addEventListener('visibilitychange', restoreIfNeeded);
+    return () => {
+      window.removeEventListener('pageshow', restoreIfNeeded);
+      document.removeEventListener('visibilitychange', restoreIfNeeded);
+    };
+  }, [authenticated]);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
