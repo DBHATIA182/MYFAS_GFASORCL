@@ -464,8 +464,8 @@ body {
 }
 
 .bs-accounts-table {
-  table-layout: fixed;
-  min-width: 0;
+  table-layout: auto;
+  min-width: 760px;
 }
 
 .bs-accounts-table th,
@@ -485,6 +485,10 @@ body {
   text-align: right;
   white-space: nowrap;
   padding-left: 0.24rem;
+}
+
+.slide-19 .report-display.table-responsive .bs-accounts-table {
+  width: max-content;
 }
 
 .report-table th {
@@ -3932,6 +3936,40 @@ td.sale-list-total-pad {
   .slide-19 .bs-table--plain td:nth-child(4),
   .slide-19 .bs-table--plain th:nth-child(4) {
     min-width: 90px;
+    white-space: nowrap;
+  }
+
+  .slide-19 .report-display.table-responsive .bs-accounts-table {
+    min-width: 720px;
+  }
+
+  .slide-19 .report-display.table-responsive .bs-accounts-table th,
+  .slide-19 .report-display.table-responsive .bs-accounts-table td {
+    padding: 0.35rem 0.4rem;
+    font-size: 0.72rem;
+    line-height: 1.18;
+    vertical-align: top;
+  }
+
+  .slide-19 .report-display.table-responsive .bs-accounts-table th:nth-child(1),
+  .slide-19 .report-display.table-responsive .bs-accounts-table td:nth-child(1) {
+    min-width: 90px;
+    white-space: nowrap;
+  }
+
+  .slide-19 .report-display.table-responsive .bs-accounts-table th:nth-child(2),
+  .slide-19 .report-display.table-responsive .bs-accounts-table td:nth-child(2) {
+    min-width: 270px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .slide-19 .report-display.table-responsive .bs-accounts-table th:nth-child(3),
+  .slide-19 .report-display.table-responsive .bs-accounts-table td:nth-child(3),
+  .slide-19 .report-display.table-responsive .bs-accounts-table th:nth-child(4),
+  .slide-19 .report-display.table-responsive .bs-accounts-table td:nth-child(4) {
+    min-width: 120px;
     white-space: nowrap;
   }
 }

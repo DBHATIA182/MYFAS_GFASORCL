@@ -308,10 +308,10 @@ export default function Slide19BalanceSheet({ apiBase, formData = {}, onPrev, on
         <div className="report-display table-responsive">
           <table className="report-table bs-accounts-table">
             <colgroup>
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '50%' }} />
-              <col style={{ width: '19%' }} />
-              <col style={{ width: '19%' }} />
+              <col style={{ width: '100px' }} />
+              <col style={{ width: '320px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '140px' }} />
             </colgroup>
             <thead>
               <tr>
