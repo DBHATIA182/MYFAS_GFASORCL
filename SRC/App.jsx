@@ -27,12 +27,46 @@ import './App.css';
 
 // Local: Vite dev uses '' so /api/* is proxied to port 5001 (see vite.config.js). Run `npm run server` in another terminal.
 // Vite preview / static file open on localhost still calls :5001 directly.
-const isLocalHost =
-  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+function getSafeHostname() {
+  try {
+    return typeof window !== 'undefined' && window.location ? String(window.location.hostname || '') : '';
+  } catch {
+    return '';
+  }
+}
+
+function safeStorageGet(key) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(key, value) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* ignore storage failures on restricted mobile browsers */
+  }
+}
+
+function safeStorageRemove(key) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    window.localStorage.removeItem(key);
+  } catch {
+    /* ignore storage failures on restricted mobile browsers */
+  }
+}
+
+const hostName = getSafeHostname();
+const isLocalHost = hostName === 'localhost' || hostName === '127.0.0.1';
 
 const rootDomain = connectionConfig.domain?.rootDomain || 'fasaccountingsoftware.in';
 const apiSubdomainSuffix = connectionConfig.domain?.apiSubdomainSuffix || '-api';
-const hostName = window.location.hostname;
 const knownClients = connectionConfig.clients || {};
 const configuredClientName = connectionConfig.clientName || connectionConfig.defaultClientKey || '';
 
@@ -81,7 +115,7 @@ const AUTH_STORAGE_KEY = 'gfas_auth_state_v1';
 
 function readPersistedAuth() {
   try {
-    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    const raw = safeStorageGet(AUTH_STORAGE_KEY);
     if (!raw) return { authenticated: false, userName: '' };
     const saved = JSON.parse(raw);
     const userName = String(saved?.userName || '').trim().toUpperCase();
@@ -103,7 +137,7 @@ console.log('Current API Base:', API_BASE || '(same origin /api proxy)');
 function App() {
   const initialAuth = readPersistedAuth();
   const [viewMode, setViewMode] = useState(() => {
-    const saved = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    const saved = safeStorageGet(VIEW_MODE_STORAGE_KEY);
     return saved === 'desktop' || saved === 'mobile' ? saved : null;
   }); // 'desktop' | 'mobile'
   const [showViewSettings, setShowViewSettings] = useState(false);
@@ -257,7 +291,7 @@ function App() {
   const applyViewMode = (mode) => {
     if (mode !== 'desktop' && mode !== 'mobile') return;
     setViewMode(mode);
-    window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+    safeStorageSet(VIEW_MODE_STORAGE_KEY, mode);
     setShowViewSettings(false);
   };
 
@@ -313,18 +347,14 @@ function App() {
     const u = String(payload?.userName ?? payload?.user_name ?? '').trim().toUpperCase();
     setLoginUserName(u);
     setAuthenticated(true);
-    try {
-      window.localStorage.setItem(
-        AUTH_STORAGE_KEY,
-        JSON.stringify({
-          authenticated: true,
-          userName: u,
-          at: Date.now(),
-        })
-      );
-    } catch {
-      /* ignore storage write failures */
-    }
+    safeStorageSet(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({
+        authenticated: true,
+        userName: u,
+        at: Date.now(),
+      })
+    );
   };
 
   const handleSlide1Next = async (data) => {
@@ -401,11 +431,7 @@ function App() {
     setCompanies([]);
     setYears([]);
     setCurrentSlide(1);
-    try {
-      window.localStorage.removeItem(AUTH_STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
+    safeStorageRemove(AUTH_STORAGE_KEY);
     performExitWindow();
   };
 
