@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import ReactDOM from 'react-dom/client';
 import axios from 'axios';
 import LoginSlide from './slides/LoginSlide';
 import Slide1 from './slides/Slide1';
@@ -800,25 +799,6 @@ function App() {
     {renderDeployUpdateModal()}
     </>
   );
-}
-
-// --- CRITICAL: VITE MOUNTING LOGIC ---
-try {
-  if (typeof window !== 'undefined') {
-    window.addEventListener('error', (event) => {
-      renderFatalStartupMessage(event?.error || event?.message || 'Runtime error');
-    });
-    window.addEventListener('unhandledrejection', (event) => {
-      renderFatalStartupMessage(event?.reason || 'Unhandled promise rejection');
-    });
-  }
-  const rootElement = typeof document !== 'undefined' ? document.getElementById('root') : null;
-  if (rootElement) {
-    const root = ReactDOM.createRoot(rootElement);
-    root.render(<React.StrictMode><App /></React.StrictMode>);
-  }
-} catch (err) {
-  renderFatalStartupMessage(err);
 }
 
 export default App;
