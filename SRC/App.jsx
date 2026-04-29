@@ -62,6 +62,57 @@ function safeStorageRemove(key) {
   }
 }
 
+function safeSetDocumentLang(lang) {
+  try {
+    if (typeof document === 'undefined' || !document.documentElement) return;
+    document.documentElement.lang = lang;
+  } catch {
+    /* ignore document access failures */
+  }
+}
+
+function safeSetBodyViewMode(mode) {
+  try {
+    if (typeof document === 'undefined' || !document.body) return;
+    document.body.classList.remove('force-mobile-view', 'force-desktop-view');
+    if (mode === 'mobile') {
+      document.body.classList.add('force-mobile-view');
+    } else if (mode === 'desktop') {
+      document.body.classList.add('force-desktop-view');
+    }
+  } catch {
+    /* ignore body class failures */
+  }
+}
+
+function safeClearBodyViewMode() {
+  try {
+    if (typeof document === 'undefined' || !document.body) return;
+    document.body.classList.remove('force-mobile-view', 'force-desktop-view');
+  } catch {
+    /* ignore body class failures */
+  }
+}
+
+function renderFatalStartupMessage(errorLike) {
+  try {
+    if (typeof document === 'undefined') return;
+    const root = document.getElementById('root');
+    if (!root) return;
+    const msg = String(errorLike?.message || errorLike || 'Unknown startup error');
+    root.innerHTML = `
+      <div style="font-family: Arial, sans-serif; padding: 24px; color: #1f2937;">
+        <h2 style="margin: 0 0 12px;">GRAINFAS Accounting</h2>
+        <p style="margin: 0 0 10px; font-weight: 600;">App could not start on this browser.</p>
+        <p style="margin: 0 0 8px;">Please refresh once. If it still fails, clear browser site data/cache.</p>
+        <pre style="white-space: pre-wrap; word-break: break-word; background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px;">${msg}</pre>
+      </div>
+    `;
+  } catch {
+    /* last-resort fallback only */
+  }
+}
+
 const hostName = getSafeHostname();
 const isLocalHost = hostName === 'localhost' || hostName === '127.0.0.1';
 
@@ -181,7 +232,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.lang = 'en-GB';
+    safeSetDocumentLang('en-GB');
   }, []);
 
   const [deployUpdateEnabled, setDeployUpdateEnabled] = useState(false);
@@ -296,15 +347,10 @@ function App() {
   };
 
   useEffect(() => {
-    document.body.classList.remove('force-mobile-view', 'force-desktop-view');
-    if (viewMode === 'mobile') {
-      document.body.classList.add('force-mobile-view');
-    } else if (viewMode === 'desktop') {
-      document.body.classList.add('force-desktop-view');
-    }
+    safeSetBodyViewMode(viewMode);
 
     return () => {
-      document.body.classList.remove('force-mobile-view', 'force-desktop-view');
+      safeClearBodyViewMode();
     };
   }, [viewMode]);
 
@@ -778,10 +824,22 @@ function App() {
 }
 
 // --- CRITICAL: VITE MOUNTING LOGIC ---
-const rootElement = document.getElementById('root');
-if (rootElement) {
+try {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('error', (event) => {
+      renderFatalStartupMessage(event?.error || event?.message || 'Runtime error');
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+      renderFatalStartupMessage(event?.reason || 'Unhandled promise rejection');
+    });
+  }
+  const rootElement = typeof document !== 'undefined' ? document.getElementById('root') : null;
+  if (rootElement) {
     const root = ReactDOM.createRoot(rootElement);
     root.render(<React.StrictMode><App /></React.StrictMode>);
+  }
+} catch (err) {
+  renderFatalStartupMessage(err);
 }
 
 export default App;
