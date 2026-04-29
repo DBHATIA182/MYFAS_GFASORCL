@@ -3869,18 +3869,18 @@ td.sale-list-total-pad {
 
   .pl-profit-loss .pl-doc .pl-pl-table {
     width: max-content;
-    min-width: 720px;
-    table-layout: fixed;
+    min-width: 620px;
+    table-layout: auto;
     font-size: 0.62rem;
     line-height: 1.12;
   }
 
   .pl-profit-loss .pl-doc .pl-pl-table .pl-col-particular {
-    width: 280px;
+    width: 220px;
   }
 
   .pl-profit-loss .pl-doc .pl-pl-table .pl-col-amount {
-    width: 80px;
+    width: 90px;
   }
 
   .pl-profit-loss .pl-doc .pl-pl-thead-row th,
@@ -3895,6 +3895,11 @@ td.sale-list-total-pad {
     font-size: 0.62rem;
   }
 
+  .pl-profit-loss .pl-doc .pl-pl-thead-row th,
+  .pl-profit-loss .pl-doc .pl-pl-amt.pl-amt {
+    white-space: nowrap;
+  }
+
   /* On phones, keep Balance Sheet readable by allowing horizontal scroll instead of collapsing both sides. */
   .slide-19 .report-display.table-responsive {
     overflow-x: auto;
@@ -3904,8 +3909,8 @@ td.sale-list-total-pad {
 
   .slide-19 .bs-table--plain {
     width: max-content;
-    min-width: 760px;
-    table-layout: fixed;
+    min-width: 640px;
+    table-layout: auto;
   }
 
   .slide-19 .bs-table--plain .pl-pl-thead-row th,
@@ -3919,14 +3924,15 @@ td.sale-list-total-pad {
   .slide-19 .bs-table--plain th:nth-child(1),
   .slide-19 .bs-table--plain td:nth-child(3),
   .slide-19 .bs-table--plain th:nth-child(3) {
-    width: 280px;
+    min-width: 220px;
   }
 
   .slide-19 .bs-table--plain td:nth-child(2),
   .slide-19 .bs-table--plain th:nth-child(2),
   .slide-19 .bs-table--plain td:nth-child(4),
   .slide-19 .bs-table--plain th:nth-child(4) {
-    width: 100px;
+    min-width: 90px;
+    white-space: nowrap;
   }
 }
 
