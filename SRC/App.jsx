@@ -432,18 +432,48 @@ function App() {
     };
     recognition.onresult = (event) => {
       const transcript = String(event?.results?.[0]?.[0]?.transcript || '').toLowerCase().trim();
-      if (
-        transcript.includes('open sale bill printing') ||
-        transcript.includes('sale bill printing') ||
-        transcript.includes('open sale bill')
-      ) {
+      const normalized = transcript
+        .replace(/[&]/g, ' and ')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const openReportByVoice = (reportType, slideNo, title) => {
         if (!authenticated || !formData.comp_uid) {
-          alert('Please select company and financial year before opening sale bill printing.');
+          alert(`Please select company and financial year before opening ${title}.`);
+          return true;
+        }
+        setFormData((prev) => ({ ...prev, reportType }));
+        setCurrentSlide(slideNo);
+        return true;
+      };
+
+      const voiceCommands = [
+        { phrases: ['open trial balance', 'trial balance'], reportType: 'trial-balance', slideNo: 4, title: 'Trial Balance' },
+        { phrases: ['open ledger with interest', 'ledger with interest'], reportType: 'ledger-interest', slideNo: 5, title: 'Ledger With Interest' },
+        { phrases: ['open ledger', 'ledger'], reportType: 'ledger', slideNo: 5, title: 'Ledger' },
+        { phrases: ['open customer ledger', 'customer ledger'], reportType: 'customer-ledger', slideNo: 6, title: 'Customer Ledger' },
+        { phrases: ['open supplier ledger', 'supplier ledger'], reportType: 'supplier-ledger', slideNo: 6, title: 'Supplier Ledger' },
+        { phrases: ['open broker wise outstanding', 'broker wise outstanding', 'open broker outstanding', 'broker outstanding'], reportType: 'broker-os', slideNo: 7, title: 'Broker Wise Outstanding' },
+        { phrases: ['open sale bill printing', 'sale bill printing', 'open sale bill'], reportType: 'sale-bill-printing', slideNo: 13, title: 'Sale Bill Printing' },
+        { phrases: ['open stock summary', 'stock summary', 'open stock sum', 'stock sum'], reportType: 'stock-sum', slideNo: 9, title: 'Stock Summary' },
+        { phrases: ['open stock lot wise', 'stock lot wise', 'open stock lot', 'stock lot'], reportType: 'stock-lot', slideNo: 10, title: 'Stock Lot Wise' },
+        { phrases: ['open ageing report', 'ageing report', 'aging report', 'open aging report'], reportType: 'ageing', slideNo: 12, title: 'Ageing Report' },
+        { phrases: ['open purchase list', 'purchase list'], reportType: 'purchase-list', slideNo: 11, title: 'Purchase List' },
+        { phrases: ['open voucher list', 'voucher list'], reportType: 'voucher-list', slideNo: 14, title: 'Voucher List' },
+        { phrases: ['open gstr1', 'gstr1', 'open gstr 1', 'gstr 1'], reportType: 'gstr1', slideNo: 15, title: 'GSTR1' },
+        { phrases: ['open hsn sales', 'hsn sales', 'open hsn sale', 'hsn sale'], reportType: 'hsn-sales', slideNo: 16, title: 'HSN Sales' },
+        { phrases: ['open hsn purchase', 'hsn purchase', 'open hsn purchases', 'hsn purchases'], reportType: 'hsn-purchase', slideNo: 17, title: 'HSN Purchase' },
+        { phrases: ['open trading account', 'trading account', 'open trading a c', 'trading a c'], reportType: 'trading-ac', slideNo: 18, title: 'Trading Account' },
+        { phrases: ['open p and l', 'p and l', 'open profit and loss', 'profit and loss', 'open p l', 'p l'], reportType: 'pl-profit-loss', slideNo: 19, title: 'P&L' },
+        { phrases: ['open balance sheet', 'balance sheet'], reportType: 'balance-sheet', slideNo: 20, title: 'Balance Sheet' },
+      ];
+
+      for (const cmd of voiceCommands) {
+        if (cmd.phrases.some((phrase) => normalized.includes(phrase))) {
+          openReportByVoice(cmd.reportType, cmd.slideNo, cmd.title);
           return;
         }
-        setFormData((prev) => ({ ...prev, reportType: 'sale-list' }));
-        setCurrentSlide(8);
-        return;
       }
       alert(`Voice command not recognized: ${transcript || 'no speech detected'}`);
     };
