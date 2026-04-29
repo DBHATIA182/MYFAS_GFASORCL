@@ -230,7 +230,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset, reportMode
   const isPurchase = String(reportMode || '').toLowerCase() === 'purchase';
   const apiPrefix = isPurchase ? 'hsn-purchase' : 'hsn-sales';
   const titleBase = isPurchase ? 'HSN Purchase' : 'HSN Sales';
-  const runButtonText = isPurchase ? 'Run HsnPurchase' : 'Run HsnSales';
+  const runButtonText = 'Run';
   const datalistId = `${apiPrefix}-parties`;
   const pdfReportType = isPurchase ? 'hsn-purchase' : 'hsn-sales';
   const compCode = formData.comp_code ?? formData.COMP_CODE;
@@ -678,7 +678,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset, reportMode
                 📊 Excel
               </button>
               <button type="button" className="btn btn-export" onClick={exportDetailPdf} disabled={!detailRows.length}>
-                📥 PDF
+                Pdf
               </button>
               <button type="button" className="btn btn-whatsapp" onClick={shareDetailWa} disabled={!detailRows.length}>
                 💬 WhatsApp
@@ -751,7 +751,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset, reportMode
               📊 Excel
             </button>
             <button type="button" className="btn btn-export" onClick={exportMainPdf} disabled={pdfBusy}>
-              {pdfBusy ? 'Preparing PDF…' : '📥 PDF'}
+              {pdfBusy ? 'Preparing PDF…' : 'Pdf'}
             </button>
             <button type="button" className="btn btn-whatsapp" onClick={shareMainWa}>
               💬 WhatsApp
@@ -966,10 +966,7 @@ export default function Slide16({ apiBase, formData, onPrev, onReset, reportMode
         {activeTab === 'dateWise' && dateWiseLoading ? <p className="stock-sum-empty">Loading full date-wise rows...</p> : null}
         <div className="button-group">
           <button type="button" className="btn btn-secondary" onClick={() => setReport(null)}>
-            ← Modify
-          </button>
-          <button type="button" className="btn btn-primary" onClick={onReset}>
-            🏠 Start Over
+            ← Back
           </button>
         </div>
       </div>
@@ -986,6 +983,14 @@ export default function Slide16({ apiBase, formData, onPrev, onReset, reportMode
       {error ? <div className="form-api-error">{error}</div> : null}
 
       <form onSubmit={runReport} className="report-form">
+        <div className="button-group button-group--form-top">
+          <button type="button" className="btn btn-secondary" onClick={onPrev}>
+            ← Back
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            {loading ? 'Loading…' : 'Run'}
+          </button>
+        </div>
         <div className="form-group">
           <label>Starting Date</label>
           <input type="date" className="form-input" value={sDate} onChange={(e) => setSDate(e.target.value)} required />
@@ -1031,9 +1036,6 @@ export default function Slide16({ apiBase, formData, onPrev, onReset, reportMode
           </button>
           <button type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? 'Loading…' : runButtonText}
-          </button>
-          <button type="button" className="btn btn-primary" onClick={onReset}>
-            🏠 Start Over
           </button>
         </div>
       </form>

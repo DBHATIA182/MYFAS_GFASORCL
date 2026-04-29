@@ -469,7 +469,7 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
               disabled={!pdfData}
               onClick={handleDownloadPdf}
             >
-              📥 PDF
+              Pdf
             </button>
             <button type="button" className="btn btn-excel" disabled={!lines.length} onClick={handleDownloadExcel}>
               📊 Excel

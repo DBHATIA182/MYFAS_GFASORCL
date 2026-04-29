@@ -717,7 +717,7 @@ export default function Slide15({ apiBase, formData, onPrev, onReset }) {
                 ← Back
               </button>
               <button type="button" className="btn btn-export" onClick={() => exportDetailPdf().catch((e) => alert(String(e?.message || e)))}>
-                📥 PDF
+                Pdf
               </button>
               <button type="button" className="btn btn-excel" onClick={exportDetailExcel}>
                 📊 Excel
@@ -786,7 +786,7 @@ export default function Slide15({ apiBase, formData, onPrev, onReset }) {
               ← Back
             </button>
             <button type="button" className="btn btn-export" onClick={() => exportPdf().catch((e) => alert(String(e?.message || e)))}>
-              📥 PDF
+              Pdf
             </button>
             <button type="button" className="btn btn-excel" onClick={exportExcel}>
               📊 Excel
@@ -879,6 +879,10 @@ export default function Slide15({ apiBase, formData, onPrev, onReset }) {
         {compName} | FY {compYear}
       </p>
       <form onSubmit={runReport} className="report-form">
+        <div className="button-group button-group--form-top">
+          <button type="button" className="btn btn-secondary" onClick={onPrev}>← Back</button>
+          <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Loading…' : 'Run'}</button>
+        </div>
         <div className="form-group"><label>Starting date</label><input type="date" className="form-input" value={sDate} onChange={(e) => setSDate(e.target.value)} required /></div>
         <div className="form-group"><label>Ending date</label><input type="date" className="form-input" value={eDate} onChange={(e) => setEDate(e.target.value)} required /></div>
         <div className="form-group"><label>B.Type in bill printing (Y/N)</label><input className="form-input" value={bTypeYn} maxLength={1} onChange={(e) => setBTypeYn(toUpperOneChar(e.target.value))} /></div>
@@ -891,8 +895,7 @@ export default function Slide15({ apiBase, formData, onPrev, onReset }) {
         <div className="form-group"><label>B2CL LIMIT 250000/100000 (1/2)</label><input className="form-input" value={b2clLimitMode} maxLength={1} onChange={(e) => setB2clLimitMode(toUpperOneChar(e.target.value))} /></div>
         <div className="button-group">
           <button type="button" className="btn btn-secondary" onClick={onPrev}>← Back</button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Loading…' : 'Run GSTR-1'}</button>
-          <button type="button" className="btn btn-primary" onClick={onReset}>🏠 Start Over</button>
+          <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Loading…' : 'Run'}</button>
         </div>
       </form>
     </div>

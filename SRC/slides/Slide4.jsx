@@ -312,7 +312,7 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
               className="btn btn-export"
               onClick={() => downloadLedgerPdf().catch((e) => alert(e?.message || String(e)))}
             >
-              📥 Download PDF
+              Pdf
             </button>
             <button
               type="button"
@@ -392,7 +392,7 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
               className="btn btn-export"
               onClick={() => downloadTrialPdf().catch((e) => alert(e?.message || String(e)))}
             >
-              📥 Download PDF
+              Pdf
             </button>
             <button
               type="button"
@@ -450,6 +450,15 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
         </span>
       </p>
 
+      <div className="button-group button-group--form-top">
+        <button type="button" className="btn btn-secondary" onClick={onPrev}>
+          ← Back
+        </button>
+        <button type="button" className="btn btn-primary" onClick={runTrialBalance} disabled={loading}>
+          {loading ? 'Loading…' : 'Run'}
+        </button>
+      </div>
+
       <div className="form-group">
         <label htmlFor="tb-end-date">Ending date — as-of (comp_e_dt)</label>
         <input
@@ -482,7 +491,7 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
           ← Back
         </button>
         <button type="button" className="btn btn-primary" onClick={runTrialBalance} disabled={loading}>
-          {loading ? '…' : '📊 Trial Balance'}
+          {loading ? 'Loading…' : 'Run'}
         </button>
       </div>
     </div>

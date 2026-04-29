@@ -18,6 +18,9 @@ import Slide13 from './slides/Slide13';
 import Slide14 from './slides/Slide14';
 import Slide15 from './slides/Slide15';
 import Slide16 from './slides/Slide16';
+import Slide17TradingAc from './slides/Slide17TradingAc';
+import Slide18PlProfitLoss from './slides/Slide18PlProfitLoss';
+import Slide19BalanceSheet from './slides/Slide19BalanceSheet';
 import { exitApp, performExitWindow } from './utils/exitApp';
 import connectionConfig from '../connection.config.json';
 import './App.css';
@@ -72,7 +75,7 @@ const API_BASE = import.meta.env.DEV
   : isLocalHost
     ? connectionConfig.local?.apiBase || 'http://localhost:5001'
     : remoteApiBase;
-const TOTAL_STEPS = 17;
+const TOTAL_STEPS = 20;
 const VIEW_MODE_STORAGE_KEY = 'gfas_view_mode';
 const AUTH_STORAGE_KEY = 'gfas_auth_state_v1';
 
@@ -383,6 +386,9 @@ function App() {
     else if (reportType === 'gstr1') setCurrentSlide(15);
     else if (reportType === 'hsn-sales') setCurrentSlide(16);
     else if (reportType === 'hsn-purchase') setCurrentSlide(17);
+    else if (reportType === 'trading-ac') setCurrentSlide(18);
+    else if (reportType === 'pl-profit-loss') setCurrentSlide(19);
+    else if (reportType === 'balance-sheet') setCurrentSlide(20);
     else setCurrentSlide(4);
   };
 
@@ -620,7 +626,6 @@ function App() {
           <h1>GRAINFAS Accounting</h1>
           <div className="app-header-actions">
             {renderViewSettings()}
-            <div className="status-badge">Step 1 / {TOTAL_STEPS}</div>
           </div>
         </header>
         <main className="app-main">
@@ -653,7 +658,6 @@ function App() {
               {voiceListening ? 'Listening...' : 'Voice'}
             </button>
           ) : null}
-          <div className="status-badge">Step {currentSlide} / {TOTAL_STEPS}</div>
         </div>
       </header>
 
@@ -700,6 +704,15 @@ function App() {
         )}
         {currentSlide === 17 && (
           <Slide16 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} reportMode="purchase" />
+        )}
+        {currentSlide === 18 && (
+          <Slide17TradingAc apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+        )}
+        {currentSlide === 19 && (
+          <Slide18PlProfitLoss apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+        )}
+        {currentSlide === 20 && (
+          <Slide19BalanceSheet apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
       </main>
     </div>

@@ -310,7 +310,7 @@ export default function PurchaseBillPrintModal({
           <h3 id="purchase-bill-print-title">{billParams.label || docTitle}</h3>
           <div className="sale-bill-print-actions">
             <button type="button" className="btn btn-export" disabled={!pdfData} onClick={handleDownloadPdf}>
-              📥 PDF
+              Pdf
             </button>
             <button type="button" className="btn btn-excel" disabled={!lines.length} onClick={handleDownloadExcel}>
               📊 Excel

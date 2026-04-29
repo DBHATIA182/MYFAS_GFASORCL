@@ -252,7 +252,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
               className="btn btn-export"
               onClick={() => downloadPDF().catch((err) => alert(err?.message || String(err)))}
             >
-              📥 Download PDF
+              Pdf
             </button>
             <button
               type="button"
@@ -303,10 +303,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
 
         <div className="button-group">
           <button type="button" className="btn btn-secondary" onClick={() => setShowReport(false)}>
-            ← Modify
-          </button>
-          <button type="button" className="btn btn-primary" onClick={onReset}>
-            🏠 Start Over
+            ← Back
           </button>
         </div>
       </div>
@@ -338,7 +335,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
             ← Back
           </button>
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Loading...' : 'Show Report'}
+            {loading ? 'Loading...' : 'Run'}
           </button>
         </div>
 
@@ -603,7 +600,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
             ← Back
           </button>
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? '⏳ Loading…' : '📊 Generate report'}
+            {loading ? '⏳ Loading…' : 'Run'}
           </button>
         </div>
       </form>

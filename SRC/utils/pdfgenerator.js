@@ -157,7 +157,13 @@ const PDF_REPORT_STYLES = `
           border-collapse: collapse;
           border: 2px solid #1e293b;
           margin: 0;
+          table-layout: fixed;
+          page-break-inside: auto;
+          break-inside: auto;
         }
+        table.table-report thead { display: table-header-group; }
+        table.table-report tfoot { display: table-footer-group; }
+        table.table-report tbody { display: table-row-group; }
         table.table-report thead th {
           background: #1e293b;
           color: #fff;
@@ -175,6 +181,12 @@ const PDF_REPORT_STYLES = `
           padding: 4px 5px;
           vertical-align: top;
           font-size: 8.5px;
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+        table.table-report tbody tr {
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
         table.table-report tbody tr:nth-child(odd) { background: #ffffff; }
         table.table-report tbody tr:nth-child(even) { background: #f1f5f9; }
@@ -251,6 +263,8 @@ const PDF_REPORT_STYLES = `
           font-size: 8px;
           color: #64748b;
           text-align: center;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
         table.table-report .col-sch { white-space: nowrap; width: 6%; }
         table.table-report .col-code { white-space: nowrap; width: 8%; }
@@ -761,6 +775,104 @@ function buildLedgerReportHtml(data, metadata) {
         <br />
         Computer-generated statement — no signature required.
       </div>
+    </div>
+  `;
+}
+
+/** Trading Ledger PDF (Entry/Date/Month wise). */
+function buildTradingLedgerReportHtml(data, metadata) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || '');
+  const year = escHtml(metadata.year || '');
+  const title = escHtml(metadata.reportTitle || 'Trading Ledger');
+  const period = escHtml(metadata.period || metadata.endDate || '');
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+
+  const fmtDate = (v) => {
+    const raw = String(v ?? '').trim();
+    if (!raw) return '';
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return raw;
+    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    return raw;
+  };
+  const z = (n, qty = false) => {
+    const v = parseFloat(n);
+    if (!Number.isFinite(v) || v === 0) return '';
+    return qty ? formatQtyPdf(v) : formatAmtPdf(v);
+  };
+
+  let sumRQ = 0; let sumRW = 0; let sumDR = 0;
+  let sumSQ = 0; let sumSW = 0; let sumCR = 0;
+  let lastBQ = 0; let lastBW = 0; let lastCL = 0;
+
+  const bodyRows = rows.map((r) => {
+    const rq = parseFloat(r.R_QNTY ?? r.r_qnty ?? 0) || 0;
+    const rw = parseFloat(r.R_WEIGHT ?? r.r_weight ?? 0) || 0;
+    const dr = parseFloat(r.DR_AMOUNT ?? r.dr_amount ?? r.DR_AMT ?? r.dr_amt ?? 0) || 0;
+    const sq = parseFloat(r.S_QNTY ?? r.s_qnty ?? 0) || 0;
+    const sw = parseFloat(r.S_WEIGHT ?? r.s_weight ?? 0) || 0;
+    const cr = parseFloat(r.CR_AMOUNT ?? r.cr_amount ?? r.CR_AMT ?? r.cr_amt ?? 0) || 0;
+    const bq = parseFloat(r.BAL_QNTY ?? r.bal_qnty ?? 0) || 0;
+    const bw = parseFloat(r.BAL_WEIGHT ?? r.bal_weight ?? 0) || 0;
+    const cl = parseFloat(r.CL_BALANCE ?? r.cl_balance ?? 0) || 0;
+    sumRQ += rq; sumRW += rw; sumDR += dr; sumSQ += sq; sumSW += sw; sumCR += cr;
+    lastBQ = bq; lastBW = bw; lastCL = cl;
+    return `
+      <tr>
+        <td>${escHtml(String(r.VR_TYPE ?? r.vr_type ?? ''))}</td>
+        <td>${escHtml(fmtDate(r.VR_DATE ?? r.vr_date))}</td>
+        <td>${escHtml(String(r.VR_NO ?? r.vr_no ?? ''))}</td>
+        <td>${escHtml(String(r.TYPE ?? r.type ?? ''))}</td>
+        <td class="amount">${z(rq, true)}</td>
+        <td class="amount">${z(rw, true)}</td>
+        <td class="amount">${z(dr)}</td>
+        <td class="amount">${z(sq, true)}</td>
+        <td class="amount">${z(sw, true)}</td>
+        <td class="amount">${z(cr)}</td>
+        <td class="amount">${z(bq, true)}</td>
+        <td class="amount">${z(bw, true)}</td>
+        <td class="amount">${z(cl)}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div class="report-doc">
+      <style>${PDF_REPORT_STYLES}</style>
+      <div class="report-topbar">
+        <div class="kicker">ACCOUNTING REPORT</div>
+        <h1>${title}</h1>
+        <table class="report-grid">
+          <tr><td class="lbl">Company</td><td class="val">${company}</td><td class="lbl">Financial year</td><td class="val">${year}</td></tr>
+        </table>
+        <div class="report-period"><strong>Period:</strong> ${period} &nbsp;|&nbsp; <strong>Generated:</strong> ${generated}</div>
+      </div>
+      <table class="table-report">
+        <thead>
+          <tr>
+            <th>Vr.Type</th><th>Vr.Date</th><th>Vr.No</th><th>Type</th>
+            <th class="amount">R.Qnty</th><th class="amount">R.Weight</th><th class="amount">Dr.Amount</th>
+            <th class="amount">S.Qnty</th><th class="amount">S.Weight</th><th class="amount">Cr.Amount</th>
+            <th class="amount">Bal.Qnty</th><th class="amount">Bal.Weight</th><th class="amount">Cl.Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${bodyRows}
+          <tr class="report-grand-total">
+            <td colspan="4" class="lbl-total">GRAND TOTAL</td>
+            <td class="amount">${z(sumRQ, true)}</td>
+            <td class="amount">${z(sumRW, true)}</td>
+            <td class="amount">${z(sumDR)}</td>
+            <td class="amount">${z(sumSQ, true)}</td>
+            <td class="amount">${z(sumSW, true)}</td>
+            <td class="amount">${z(sumCR)}</td>
+            <td class="amount">${z(lastBQ, true)}</td>
+            <td class="amount">${z(lastBW, true)}</td>
+            <td class="amount">${z(lastCL)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="report-foot">Trading Ledger export with quantity, weight and balance columns.</div>
     </div>
   `;
 }
@@ -2425,8 +2537,273 @@ function buildHsnSalesReportHtml(payload, metadata) {
   `;
 }
 
+function buildBalanceSheetReportHtml(data, metadata) {
+  const rows = Array.isArray(data?.rows) ? data.rows : Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Balance Sheet');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || '—');
+  const totals = metadata.totals || {};
+  const fmt = (v) => (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const isMainSch = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 1 && n <= 11 && Math.abs(n - Math.trunc(n)) < 0.0001;
+  };
+  const body = rows
+    .map((r) => {
+      const lSch = rowFieldAny(r, ['L_SCH_NO']) || '';
+      const lDetail = rowFieldAny(r, ['L_DETAIL']) || '';
+      const lAmt = Number(rowFieldAny(r, ['CR_AMT'])) || Number(rowFieldAny(r, ['L_AMOUNT'])) || 0;
+      const lMain = isMainSch(lSch);
+      const aSch = rowFieldAny(r, ['A_SCH_NO']) || '';
+      const aDetail = rowFieldAny(r, ['A_DETAIL']) || '';
+      const aAmt = Number(rowFieldAny(r, ['DR_AMT'])) || Number(rowFieldAny(r, ['A_AMOUNT'])) || 0;
+      const aMain = isMainSch(aSch);
+      return `<tr>
+        <td class="${lMain ? 'bs-main' : ''}">${escHtml(String(lSch || '').trim())}</td>
+        <td class="${lMain ? 'bs-main' : ''}">${escHtml(String(lDetail || '').trim())}</td>
+        <td class="num ${lMain ? 'bs-main' : ''}">${lAmt ? escHtml(fmt(lAmt)) : ''}</td>
+        <td class="${aMain ? 'bs-main' : ''}">${escHtml(String(aSch || '').trim())}</td>
+        <td class="${aMain ? 'bs-main' : ''}">${escHtml(String(aDetail || '').trim())}</td>
+        <td class="num ${aMain ? 'bs-main' : ''}">${aAmt ? escHtml(fmt(aAmt)) : ''}</td>
+      </tr>`;
+    })
+    .join('');
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .bs-pdf .report-topbar { padding-bottom: 8px; }
+        .bs-pdf h1 { font-size: 18px; margin-bottom: 4px; }
+        .bs-pdf .company { font-size: 14px; }
+        .bs-pdf .report-grid { font-size: 11px; }
+        .bs-pdf .table-report { width: 100%; table-layout: fixed; font-size: 9px; }
+        .bs-pdf .table-report th,
+        .bs-pdf .table-report td { padding: 3px 5px; line-height: 1.15; }
+        .bs-pdf .table-report th:nth-child(1),
+        .bs-pdf .table-report td:nth-child(1),
+        .bs-pdf .table-report th:nth-child(4),
+        .bs-pdf .table-report td:nth-child(4) { width: 7%; }
+        .bs-pdf .table-report th:nth-child(2),
+        .bs-pdf .table-report td:nth-child(2),
+        .bs-pdf .table-report th:nth-child(5),
+        .bs-pdf .table-report td:nth-child(5) { width: 28%; white-space: nowrap; }
+        .bs-pdf .table-report th:nth-child(3),
+        .bs-pdf .table-report td:nth-child(3),
+        .bs-pdf .table-report th:nth-child(6),
+        .bs-pdf .table-report td:nth-child(6) { width: 15%; }
+        .bs-pdf .table-report td.num,
+        .bs-pdf .table-report th.num { text-align: right; white-space: nowrap; }
+        .bs-pdf .bs-main { color: #b91c1c; font-weight: 700; }
+      </style>
+      <div class="report-topbar bs-pdf">
+        <div class="kicker">BALANCE SHEET</div>
+        <h1>${title}</h1>
+        <div class="company">${company}</div>
+        <table class="report-grid">
+          <tr><td class="lbl">FY</td><td class="val">${fy}</td><td class="lbl">Period</td><td class="val">${period}</td></tr>
+        </table>
+      </div>
+      <table class="table-report bs-pdf">
+        <thead>
+          <tr>
+            <th>L Sch</th>
+            <th>Liabilities</th>
+            <th class="num">Amount</th>
+            <th>A Sch</th>
+            <th>Assets</th>
+            <th class="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>${body || '<tr><td colspan="6">(No rows)</td></tr>'}</tbody>
+        <tfoot>
+          <tr>
+            <td></td>
+            <td class="bs-main">TOTAL</td>
+            <td class="num bs-main">${escHtml(fmt(totals.liabilitiesTotal || 0))}</td>
+            <td></td>
+            <td class="bs-main">TOTAL</td>
+            <td class="num bs-main">${escHtml(fmt(totals.assetsTotal || 0))}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function buildTradingAccountReportHtml(data, metadata) {
+  const payload = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  const stockRows = Array.isArray(payload.stockRows) ? payload.stockRows : [];
+  const expenseRows = Array.isArray(payload.expenseRows) ? payload.expenseRows : [];
+  const summary = payload.summary || {};
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Trading A/C');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || '—');
+  const fmt = (v) => (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const qty = (v) => (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+  const body = [];
+  stockRows.forEach((r) => {
+    const titleText = escHtml(String(r.NAME || r.CODE || '').trim());
+    const lTotal = (Number(r.OAMT) || 0) + (Number(r.PAMT) || 0) + (Number(r.GPROFIT) || 0);
+    const rTotal = (Number(r.SAMT) || 0) + (Number(r.CAMT) || 0) + (Number(r.GLOSS) || 0);
+    body.push(`<tr class="trading-title"><td colspan="8">${titleText}</td></tr>`);
+    body.push(`<tr><td>OPENING</td><td class="num">${qty(r.OWGT)}</td><td class="num">${fmt(r.OAMT)}</td><td class="num"></td><td>SALES</td><td class="num">${qty(r.SWGT)}</td><td class="num">${fmt(r.SAMT)}</td><td class="num"></td></tr>`);
+    body.push(`<tr><td>PURCHASE</td><td class="num">${qty(r.PWGT)}</td><td class="num">${fmt(r.PAMT)}</td><td class="num"></td><td>SHORT/ACCESS</td><td class="num">${qty(r.SHORT)}</td><td class="num"></td><td class="num"></td></tr>`);
+    body.push(`<tr><td>G.PROFIT</td><td class="num"></td><td class="num">${fmt(r.GPROFIT)}</td><td class="num"></td><td>CLOSING</td><td class="num">${qty(r.CWGT)}</td><td class="num">${fmt(r.CAMT)}</td><td class="num"></td></tr>`);
+    body.push(`<tr><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td>G.LOSS</td><td class="num"></td><td class="num">${fmt(r.GLOSS)}</td><td class="num"></td></tr>`);
+    body.push(`<tr class="trading-total"><td>TOTAL</td><td class="num"></td><td class="num">${fmt(lTotal)}</td><td class="num"></td><td>TOTAL</td><td class="num"></td><td class="num">${fmt(rTotal)}</td><td class="num"></td></tr>`);
+  });
+  expenseRows.forEach((r) => {
+    body.push(`<tr><td>${escHtml(String(r.NAME || '').trim())}</td><td class="num"></td><td class="num">${Number(r.DR_AMT) ? fmt(r.DR_AMT) : ''}</td><td class="num"></td><td></td><td class="num"></td><td class="num">${Number(r.CR_AMT) ? fmt(r.CR_AMT) : ''}</td><td class="num"></td></tr>`);
+  });
+  const summaryRows = `
+    <tr class="trading-summary-head"><td colspan="8">SUMMARY</td></tr>
+    <tr><td>OPENING</td><td class="num"></td><td class="num">${fmt(summary.opening)}</td><td class="num"></td><td>SALES</td><td class="num"></td><td class="num">${fmt(summary.sales)}</td><td class="num">${fmt(summary.salesRate)}</td></tr>
+    <tr><td>PURCHASE</td><td class="num"></td><td class="num">${fmt(summary.purchase)}</td><td class="num">${fmt(summary.purchaseRate)}</td><td>CL.STOCK</td><td class="num"></td><td class="num">${fmt(summary.closing)}</td><td class="num"></td></tr>
+    <tr><td>DIRECT EXP.</td><td class="num"></td><td class="num">${fmt(summary.directExp)}</td><td class="num"></td><td>DIRECT INCOME</td><td class="num"></td><td class="num">${fmt(summary.directInc)}</td><td class="num"></td></tr>
+    <tr class="trading-total"><td>G.TOTAL</td><td class="num"></td><td class="num">${fmt(summary.leftTotal)}</td><td class="num"></td><td>G.TOTAL</td><td class="num"></td><td class="num">${fmt(summary.rightTotal)}</td><td class="num"></td></tr>
+    <tr class="trading-total"><td>TOTAL GROSS PROFIT/LOSS</td><td class="num"></td><td class="num">${fmt(summary.grossProfitLoss)}</td><td class="num"></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td></tr>
+  `;
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .trading-ac-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; }
+        .trading-ac-pdf .table-report th, .trading-ac-pdf .table-report td { padding: 3px 4px; line-height: 1.12; }
+        .trading-ac-pdf .table-report td.num, .trading-ac-pdf .table-report th.num { text-align: right; white-space: nowrap; }
+        .trading-ac-pdf .trading-title td { font-weight: 700; border-top: 1px solid #999; }
+        .trading-ac-pdf .trading-total td { font-weight: 700; border-top: 1px solid #ccc; }
+        .trading-ac-pdf .trading-summary-head td { font-weight: 700; text-align: center; border-top: 2px solid #999; }
+      </style>
+      <div class="report-topbar trading-ac-pdf">
+        <div class="kicker">TRADING A/C</div>
+        <h1>${title}</h1>
+        <div class="company">${company}</div>
+        <table class="report-grid"><tr><td class="lbl">FY</td><td class="val">${fy}</td><td class="lbl">Period</td><td class="val">${period}</td></tr></table>
+      </div>
+      <table class="table-report trading-ac-pdf">
+        <thead>
+          <tr>
+            <th>Particulars</th><th class="num">Weight</th><th class="num">Amount</th><th class="num">Avg.Rate</th>
+            <th>Particulars</th><th class="num">Weight</th><th class="num">Amount</th><th class="num">Avg.Rate</th>
+          </tr>
+        </thead>
+        <tbody>${body.join('')}${summaryRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function buildProfitLossReportHtml(data, metadata) {
+  const payload = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  const trading = payload.trading || {};
+  const blocks = Array.isArray(payload.scheduleBlocks) ? payload.scheduleBlocks : [];
+  const totals = payload.totals || {};
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Profit & Loss Account');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || '—');
+  const fmt = (v) => (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pairDebitCreditRows = (lines) => {
+    const debit = [];
+    const credit = [];
+    (lines || []).forEach((ln) => {
+      const drAmt = Number(ln?.DR_AMT) || 0;
+      const crAmt = Number(ln?.CR_AMT) || 0;
+      const drDetail = String(ln?.DR_DETAIL || '').trim();
+      const crDetail = String(ln?.CR_DETAIL || '').trim();
+      if (drAmt !== 0 || drDetail) debit.push({ detail: drDetail, amount: drAmt });
+      if (crAmt !== 0 || crDetail) credit.push({ detail: crDetail, amount: crAmt });
+    });
+    const rowCount = Math.max(debit.length, credit.length);
+    const out = [];
+    for (let i = 0; i < rowCount; i += 1) {
+      out.push({
+        drDetail: debit[i]?.detail || '',
+        drAmt: debit[i]?.amount || 0,
+        crDetail: credit[i]?.detail || '',
+        crAmt: credit[i]?.amount || 0,
+      });
+    }
+    return out;
+  };
+
+  const amountCell = (v) => ((Number(v) || 0) ? escHtml(fmt(v)) : '');
+  const lineRow = (lPart, lAmt, rPart, rAmt, cls = '') => `<tr class="${cls}">
+    <td>${escHtml(String(lPart || '').trim()) || '&nbsp;'}</td>
+    <td class="num">${amountCell(lAmt)}</td>
+    <td>${escHtml(String(rPart || '').trim()) || '&nbsp;'}</td>
+    <td class="num">${amountCell(rAmt)}</td>
+  </tr>`;
+
+  const sectionRows = [];
+  sectionRows.push(`<tr class="pl-section"><td colspan="4">TRADING (SCHEDULE 12.10)</td></tr>`);
+  sectionRows.push(lineRow(trading.DR_DETAIL, trading.DR_AMT, trading.CR_DETAIL, trading.CR_AMT));
+  sectionRows.push(lineRow('SCHEDULE TOTAL', trading.DR_AMT, '', trading.CR_AMT, 'pl-total'));
+  if (blocks.length) sectionRows.push(`<tr class="pl-section"><td colspan="4">SCHEDULE 16 ONWARDS</td></tr>`);
+  blocks.forEach((blk) => {
+    sectionRows.push(`<tr class="pl-schedule"><td colspan="4">${escHtml(String(blk.schedule || ''))} ${escHtml(String(blk.schName || ''))}</td></tr>`);
+    const paired = pairDebitCreditRows(Array.isArray(blk.lines) ? blk.lines : []);
+    paired.forEach((ln) => {
+      sectionRows.push(lineRow(ln.drDetail, ln.drAmt, ln.crDetail, ln.crAmt));
+    });
+    sectionRows.push(lineRow('SCHEDULE TOTAL', blk.scheduleTotalDr, '', blk.scheduleTotalCr, 'pl-total'));
+  });
+  sectionRows.push(lineRow('TOTAL EXPENSES WITH GL', totals.totalLeftDr, 'TOTAL INCOME WITHOUT GP', totals.totalIncomeWithoutGp, 'pl-total'));
+  sectionRows.push(lineRow(totals.netProfit ? 'NET PROFIT' : '', totals.netProfit, totals.netLoss ? 'NET LOSS' : '', totals.netLoss, 'pl-total'));
+  sectionRows.push(lineRow('TOTAL', totals.grandTotal, 'TOTAL', totals.grandTotal, 'pl-grand'));
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .pl-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .pl-pdf .pl-header { text-align: center; margin-bottom: 10px; }
+        .pl-pdf .pl-company { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .pl-pdf .pl-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .pl-pdf .pl-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .pl-pdf .table-report { width: 100%; table-layout: fixed; font-size: 11px; border-collapse: collapse; }
+        .pl-pdf .table-report th, .pl-pdf .table-report td { padding: 2px 3px; line-height: 1.08; vertical-align: top; }
+        .pl-pdf .table-report thead th { text-align: left; border-top: 1px solid #999; border-bottom: 1px solid #999; background: #fff; color: #111; }
+        .pl-pdf .table-report thead th.num, .pl-pdf .table-report td.num { text-align: right; white-space: nowrap; }
+        .pl-pdf .table-report th:nth-child(1), .pl-pdf .table-report td:nth-child(1) { width: 39%; }
+        .pl-pdf .table-report th:nth-child(2), .pl-pdf .table-report td:nth-child(2) { width: 11%; border-right: 1px solid #c8c8c8; }
+        .pl-pdf .table-report th:nth-child(3), .pl-pdf .table-report td:nth-child(3) { width: 39%; }
+        .pl-pdf .table-report th:nth-child(4), .pl-pdf .table-report td:nth-child(4) { width: 11%; }
+        .pl-pdf .table-report td:nth-child(1),
+        .pl-pdf .table-report td:nth-child(3) { white-space: normal; overflow-wrap: anywhere; }
+        .pl-pdf .pl-section td { padding-top: 7px; padding-bottom: 3px; font-weight: 700; text-transform: uppercase; }
+        .pl-pdf .pl-schedule td { padding-top: 5px; padding-bottom: 2px; font-weight: 700; }
+        .pl-pdf .pl-total td { font-weight: 700; border-top: 1px solid #d8d8d8; }
+        .pl-pdf .pl-grand td { font-weight: 700; border-top: 1px solid #777; }
+      </style>
+      <div class="pl-pdf report-doc">
+        <div class="pl-header">
+          <div class="pl-company">${company}</div>
+          <div class="pl-title">${title}</div>
+          <div class="pl-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Particulars</th>
+              <th class="num">Amount</th>
+              <th>Particulars</th>
+              <th class="num">Amount</th>
+            </tr>
+          </thead>
+          <tbody>${sectionRows.join('') || '<tr><td colspan="4">(No rows)</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'ledger') return buildLedgerReportHtml(data, metadata);
+  if (reportType === 'trading-ledger') return buildTradingLedgerReportHtml(data, metadata);
   if (reportType === 'bill-ledger') return buildBillLedgerReportHtml(data, metadata);
   if (reportType === 'broker-os') return buildBrokerOsReportHtml(data, metadata);
   if (reportType === 'ageing') return buildAgeingReportHtml(data, metadata);
@@ -2440,6 +2817,9 @@ export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'gstr1') return buildGstr1ReportHtml(data, metadata);
   if (reportType === 'hsn-sales') return buildHsnSalesReportHtml(data, metadata);
   if (reportType === 'hsn-purchase') return buildHsnSalesReportHtml(data, metadata);
+  if (reportType === 'balance-sheet') return buildBalanceSheetReportHtml(data, metadata);
+  if (reportType === 'trading-account') return buildTradingAccountReportHtml(data, metadata);
+  if (reportType === 'profit-loss') return buildProfitLossReportHtml(data, metadata);
   return buildTrialBalanceReportHtml(data, metadata);
 }
 
@@ -2474,10 +2854,19 @@ function getPdfOptions(metadata, reportType) {
             scrollX: 0,
             scrollY: 0,
           }
+        : reportType === 'balance-sheet'
+          ? {
+              scale: 1.35,
+              useCORS: true,
+              logging: false,
+              windowWidth: 2200,
+              scrollX: 0,
+              scrollY: 0,
+            }
       : { scale: 2, useCORS: true };
 
   return {
-    margin: reportType === 'sale-bill' || reportType === 'purchase-bill' ? 8 : 10,
+    margin: reportType === 'sale-bill' || reportType === 'purchase-bill' ? 8 : reportType === 'balance-sheet' ? 6 : 10,
     filename,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas,
@@ -2595,6 +2984,12 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
   const reportLabel =
     reportType === 'trial-balance'
       ? 'Trial Balance'
+      : reportType === 'trading-account'
+        ? 'Trading A/C'
+        : reportType === 'profit-loss'
+          ? 'Profit & Loss Account'
+          : reportType === 'balance-sheet'
+            ? 'Balance Sheet'
       : reportType === 'bill-ledger'
         ? metadata?.billLedgerTitle || 'CustomerLedger'
         : reportType === 'broker-os'

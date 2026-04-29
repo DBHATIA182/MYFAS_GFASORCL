@@ -20,6 +20,9 @@ export default function Slide3({ onPrev, onNext, formData }) {
     'gstr1',
     'hsn-sales',
     'hsn-purchase',
+    'trading-ac',
+    'pl-profit-loss',
+    'balance-sheet',
   ];
 
   const moveReportSelection = (delta) => {
@@ -78,8 +81,6 @@ export default function Slide3({ onPrev, onNext, formData }) {
 
   return (
     <div className="slide slide-3">
-      <h2>Step 3: Select Report Type</h2>
-      
       <p className="company-info">
         {formData.comp_name} | {formData.comp_year}
       </p>
@@ -358,6 +359,55 @@ export default function Slide3({ onPrev, onNext, formData }) {
           <label>
             <h3>HsnPurchase</h3>
             <p>HSN Purchase with Date Wise, Monthly HSN Wise, and HSN Wise Monthly tabs</p>
+          </label>
+        </div>
+        <div
+          className={`report-option ${reportType === 'trading-ac' ? 'selected' : ''}`}
+          onClick={() => setReportType('trading-ac')}
+        >
+          <input
+            type="radio"
+            name="reportType"
+            value="trading-ac"
+            checked={reportType === 'trading-ac'}
+            onChange={(e) => setReportType(e.target.value)}
+          />
+          <label>
+            <h3>Trading A/C</h3>
+            <p>Trading account report with schedule, account code, ending date, shortage, and closing stock options</p>
+          </label>
+        </div>
+
+        <div
+          className={`report-option ${reportType === 'pl-profit-loss' ? 'selected' : ''}`}
+          onClick={() => setReportType('pl-profit-loss')}
+        >
+          <input
+            type="radio"
+            name="reportType"
+            value="pl-profit-loss"
+            checked={reportType === 'pl-profit-loss'}
+            onChange={(e) => setReportType(e.target.value)}
+          />
+          <label>
+            <h3>Profit &amp; Loss Account</h3>
+            <p>Gross from Trading A/C (schedule 12.10 style) plus schedule ≥ 16 ledger balances as on date (VFP PLACT)</p>
+          </label>
+        </div>
+        <div
+          className={`report-option ${reportType === 'balance-sheet' ? 'selected' : ''}`}
+          onClick={() => setReportType('balance-sheet')}
+        >
+          <input
+            type="radio"
+            name="reportType"
+            value="balance-sheet"
+            checked={reportType === 'balance-sheet'}
+            onChange={(e) => setReportType(e.target.value)}
+          />
+          <label>
+            <h3>Balance Sheet</h3>
+            <p>Liabilities vs Assets tree (NO&lt;12) with profit/loss and closing stock adjustments as of date</p>
           </label>
         </div>
       </div>

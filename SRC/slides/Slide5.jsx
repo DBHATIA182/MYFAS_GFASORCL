@@ -365,10 +365,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
               ← Back to ledger
             </button>
             <button type="button" onClick={closeReport} className="btn btn-secondary">
-              ← Modify
-            </button>
-            <button type="button" onClick={onReset} className="btn btn-primary">
-              🏠 Start Over
+              ← Back
             </button>
           </div>
           {saleBillModal}
@@ -386,7 +383,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
             </button>
             {!isLedgerInterest ? (
               <button type="button" onClick={() => downloadPDF().catch((e) => alert(e?.message || String(e)))} className="btn btn-export">
-                📥 Download PDF
+                Pdf
               </button>
             ) : null}
             <button
@@ -437,10 +434,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
 
         <div className="button-group">
           <button onClick={closeReport} className="btn btn-secondary">
-            ← Modify
-          </button>
-          <button onClick={onReset} className="btn btn-primary">
-            🏠 Start Over
+            ← Back
           </button>
         </div>
         {saleBillModal}
@@ -461,6 +455,14 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
       </p>
 
       <form onSubmit={handleSubmit} className="report-form">
+        <div className="button-group button-group--form-top">
+          <button type="button" className="btn btn-secondary" onClick={onPrev}>
+            ← Back
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            {loading ? 'Loading...' : 'Run'}
+          </button>
+        </div>
         <div className="form-group account-search-group">
           <label htmlFor="account-search">Search account:</label>
           <input
@@ -670,7 +672,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
             ← Back
           </button>
           <button type="submit" disabled={loading} className="btn btn-primary">
-            {loading ? '⏳ Generating...' : '📊 Generate Report'}
+            {loading ? 'Loading...' : 'Run'}
           </button>
         </div>
       </form>

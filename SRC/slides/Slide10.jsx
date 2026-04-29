@@ -268,7 +268,7 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
               ← Back
             </button>
             <button type="button" className="btn btn-export" onClick={downloadPdf}>
-              📥 Download PDF
+              Pdf
             </button>
             <button
               type="button"
@@ -388,10 +388,7 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
         </div>
         <div className="button-group">
           <button type="button" className="btn btn-secondary" onClick={() => setShowReport(false)}>
-            ← Modify
-          </button>
-          <button type="button" className="btn btn-primary" onClick={onReset}>
-            🏠 Start Over
+            ← Back
           </button>
         </div>
 
@@ -520,6 +517,14 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
       ) : null}
 
       <form onSubmit={handleSubmit} className="report-form">
+        <div className="button-group button-group--form-top">
+          <button type="button" className="btn btn-secondary" onClick={onPrev}>
+            ← Back
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            {loading ? 'Loading…' : 'Run'}
+          </button>
+        </div>
         <div className="form-group">
           <label htmlFor="slt-end">Ending date</label>
           <input
@@ -597,10 +602,7 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
             ← Back
           </button>
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Loading…' : 'Run report'}
-          </button>
-          <button type="button" className="btn btn-primary" onClick={onReset}>
-            🏠 Start Over
+            {loading ? 'Loading…' : 'Run'}
           </button>
         </div>
       </form>
