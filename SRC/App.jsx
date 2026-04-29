@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import LoginSlide from './slides/LoginSlide';
 import Slide1 from './slides/Slide1';
-import Slide2 from './slides/Slide2';
+import Slide2 from './slides/slide2';
 import Slide3 from './slides/Slide3';
 import Slide4 from './slides/Slide4';
 import Slide5 from './slides/Slide5';
