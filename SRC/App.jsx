@@ -129,6 +129,10 @@ function getClientKeyFromHost(host, domain) {
   return subdomain.split('.')[0] || null;
 }
 
+function normalizeClientKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function buildApiBase(clientKey) {
   if (!clientKey) return '';
   if (connectionConfig.apiBase) return connectionConfig.apiBase;
@@ -177,6 +181,8 @@ console.log('Current API Base:', API_BASE || '(same origin /api proxy)');
 
 function App() {
   const initialAuth = readPersistedAuth();
+  const [clientGuardChecked, setClientGuardChecked] = useState(false);
+  const [clientGuardMismatch, setClientGuardMismatch] = useState(null);
   const [viewMode, setViewMode] = useState(() => {
     const saved = safeStorageGet(VIEW_MODE_STORAGE_KEY);
     return saved === 'desktop' || saved === 'mobile' ? saved : null;
@@ -202,6 +208,42 @@ function App() {
 
   useEffect(() => {
     /* Temporarily disabled persisted-auth restore to verify mobile startup path. */
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const expectedClient = normalizeClientKey(hostClientKey);
+    if (import.meta.env.DEV || isLocalHost || !expectedClient) {
+      setClientGuardChecked(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    (async () => {
+      try {
+        const base = API_BASE || '';
+        const response = await axios.get(`${base}/api/client-identity`, { timeout: 10000 });
+        const actualClient = normalizeClientKey(response?.data?.clientKey);
+        if (!cancelled && actualClient && actualClient !== expectedClient) {
+          setAuthenticated(false);
+          setLoginUserName('');
+          setCompanies([]);
+          setYears([]);
+          setCurrentSlide(1);
+          safeStorageRemove(AUTH_STORAGE_KEY);
+          setClientGuardMismatch({ expectedClient, actualClient });
+        }
+      } catch {
+        /* If identity endpoint is unreachable, do not block startup. */
+      } finally {
+        if (!cancelled) setClientGuardChecked(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -677,6 +719,42 @@ function App() {
   }
 
   const appClassName = `app ${viewMode === 'desktop' ? 'app--desktop' : 'app--mobile'}`;
+
+  if (!clientGuardChecked) {
+    return (
+      <>
+      <div className={appClassName}>
+        <main className="app-main">
+          <div className="app-loading">
+            <h2>Verifying client route...</h2>
+          </div>
+        </main>
+      </div>
+      {renderDeployUpdateModal()}
+      </>
+    );
+  }
+
+  if (clientGuardMismatch) {
+    return (
+      <>
+      <div className={appClassName}>
+        <main className="app-main">
+          <section className="slide startup-mode-card">
+            <h2>Client Route Mismatch</h2>
+            <p className="startup-mode-subtitle">
+              This host is mapped to a different backend client. Access is blocked to avoid cross-client data mix.
+            </p>
+            <p><strong>Host client:</strong> {clientGuardMismatch.expectedClient}</p>
+            <p><strong>Connected backend:</strong> {clientGuardMismatch.actualClient}</p>
+            <p>Please fix Cloudflare/Tunnel hostname mapping for this domain.</p>
+          </section>
+        </main>
+      </div>
+      {renderDeployUpdateModal()}
+      </>
+    );
+  }
 
   if (!authenticated) {
     return (

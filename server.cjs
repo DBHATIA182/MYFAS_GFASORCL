@@ -59,6 +59,14 @@ app.use(cors({
 
 app.use(express.json());
 
+app.get('/api/client-identity', (req, res) => {
+  res.json({
+    ok: true,
+    clientKey: String(configuredClientName || '').trim().toLowerCase(),
+    rootDomain,
+  });
+});
+
 /** Merge file overrides without letting JSON null / empty wipe credentials (spread alone can set password: null). */
 function mergeOracleConn(defaults, fileOverride) {
   const o = fileOverride && typeof fileOverride === 'object' ? fileOverride : {};
