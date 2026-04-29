@@ -165,16 +165,7 @@ const VIEW_MODE_STORAGE_KEY = 'gfas_view_mode';
 const AUTH_STORAGE_KEY = 'gfas_auth_state_v1';
 
 function readPersistedAuth() {
-  try {
-    const raw = safeStorageGet(AUTH_STORAGE_KEY);
-    if (!raw) return { authenticated: false, userName: '' };
-    const saved = JSON.parse(raw);
-    const userName = String(saved?.userName || '').trim().toUpperCase();
-    if (!saved?.authenticated || !userName) return { authenticated: false, userName: '' };
-    return { authenticated: true, userName };
-  } catch {
-    return { authenticated: false, userName: '' };
-  }
+  return { authenticated: false, userName: '' };
 }
 
 if (import.meta.env.DEV && API_BASE === '') {
@@ -211,20 +202,8 @@ function App() {
   const [loginUserName, setLoginUserName] = useState(initialAuth.userName);
 
   useEffect(() => {
-    const restoreIfNeeded = () => {
-      if (authenticated) return;
-      const saved = readPersistedAuth();
-      if (!saved.authenticated || !saved.userName) return;
-      setLoginUserName(saved.userName);
-      setAuthenticated(true);
-    };
-    window.addEventListener('pageshow', restoreIfNeeded);
-    document.addEventListener('visibilitychange', restoreIfNeeded);
-    return () => {
-      window.removeEventListener('pageshow', restoreIfNeeded);
-      document.removeEventListener('visibilitychange', restoreIfNeeded);
-    };
-  }, [authenticated]);
+    /* Temporarily disabled persisted-auth restore to verify mobile startup path. */
+  }, []);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
