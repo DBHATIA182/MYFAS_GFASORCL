@@ -470,7 +470,8 @@ body {
 
 .bs-accounts-table th,
 .bs-accounts-table td {
-  padding: 0.42rem 0.52rem;
+  padding: 0.58rem 0.56rem;
+  line-height: 1.35;
 }
 
 .bs-accounts-table th:nth-child(2),
@@ -665,6 +666,28 @@ body {
   font-size: 0.85rem;
 }
 
+/* Trial balance: clicked row highlight */
+.report-table--trial tbody tr.trial-subtotal-row,
+.report-table--trial tbody tr.trial-schedule-total-row,
+.report-table--trial tbody tr.trial-grand-total-footer {
+  cursor: pointer;
+}
+
+.report-table--trial tbody tr.trial-row-selected:not(.trial-grand-total) td {
+  background: #bfdbfe !important;
+  box-shadow: inset 0 0 0 2px #2563eb;
+}
+
+.report-table--trial tbody tr.trial-grand-total.trial-row-selected td {
+  background: #1d4ed8 !important;
+  color: #fff !important;
+  box-shadow: inset 0 0 0 3px #fbbf24;
+}
+
+.report-table--trial tbody tr.trial-grand-total.trial-row-selected .text-right {
+  color: #fff !important;
+}
+
 .report-table--trial .trial-grand-total .text-right {
   color: #fff !important;
 }
@@ -707,6 +730,54 @@ body {
   min-width: 0;
   table-layout: fixed;
   width: 100%;
+}
+
+/* Voucher lines (CV/BV/JV drill-down): main ledger uses fixed layout; voucher is wide — scroll, don’t squeeze */
+.table-responsive--ledger-voucher {
+  margin: 0.75rem 0;
+}
+
+.report-table--ledger.report-table--voucher {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+}
+
+.report-table--ledger.report-table--voucher th,
+.report-table--ledger.report-table--voucher td {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.report-table--ledger.report-table--voucher .col-voucher-code {
+  min-width: 4.5rem;
+}
+
+.report-table--ledger.report-table--voucher .col-voucher-name {
+  min-width: 9rem;
+}
+
+.report-table--ledger.report-table--voucher .col-voucher-city {
+  min-width: 5rem;
+}
+
+.report-table--ledger.report-table--voucher .col-voucher-type {
+  min-width: 2.5rem;
+  text-align: center;
+}
+
+.report-table--ledger.report-table--voucher .col-voucher-detail {
+  min-width: 10rem;
+}
+
+.report-table--ledger.report-table--voucher .col-voucher-dc {
+  min-width: 12rem;
+}
+
+.report-table--ledger.report-table--voucher .col-voucher-amt {
+  min-width: 6.5rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .report-table--ledger-compact .col-ledger-dt {
@@ -1009,6 +1080,135 @@ body {
 .report-table--ledger tr.ledger-grand-total .text-right,
 .report-table--bill-ledger tr.bill-ledger-grand-total .text-right,
 .report-table--broker-os tr.bill-ledger-grand-total .text-right {
+  color: #fff !important;
+}
+
+.report-table--ledger tbody tr.ledger-row-focusable {
+  cursor: pointer;
+}
+
+.report-table--ledger tbody tr.ledger-grand-total {
+  cursor: pointer;
+}
+
+.report-table--ledger tbody tr.ledger-row-selected:not(.ledger-grand-total) td {
+  background: #bfdbfe !important;
+  box-shadow: inset 0 0 0 2px #2563eb;
+}
+
+.report-table--ledger tbody tr.ledger-grand-total.ledger-row-selected td {
+  background: #1d4ed8 !important;
+  color: #fff !important;
+  box-shadow: inset 0 0 0 3px #fbbf24;
+}
+
+.report-table--ledger tbody tr.ledger-grand-total.ledger-row-selected .text-right {
+  color: #fff !important;
+}
+
+/* Ageing → pending ledger / pending bills: scroll wide grid on phone; row highlight uses .ledger-row-selected */
+.table-responsive--ageing-drill {
+  -webkit-overflow-scrolling: touch;
+}
+
+.report-table--ledger.report-table--ageing-ledger-detail {
+  table-layout: auto;
+  width: max-content;
+  min-width: 0;
+  max-width: none;
+}
+
+.report-table--ledger.report-table--ageing-ledger-detail th,
+.report-table--ledger.report-table--ageing-ledger-detail td {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.report-table--ledger.report-table--ageing-ledger-detail .col-ageing-ld-date {
+  min-width: 5.6rem;
+}
+
+.report-table--ledger.report-table--ageing-ledger-detail .col-ageing-ld-type {
+  min-width: 3.25rem;
+}
+
+.report-table--ledger.report-table--ageing-ledger-detail .col-ageing-ld-detail {
+  min-width: 10rem;
+}
+
+.report-table--ledger.report-table--ageing-ledger-detail .col-ageing-ld-amt {
+  min-width: 6.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-table--ledger.report-table--ageing-ledger-detail .col-ageing-ld-pending {
+  min-width: 7.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-table--bill-ledger.report-table--ageing-bills-detail {
+  table-layout: auto;
+  width: max-content;
+  min-width: 0;
+  max-width: none;
+}
+
+.report-table--bill-ledger.report-table--ageing-bills-detail th,
+.report-table--bill-ledger.report-table--ageing-bills-detail td {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.report-table--bill-ledger.report-table--ageing-bills-detail .col-ageing-bd-code {
+  min-width: 4rem;
+}
+
+.report-table--bill-ledger.report-table--ageing-bills-detail .col-ageing-bd-name {
+  min-width: 10rem;
+}
+
+.report-table--bill-ledger.report-table--ageing-bills-detail .col-ageing-bd-bill {
+  min-width: 4rem;
+}
+
+.report-table--bill-ledger.report-table--ageing-bills-detail .col-ageing-bd-date {
+  min-width: 5.6rem;
+}
+
+.report-table--bill-ledger.report-table--ageing-bills-detail .col-ageing-bd-bt {
+  min-width: 2.5rem;
+}
+
+.report-table--bill-ledger.report-table--ageing-bills-detail .col-ageing-bd-amt {
+  min-width: 6.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-table--bill-ledger.report-table--ageing-bills-detail .col-ageing-bd-pending {
+  min-width: 7.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-table--bill-ledger tbody tr.ledger-row-focusable {
+  cursor: pointer;
+}
+
+.report-table--bill-ledger tbody tr.ledger-row-selected:not(.bill-ledger-grand-total) td {
+  background: #bfdbfe !important;
+  box-shadow: inset 0 0 0 2px #2563eb;
+}
+
+.report-table--bill-ledger tbody tr.bill-ledger-grand-total {
+  cursor: pointer;
+}
+
+.report-table--bill-ledger tbody tr.bill-ledger-grand-total.ledger-row-selected td {
+  background: #1d4ed8 !important;
+  color: #fff !important;
+  box-shadow: inset 0 0 0 3px #fbbf24;
+}
+
+.report-table--bill-ledger tbody tr.bill-ledger-grand-total.ledger-row-selected .text-right {
   color: #fff !important;
 }
 
@@ -1805,7 +2005,7 @@ mark.search-highlight {
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.76rem;
-  line-height: 1.25;
+  line-height: 1.36;
   border: 0;
 }
 
@@ -1818,7 +2018,7 @@ mark.search-highlight {
 }
 
 .pl-doc .pl-pl-thead-row th {
-  padding: 0.22rem 0.2rem 0.24rem;
+  padding: 0.26rem 0.22rem 0.28rem;
   text-align: left;
   font-weight: 700;
   font-size: 0.72rem;
@@ -1840,7 +2040,7 @@ mark.search-highlight {
 
 .pl-doc .pl-pl-particular,
 .pl-doc .pl-pl-amt {
-  padding: 0.12rem 0.16rem;
+  padding: 0.22rem 0.2rem;
   vertical-align: top;
   border-bottom: 0;
 }
@@ -1874,6 +2074,17 @@ mark.search-highlight {
   outline: none;
 }
 
+.pl-doc .pl-pl-table tbody tr.pl-pl-row--interactive,
+.pl-doc .pl-pl-table tfoot tr.pl-pl-row--interactive {
+  cursor: pointer;
+}
+
+.pl-doc .pl-pl-table tbody tr.pl-pl-row--selected td,
+.pl-doc .pl-pl-table tfoot tr.pl-pl-row--selected td {
+  background: #bfdbfe !important;
+  box-shadow: inset 0 0 0 2px #2563eb;
+}
+
 .pl-doc .pl-pl-section-label td {
   padding: 0.26rem 0.16rem 0.04rem;
   font-size: 0.68rem;
@@ -1886,7 +2097,8 @@ mark.search-highlight {
 
 .pl-doc .pl-pl-trading-row td {
   border-top: 1px solid #b8b8b8;
-  padding-top: 0.2rem;
+  padding-top: 0.28rem;
+  padding-bottom: 0.24rem;
 }
 
 .pl-doc .pl-pl-sch-header td {
@@ -1913,8 +2125,8 @@ mark.search-highlight {
 
 .pl-doc .pl-pl-schedule-total .pl-pl-particular,
 .pl-doc .pl-pl-schedule-total .pl-pl-amt {
-  padding-top: 0.14rem;
-  padding-bottom: 0.18rem;
+  padding-top: 0.2rem;
+  padding-bottom: 0.24rem;
   font-weight: 700;
   font-size: 0.72rem;
   border-top: 1px solid #b8b8b8;
@@ -1927,7 +2139,7 @@ mark.search-highlight {
 }
 
 .pl-doc .pl-pl-foot-summary td {
-  padding: 0.18rem 0.16rem 0.1rem;
+  padding: 0.24rem 0.2rem 0.16rem;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -1936,14 +2148,14 @@ mark.search-highlight {
 }
 
 .pl-doc .pl-pl-foot-net td {
-  padding: 0.1rem 0.16rem;
+  padding: 0.18rem 0.2rem;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .pl-doc .pl-pl-foot-grand td {
-  padding: 0.18rem 0.16rem 0.2rem;
+  padding: 0.26rem 0.2rem 0.24rem;
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -1983,7 +2195,7 @@ mark.search-highlight {
 
 .bs-table--plain .bs-title-cell {
   border-bottom: 1px solid #b8b8b8;
-  padding: 0.22rem 0.2rem 0.18rem;
+  padding: 0.32rem 0.26rem 0.34rem;
   text-align: center;
 }
 
@@ -1994,7 +2206,7 @@ mark.search-highlight {
   border-bottom: 1px solid #cfcfcf;
   font-size: 0.7rem;
   letter-spacing: 0.02em;
-  padding: 0.2rem 0.24rem;
+  padding: 0.34rem 0.28rem 0.36rem;
   text-align: left;
 }
 
@@ -2005,8 +2217,8 @@ mark.search-highlight {
 .bs-table--plain .pl-pl-particular,
 .bs-table--plain .pl-pl-amt {
   border-bottom: 0;
-  padding: 0.16rem 0.24rem;
-  line-height: 1.22;
+  padding: 0.2rem 0.24rem;
+  line-height: 1.32;
   font-size: 0.74rem;
 }
 
@@ -2018,7 +2230,14 @@ mark.search-highlight {
 .bs-table--plain .pl-pl-sch-header td {
   font-weight: 700;
   border-top: 0;
-  padding-top: 0.24rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.42rem;
+  vertical-align: top;
+}
+
+.bs-table--plain tbody tr.pl-pl-line td {
+  padding-top: 0.34rem;
+  padding-bottom: 0.34rem;
 }
 
 .bs-table--plain .bs-main-total {
@@ -2065,6 +2284,42 @@ mark.search-highlight {
   background: #fcfcfc;
 }
 
+.slide-19 .bs-table--plain tbody tr.bs-body-row--interactive {
+  cursor: pointer;
+}
+
+.slide-19 .bs-table--plain tbody tr.bs-row--selected td,
+.slide-19 .bs-table--plain tbody tr.bs-row--selected th {
+  background: #bfdbfe !important;
+  box-shadow: inset 0 0 0 2px #2563eb;
+}
+
+.slide-19 .bs-table--plain tfoot tr.bs-row--selected td {
+  background: #bfdbfe !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 0 0 2px #2563eb;
+}
+
+.bs-accounts-table tbody tr.bs-accounts-row--interactive,
+.bs-accounts-table tfoot tr.bs-accounts-row--interactive {
+  cursor: pointer;
+}
+
+.slide-19 .report-display .bs-accounts-table tbody tr.bs-accounts-row--selected td {
+  background: #bfdbfe !important;
+  box-shadow: inset 0 0 0 2px #2563eb;
+}
+
+.slide-19 .report-display .bs-accounts-table tfoot tr.bs-accounts-row--selected td {
+  background: #1d4ed8 !important;
+  color: #fff !important;
+  box-shadow: inset 0 0 0 3px #fbbf24;
+}
+
+.slide-19 .report-display .bs-accounts-table tfoot tr.bs-accounts-row--selected td strong {
+  color: #fff !important;
+}
+
 @media (max-width: 900px) {
   .bs-table--plain .pl-pl-thead-row th {
     font-size: 0.62rem;
@@ -2074,8 +2329,18 @@ mark.search-highlight {
   .bs-table--plain .pl-pl-particular,
   .bs-table--plain .pl-pl-amt {
     font-size: 0.67rem;
-    padding: 0.12rem 0.14rem;
-    line-height: 1.18;
+    padding: 0.22rem 0.16rem;
+    line-height: 1.38;
+  }
+
+  .bs-table--plain tbody tr.pl-pl-line td {
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+  }
+
+  .bs-table--plain .pl-pl-sch-header td {
+    padding-top: 0.44rem;
+    padding-bottom: 0.38rem;
   }
 
   .bs-table--plain .bs-title-cell {
@@ -2125,27 +2390,27 @@ mark.search-highlight {
 
   .pl-doc .pl-pl-table {
     font-size: 0.66rem;
-    line-height: 1.18;
+    line-height: 1.28;
   }
 
   .pl-doc .pl-pl-thead-row th {
-    padding: 0.18rem 0.2rem 0.22rem;
+    padding: 0.22rem 0.22rem 0.26rem;
     font-size: 0.58rem;
     letter-spacing: 0.03em;
   }
 
   .pl-doc .pl-pl-particular,
   .pl-doc .pl-pl-amt {
-    padding: 0.11rem 0.18rem;
+    padding: 0.18rem 0.2rem;
   }
 
   .pl-doc .pl-pl-section-label td {
-    padding: 0.22rem 0.18rem 0.05rem;
+    padding: 0.28rem 0.2rem 0.08rem;
     font-size: 0.58rem;
   }
 
   .pl-doc .pl-pl-sch-title {
-    padding: 0.16rem 0.18rem 0.08rem !important;
+    padding: 0.2rem 0.2rem 0.1rem !important;
   }
 }
 
@@ -2162,6 +2427,11 @@ mark.search-highlight {
 
   .pl-doc .pl-pl-table {
     font-size: 9pt;
+  }
+
+  .pl-doc .pl-pl-table tr.pl-pl-row--selected td {
+    background: transparent !important;
+    box-shadow: none !important;
   }
 }
 
@@ -2192,9 +2462,9 @@ mark.search-highlight {
 
 .report-table--trading-ledger th,
 .report-table--trading-ledger td {
-  padding: 0.18rem 0.2rem !important;
+  padding: 0.3rem 0.22rem !important;
   white-space: nowrap;
-  line-height: 1.12;
+  line-height: 1.28;
 }
 
 .report-table--trading-ledger th.text-right,
@@ -2229,9 +2499,9 @@ mark.search-highlight {
 
 .report-table--sale-list th,
 .report-table--sale-list td {
-  padding: 0.11rem 0.16rem !important;
+  padding: 0.2rem 0.16rem !important;
   white-space: nowrap;
-  line-height: 1.05;
+  line-height: 1.18;
 }
 
 /* Keep compact headers readable; prevent overlap from inherited tracking/uppercase. */
@@ -2328,6 +2598,112 @@ mark.search-highlight {
     overflow-y: visible;
     overscroll-behavior-x: auto;
     touch-action: pan-x pan-y;
+  }
+
+  /*
+    Party / item / broker sorts: rigid rem widths squash into the viewport and columns visually overlap.
+    Let the grid size from content and scroll horizontally (same idea as GSTR1 on small screens).
+  */
+  .report-table--sale-list.report-table--sale-list-grouped {
+    table-layout: auto;
+    width: max-content !important;
+    min-width: 0;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(n),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(n) {
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th,
+  .report-table--sale-list.report-table--sale-list-grouped td {
+    overflow: visible;
+    box-sizing: border-box;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(1),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(1) {
+    min-width: 2rem;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(2),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(2) {
+    min-width: 5.4rem;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(3),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(3) {
+    min-width: 3.5rem;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(4),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(4) {
+    min-width: 2rem;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(5),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(5) {
+    min-width: 4rem;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(6),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(6) {
+    min-width: 10rem;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(11),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(11) {
+    min-width: 7rem;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(12),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(12) {
+    min-width: 4.5rem;
+  }
+
+  /* Restore sensible measure columns after nth-child(n) reset */
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(17),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(17),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(18),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(18),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(19),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(19),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(20),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(20),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(21),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(21),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(22),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(22),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(23),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(23),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(24),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(24),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(25),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(25),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(26),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(26),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(27),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(27) {
+    min-width: 4rem;
+    text-align: right;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(13),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(13) {
+    min-width: 4rem;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(14),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(14) {
+    min-width: 10rem;
+  }
+
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(15),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(15),
+  .report-table--sale-list.report-table--sale-list-grouped th:nth-child(16),
+  .report-table--sale-list.report-table--sale-list-grouped td:nth-child(16) {
+    min-width: 3.25rem;
   }
 }
 
@@ -3387,6 +3763,65 @@ td.sale-list-total-pad {
   width: 100%;
 }
 
+/*
+  Stock detail header: close must be a direct grid child — when it lived inside Pdf/Excel/WA flex row,
+  small screens clipped it. Title row + full-width toolbar.
+*/
+.stock-sum-detail-modal .sale-bill-modal-head.stock-sum-detail-modal-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title close'
+    'actions actions';
+  gap: 0.5rem 0.6rem;
+  align-items: center;
+}
+
+.stock-sum-detail-modal .stock-sum-detail-modal-head .sale-bill-modal-close {
+  grid-area: close;
+  justify-self: end;
+}
+
+.stock-sum-detail-modal .stock-sum-detail-modal-head h3 {
+  grid-area: title;
+  margin: 0;
+  min-width: 0;
+  font-size: 0.94rem;
+  line-height: 1.35;
+}
+
+.stock-sum-detail-modal .stock-sum-detail-modal-head .sale-bill-print-actions {
+  grid-area: actions;
+  width: 100%;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.stock-sum-detail-modal .stock-sum-detail-modal-head .sale-bill-print-actions .btn {
+  flex: 0 1 auto;
+  padding: 0.42rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .stock-sum-detail-modal .stock-sum-detail-modal-head h3 {
+    font-size: 0.82rem;
+  }
+
+  .stock-sum-detail-modal .stock-sum-detail-modal-head .sale-bill-modal-close {
+    width: 2.1rem;
+    height: 2.1rem;
+    font-size: 1.25rem;
+  }
+
+  .stock-sum-detail-modal .stock-sum-detail-modal-head .sale-bill-print-actions .btn {
+    padding: 0.38rem 0.45rem;
+    font-size: 0.68rem;
+  }
+}
+
 .stock-sum-detail-body {
   max-height: min(70vh, 720px);
   overflow: auto;
@@ -3697,7 +4132,7 @@ td.sale-list-total-pad {
   }
 
   .slide-19 .bs-table--plain .bs-title-cell {
-    padding: 0.14rem 0.08rem 0.12rem;
+    padding: 0.28rem 0.12rem 0.26rem;
   }
 
   .slide-19 .bs-table--plain .bs-head-company {
@@ -3715,16 +4150,27 @@ td.sale-list-total-pad {
 
   .slide-19 .bs-table--plain .pl-pl-thead-row th {
     font-size: 0.54rem;
-    padding: 0.12rem 0.08rem;
+    padding: 0.34rem 0.12rem 0.32rem;
     white-space: nowrap;
   }
 
   .slide-19 .bs-table--plain .pl-pl-particular,
   .slide-19 .bs-table--plain .pl-pl-amt {
-    font-size: 0.6rem;
-    padding: 0.08rem 0.08rem;
-    line-height: 1.12;
+    font-size: 0.62rem;
+    padding: 0.38rem 0.12rem;
+    line-height: 1.45;
     vertical-align: top;
+  }
+
+  /* Main schedule heads vs detail lines — extra air on phones */
+  .slide-19 .bs-table--plain tbody tr.pl-pl-sch-header td {
+    padding-top: 0.55rem;
+    padding-bottom: 0.48rem;
+  }
+
+  .slide-19 .bs-table--plain tbody tr.pl-pl-line td {
+    padding-top: 0.42rem;
+    padding-bottom: 0.42rem;
   }
 
   .slide-19 .bs-table--plain .pl-pl-particular {
@@ -3748,8 +4194,8 @@ td.sale-list-total-pad {
   }
 
   .slide-19 .bs-table--plain .pl-pl-foot-grand td {
-    font-size: 0.6rem;
-    padding: 0.14rem 0.08rem;
+    font-size: 0.62rem;
+    padding: 0.36rem 0.12rem 0.4rem;
   }
 
   .pl-profit-loss .report-toolbar {
@@ -3831,8 +4277,8 @@ td.sale-list-total-pad {
   .pl-profit-loss .pl-doc .pl-pl-particular,
   .pl-profit-loss .pl-doc .pl-pl-amt {
     font-size: 0.56rem;
-    padding: 0.08rem 0.08rem;
-    line-height: 1.08;
+    padding: 0.14rem 0.12rem;
+    line-height: 1.22;
     vertical-align: top;
   }
 
@@ -3852,8 +4298,10 @@ td.sale-list-total-pad {
   .pl-profit-loss .pl-doc .pl-pl-schedule-total .pl-pl-particular,
   .pl-profit-loss .pl-doc .pl-pl-schedule-total .pl-pl-amt {
     font-size: 0.54rem;
-    padding-left: 0.08rem;
-    padding-right: 0.08rem;
+    padding-left: 0.14rem;
+    padding-right: 0.14rem;
+    padding-top: 0.12rem;
+    padding-bottom: 0.14rem;
   }
 
   .pl-profit-loss .pl-doc .pl-pl-sch-title {
@@ -3876,7 +4324,7 @@ td.sale-list-total-pad {
     min-width: 620px;
     table-layout: auto;
     font-size: 0.62rem;
-    line-height: 1.12;
+    line-height: 1.26;
   }
 
   .pl-profit-loss .pl-doc .pl-pl-table .pl-col-particular {
@@ -3917,11 +4365,23 @@ td.sale-list-total-pad {
     table-layout: auto;
   }
 
+  .slide-19 .bs-table--plain .pl-pl-thead-row th {
+    padding-top: 0.38rem;
+    padding-bottom: 0.38rem;
+  }
+
   .slide-19 .bs-table--plain .pl-pl-thead-row th,
   .slide-19 .bs-table--plain .pl-pl-particular,
   .slide-19 .bs-table--plain .pl-pl-amt,
   .slide-19 .bs-table--plain .pl-pl-foot-grand td {
     font-size: 0.64rem;
+  }
+
+  .slide-19 .bs-table--plain .pl-pl-particular,
+  .slide-19 .bs-table--plain .pl-pl-amt {
+    line-height: 1.42;
+    padding-left: 0.14rem;
+    padding-right: 0.14rem;
   }
 
   .slide-19 .bs-table--plain td:nth-child(1),

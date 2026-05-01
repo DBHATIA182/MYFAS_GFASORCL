@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { toDisplayDate, toInputDateString, toOracleDate } from '../utils/dateFormat';
-import { downloadExcelWorkbook } from '../utils/excelExport';
+import { downloadExcelWorkbook, downloadExcelRows } from '../utils/excelExport';
 import ReportTable from '../components/ReportTable';
+import SaleBillPrintModal from '../components/SaleBillPrintModal';
+import LedgerReportHeader from '../components/LedgerReportHeader';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
+import { formatLedgerVoucherApiError } from '../utils/apiLabel';
 
 function num(v) {
   const n = Number(v);
@@ -52,6 +55,8 @@ function pairDebitCreditRows(lines) {
   return out;
 }
 
+const SCREEN = { REPORT: 'report', LEDGER: 'ledger', VOUCHER: 'voucher' };
+
 export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, onReset }) {
   const compCode = formData.comp_code ?? formData.COMP_CODE;
   const compUid = formData.comp_uid ?? formData.COMP_UID;
@@ -73,7 +78,44 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
   const [ledgerRows, setLedgerRows] = useState([]);
   const [ledgerTitle, setLedgerTitle] = useState('');
   const [ledgerCode, setLedgerCode] = useState('');
-  const [screen, setScreen] = useState('report');
+  const [screen, setScreen] = useState(SCREEN.REPORT);
+  const [selectedPlRowKey, setSelectedPlRowKey] = useState(null);
+  const [voucherRows, setVoucherRows] = useState([]);
+  const [voucherTitle, setVoucherTitle] = useState('');
+  const [billPrintOpen, setBillPrintOpen] = useState(false);
+  const [billPrintParams, setBillPrintParams] = useState(null);
+  const [compLedgerHeader, setCompLedgerHeader] = useState(null);
+
+  useEffect(() => {
+    setSelectedPlRowKey(null);
+  }, [plData]);
+
+  useEffect(() => {
+    if (!compCode || compUid == null || String(compUid).trim() === '') {
+      setCompLedgerHeader(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await axios.get(`${apiBase}/api/compdet-ledger-header`, {
+          params: { comp_code: compCode, comp_uid: compUid },
+          withCredentials: true,
+        });
+        if (!cancelled) setCompLedgerHeader(data && typeof data === 'object' ? data : null);
+      } catch {
+        if (!cancelled) setCompLedgerHeader(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, compCode, compUid]);
+
+  const plRowClass = (baseClass, rowKey) =>
+    [baseClass, 'pl-pl-row--interactive', selectedPlRowKey === rowKey ? 'pl-pl-row--selected' : '']
+      .filter(Boolean)
+      .join(' ');
 
   const normalizeSchedule = (raw) => {
     const txt = String(raw ?? '').replace(/[^\d.]/g, '');
@@ -274,7 +316,7 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
       setLedgerRows(rows);
       setLedgerCode(codeTrim);
       setLedgerTitle(String(accountName || '').trim() || codeTrim);
-      setScreen('ledger');
+      setScreen(SCREEN.LEDGER);
     } catch (err) {
       alert(err.response?.data?.error || err.message || 'Failed to load ledger');
     } finally {
@@ -282,28 +324,183 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
     }
   };
 
-  if (screen === 'ledger') {
+  const ledgerPeriodStart = toDisplayDate(toInputDateString(formData.comp_s_dt ?? formData.COMP_S_DT));
+  const ledgerPeriodEnd = toDisplayDate(edt);
+
+  /** SALE.TYPE=LEDGER.VR_TYPE, SALE.BILL_NO=LEDGER.VR_NO, … */
+  const openLedgerSaleBill = (row) => {
+    const vrType = row.VR_TYPE ?? row.vr_type;
+    const ledgerLineType = row.TYPE ?? row.type;
+    const billNo = row.VR_NO ?? row.vr_no;
+    const billDt = row.VR_DATE ?? row.vr_date;
+    const ymd = toInputDateString(billDt);
+    const oracleDt = toOracleDate(ymd);
+    const saleType = vrType != null && String(vrType).trim() !== '' ? String(vrType).trim() : '';
+    if (!saleType) {
+      alert('Cannot open sale bill: missing vr_type (maps to sale.type).');
+      return;
+    }
+    if (billNo == null || String(billNo).trim() === '' || !oracleDt) {
+      alert('Cannot open sale bill: missing vr_no or vr_Date.');
+      return;
+    }
+    const bTypeFromLedger = ledgerLineType != null && String(ledgerLineType).trim() !== '' ? String(ledgerLineType).trim() : ' ';
+    setBillPrintParams({
+      type: saleType,
+      billNo: String(billNo).trim(),
+      bType: bTypeFromLedger,
+      oracleDt,
+      label: `Sale bill — sale.type=${saleType} · bill_no=${String(billNo)} · b_type=${bTypeFromLedger.trim() || ' '} · ${toDisplayDate(ymd)}`,
+    });
+    setBillPrintOpen(true);
+  };
+
+  const runLedgerVoucher = async (row) => {
+    const vrType = row.VR_TYPE ?? row.vr_type;
+    const vrNo = row.VR_NO ?? row.vr_no;
+    const vrDate = row.VR_DATE ?? row.vr_date;
+    if (!vrType) {
+      alert('Cannot open voucher: missing vr_type on this row.');
+      return;
+    }
+    const n = Number(vrNo);
+    if (!Number.isFinite(n) || n <= 0) return;
+    const ymd = toInputDateString(vrDate);
+    if (!ymd) {
+      alert('Could not read voucher date on this line.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await axios.get(`${apiBase}/api/ledger-voucher`, {
+        params: {
+          comp_code: compCode,
+          vr_type: String(vrType),
+          vr_date: toOracleDate(ymd),
+          vr_no: n,
+          comp_uid: compUid,
+        },
+        withCredentials: true,
+      });
+      const rows = Array.isArray(data) ? data : [];
+      if (rows.length === 0) {
+        alert('No voucher lines found for this voucher.');
+        return;
+      }
+      setVoucherRows(rows);
+      setVoucherTitle(`${String(vrType)} ${n} · ${toDisplayDate(ymd)}`);
+      setScreen(SCREEN.VOUCHER);
+    } catch (err) {
+      alert('Error: ' + formatLedgerVoucherApiError(err, apiBase));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const ledgerFirstRow = ledgerRows[0];
+
+  if (screen === SCREEN.VOUCHER) {
+    return (
+      <div className="slide slide-report slide-18 pl-profit-loss">
+        <div className="report-toolbar">
+          <h2>Voucher entries</h2>
+          <div className="toolbar-actions">
+            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen(SCREEN.LEDGER)}>
+              ← Back to ledger
+            </button>
+            <button
+              type="button"
+              className="btn btn-excel"
+              onClick={() => {
+                try {
+                  downloadExcelRows(voucherRows, 'Voucher', `${compName}_Voucher_${voucherTitle.replace(/\s+/g, '_')}`);
+                } catch (e) {
+                  alert(String(e?.message || e));
+                }
+              }}
+            >
+              📊 Excel
+            </button>
+          </div>
+        </div>
+        <LedgerReportHeader
+          compHeader={compLedgerHeader}
+          companyNameFallback={compName}
+          account={ledgerFirstRow}
+          accountNameFallback={ledgerTitle}
+          accountCodeFallback={ledgerCode}
+          periodLine={`Financial year ${compYear} · ${ledgerPeriodStart} – ${ledgerPeriodEnd}`}
+        />
+        <p className="ledger-report-voucher-ref">
+          Voucher: <strong>{voucherTitle}</strong>
+        </p>
+        <p className="compdet-date-hint">All accounts posted on this voucher (LEDGER).</p>
+        <div className="report-display">
+          <ReportTable data={voucherRows} type="ledger-voucher" />
+        </div>
+        <div className="button-group">
+          <button type="button" className="btn btn-secondary" onClick={() => setScreen(SCREEN.LEDGER)}>
+            ← Back to ledger
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => setScreen(SCREEN.REPORT)}>
+            ← Back to P&amp;L
+          </button>
+          {typeof onReset === 'function' ? (
+            <button type="button" className="btn btn-primary" onClick={onReset}>
+              🏠 Home
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === SCREEN.LEDGER) {
     return (
       <div className="slide slide-report slide-18 pl-profit-loss">
         <div className="report-toolbar">
           <h2>Ledger Report</h2>
           <div className="toolbar-actions">
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen('report')}>
+            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen(SCREEN.REPORT)}>
               ← Back to P&L
             </button>
           </div>
         </div>
-        <div className="report-info">
-          <p>
-            <strong>{ledgerTitle}</strong> ({ledgerCode})
-          </p>
-          <p>
-            {compName} | FY {compYear} | {toDisplayDate(toInputDateString(formData.comp_s_dt ?? formData.COMP_S_DT))} - {toDisplayDate(edt)}
-          </p>
-        </div>
+        <LedgerReportHeader
+          compHeader={compLedgerHeader}
+          companyNameFallback={compName}
+          account={ledgerFirstRow}
+          accountNameFallback={ledgerTitle}
+          accountCodeFallback={ledgerCode}
+          periodLine={`Financial year ${compYear} · ${ledgerPeriodStart} – ${ledgerPeriodEnd}`}
+          hint="Tap a row for voucher detail; sale bill opens for SL / SE / CN where available."
+        />
         <div className="report-display">
-          <ReportTable data={ledgerRows} type="ledger" />
+          <ReportTable
+            data={ledgerRows}
+            type="ledger"
+            onVoucherClick={runLedgerVoucher}
+            onLedgerSaleBillClick={openLedgerSaleBill}
+          />
         </div>
+        <div className="button-group">
+          <button type="button" className="btn btn-secondary" onClick={() => setScreen(SCREEN.REPORT)}>
+            ← Back to P&L
+          </button>
+        </div>
+        <SaleBillPrintModal
+          open={billPrintOpen}
+          onClose={() => {
+            setBillPrintOpen(false);
+            setBillPrintParams(null);
+          }}
+          apiBase={apiBase}
+          compCode={compCode}
+          compUid={compUid}
+          billParams={billPrintParams}
+          companyName={compName}
+        />
       </div>
     );
   }
@@ -363,16 +560,25 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
                 </tr>
               </thead>
               <tbody>
-                <tr className="pl-pl-section-label">
+                <tr
+                  className={plRowClass('pl-pl-section-label', 'pl-section-trading')}
+                  onClick={() => setSelectedPlRowKey('pl-section-trading')}
+                >
                   <td colSpan={4}>Trading (schedule 12.10)</td>
                 </tr>
-                <tr className="pl-pl-trading-row">
+                <tr
+                  className={plRowClass('pl-pl-trading-row', 'pl-trading')}
+                  onClick={() => setSelectedPlRowKey('pl-trading')}
+                >
                   <td className="pl-pl-particular">{tr.DR_DETAIL || <span className="pl-empty"> </span>}</td>
                   <AmtCell value={tr.DR_AMT} />
                   <td className="pl-pl-particular">{tr.CR_DETAIL || <span className="pl-empty"> </span>}</td>
                   <AmtCell value={tr.CR_AMT} />
                 </tr>
-                <tr className="pl-pl-schedule-total">
+                <tr
+                  className={plRowClass('pl-pl-schedule-total', 'pl-trading-schedule-total')}
+                  onClick={() => setSelectedPlRowKey('pl-trading-schedule-total')}
+                >
                   <td className="pl-pl-particular">SCHEDULE TOTAL</td>
                   <td className="pl-pl-amt pl-amt text-right">
                     <strong>{fmtAmount(tr.DR_AMT || 0)}</strong>
@@ -384,21 +590,31 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
                 </tr>
 
                 {blocks.length ? (
-                  <tr className="pl-pl-section-label">
+                  <tr
+                    className={plRowClass('pl-pl-section-label', 'pl-section-sch16')}
+                    onClick={() => setSelectedPlRowKey('pl-section-sch16')}
+                  >
                     <td colSpan={4}>Schedule 16 onwards</td>
                   </tr>
                 ) : null}
 
                 {blocks.map((blk, bi) => (
                   <React.Fragment key={`blk_${bi}_${blk.schedule}_${blk.schName}`}>
-                    <tr className="pl-pl-sch-header">
+                    <tr
+                      className={plRowClass('pl-pl-sch-header', `pl-sch-hdr-${bi}`)}
+                      onClick={() => setSelectedPlRowKey(`pl-sch-hdr-${bi}`)}
+                    >
                       <td colSpan={4} className="pl-pl-sch-title">
                         <span className="pl-pl-sch-code">{fmtSchedule(blk.schedule)}</span>
                         <span className="pl-pl-sch-name">{blk.schName}</span>
                       </td>
                     </tr>
                     {pairDebitCreditRows(blk.lines).map((ln, li) => (
-                      <tr key={`ln_${bi}_${li}`} className="pl-pl-line">
+                      <tr
+                        key={`ln_${bi}_${li}`}
+                        className={plRowClass('pl-pl-line', `pl-line-${bi}-${li}`)}
+                        onClick={() => setSelectedPlRowKey(`pl-line-${bi}-${li}`)}
+                      >
                         <td className="pl-pl-particular">
                           {ln.drCode && ln.drDetail ? (
                             <button
@@ -431,7 +647,10 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
                         <AmtCell value={ln.crAmt} />
                       </tr>
                     ))}
-                    <tr className="pl-pl-schedule-total">
+                    <tr
+                      className={plRowClass('pl-pl-schedule-total', `pl-blk-total-${bi}`)}
+                      onClick={() => setSelectedPlRowKey(`pl-blk-total-${bi}`)}
+                    >
                       <td className="pl-pl-particular">SCHEDULE TOTAL</td>
                       <td className="pl-pl-amt pl-amt text-right">
                         <strong>{fmtAmount(blk.scheduleTotalDr)}</strong>
@@ -445,7 +664,10 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
                 ))}
               </tbody>
               <tfoot>
-                <tr className="pl-pl-foot-summary">
+                <tr
+                  className={plRowClass('pl-pl-foot-summary', 'pl-foot-summary')}
+                  onClick={() => setSelectedPlRowKey('pl-foot-summary')}
+                >
                   <td className="pl-pl-particular">TOTAL EXPENSES WITH GL</td>
                   <td className="pl-pl-amt pl-amt text-right">
                     <strong>{fmtAmount(totals.totalLeftDr)}</strong>
@@ -455,7 +677,10 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
                     <strong>{fmtAmount(totals.totalIncomeWithoutGp)}</strong>
                   </td>
                 </tr>
-                <tr className="pl-pl-foot-net">
+                <tr
+                  className={plRowClass('pl-pl-foot-net', 'pl-foot-net')}
+                  onClick={() => setSelectedPlRowKey('pl-foot-net')}
+                >
                   <td className="pl-pl-particular">{totals.netProfit > 0 ? 'NET PROFIT' : ''}</td>
                   <td className="pl-pl-amt pl-amt text-right">
                     <strong>{totals.netProfit > 0 ? fmtAmount(totals.netProfit) : ''}</strong>
@@ -465,7 +690,10 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
                     <strong>{totals.netLoss > 0 ? fmtAmount(totals.netLoss) : ''}</strong>
                   </td>
                 </tr>
-                <tr className="pl-pl-foot-grand">
+                <tr
+                  className={plRowClass('pl-pl-foot-grand', 'pl-foot-grand')}
+                  onClick={() => setSelectedPlRowKey('pl-foot-grand')}
+                >
                   <td className="pl-pl-particular">TOTAL</td>
                   <td className="pl-pl-amt pl-amt text-right">
                     <strong>{fmtAmount(totals.grandTotal)}</strong>

@@ -350,21 +350,24 @@ export default function Slide9({ apiBase, formData, onPrev, onReset }) {
 
         {detailOpen ? (
           <div
-            className="sale-bill-modal-backdrop stock-sum-detail-backdrop"
+            className="sale-bill-modal-backdrop sale-bill-print-backdrop stock-sum-detail-backdrop"
             role="presentation"
             onClick={closeDetail}
           >
             <div
-              className="sale-bill-modal stock-sum-detail-modal"
+              className="sale-bill-modal sale-bill-print-modal stock-sum-detail-modal"
               role="dialog"
               aria-labelledby="stock-sum-detail-title"
               onClick={(ev) => ev.stopPropagation()}
             >
-              <div className="sale-bill-modal-head no-print">
+              <div className="sale-bill-modal-head no-print stock-sum-detail-modal-head">
                 <h3 id="stock-sum-detail-title">
                   Stock detail — {detailItem?.code}
                   {detailItem?.name ? ` — ${detailItem.name}` : ''}
                 </h3>
+                <button type="button" className="sale-bill-modal-close" onClick={closeDetail} aria-label="Close">
+                  ×
+                </button>
                 <div className="sale-bill-print-actions">
                   <button type="button" className="btn btn-export" onClick={downloadDetailPdf}>
                     Pdf
@@ -385,9 +388,6 @@ export default function Slide9({ apiBase, formData, onPrev, onReset }) {
                   </button>
                   <button type="button" className="btn btn-whatsapp" onClick={shareDetailWa}>
                     💬 WhatsApp
-                  </button>
-                  <button type="button" className="sale-bill-modal-close" onClick={closeDetail} aria-label="Close">
-                    ×
                   </button>
                 </div>
               </div>

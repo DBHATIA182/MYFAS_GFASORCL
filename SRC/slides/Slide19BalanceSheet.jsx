@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { toDisplayDate, toInputDateString, toOracleDate } from '../utils/dateFormat';
-import { downloadExcelWorkbook } from '../utils/excelExport';
+import { downloadExcelWorkbook, downloadExcelRows } from '../utils/excelExport';
 import ReportTable from '../components/ReportTable';
+import SaleBillPrintModal from '../components/SaleBillPrintModal';
+import LedgerReportHeader from '../components/LedgerReportHeader';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
+import { formatLedgerVoucherApiError } from '../utils/apiLabel';
 
 function num(v) {
   const n = Number(v);
@@ -25,6 +28,8 @@ function fmtAmtAbs(v) {
   return n ? fmt(n) : '';
 }
 
+const SCREEN = { BS: 'bs', ACCOUNTS: 'accounts', LEDGER: 'ledger', VOUCHER: 'voucher' };
+
 export default function Slide19BalanceSheet({ apiBase, formData = {}, onPrev, onReset }) {
   const compCode = formData.comp_code ?? formData.COMP_CODE;
   const compUid = formData.comp_uid ?? formData.COMP_UID;
@@ -43,11 +48,49 @@ export default function Slide19BalanceSheet({ apiBase, formData = {}, onPrev, on
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [bsData, setBsData] = useState(null);
-  const [screen, setScreen] = useState('bs');
+  const [screen, setScreen] = useState(SCREEN.BS);
   const [scheduleAccounts, setScheduleAccounts] = useState([]);
   const [scheduleTitle, setScheduleTitle] = useState('');
   const [ledgerRows, setLedgerRows] = useState([]);
   const [ledgerTitle, setLedgerTitle] = useState('');
+  const [ledgerCode, setLedgerCode] = useState('');
+  const [selectedBsRowIndex, setSelectedBsRowIndex] = useState(null);
+  const [selectedAccountRowKey, setSelectedAccountRowKey] = useState(null);
+  const [voucherRows, setVoucherRows] = useState([]);
+  const [voucherTitle, setVoucherTitle] = useState('');
+  const [billPrintOpen, setBillPrintOpen] = useState(false);
+  const [billPrintParams, setBillPrintParams] = useState(null);
+  const [compLedgerHeader, setCompLedgerHeader] = useState(null);
+
+  useEffect(() => {
+    setSelectedBsRowIndex(null);
+  }, [bsData]);
+
+  useEffect(() => {
+    setSelectedAccountRowKey(null);
+  }, [scheduleAccounts]);
+
+  useEffect(() => {
+    if (!compCode || compUid == null || String(compUid).trim() === '') {
+      setCompLedgerHeader(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await axios.get(`${apiBase}/api/compdet-ledger-header`, {
+          params: { comp_code: compCode, comp_uid: compUid },
+          withCredentials: true,
+        });
+        if (!cancelled) setCompLedgerHeader(data && typeof data === 'object' ? data : null);
+      } catch {
+        if (!cancelled) setCompLedgerHeader(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, compCode, compUid]);
 
   const normalizeSchedule = (raw) => {
     const txt = String(raw ?? '').replace(/[^\d.]/g, '');
@@ -207,7 +250,7 @@ export default function Slide19BalanceSheet({ apiBase, formData = {}, onPrev, on
       }
       setScheduleAccounts(rows);
       setScheduleTitle(`${sch.toFixed(2)} (${side})`);
-      setScreen('accounts');
+      setScreen(SCREEN.ACCOUNTS);
     } catch (err) {
       alert(err.response?.data?.error || err.message || 'Failed to load schedule accounts');
     } finally {
@@ -244,10 +287,85 @@ export default function Slide19BalanceSheet({ apiBase, formData = {}, onPrev, on
         return;
       }
       setLedgerRows(rows);
+      setLedgerCode(code);
       setLedgerTitle(`${String(account?.NAME || '').trim()} (${code})`);
-      setScreen('ledger');
+      setScreen(SCREEN.LEDGER);
     } catch (err) {
       alert(err.response?.data?.error || err.message || 'Failed to load ledger');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const ledgerPeriodStart = toDisplayDate(toInputDateString(formData.comp_s_dt ?? formData.COMP_S_DT));
+  const ledgerPeriodEnd = toDisplayDate(edt);
+  const ledgerFirstRow = ledgerRows[0];
+
+  const openLedgerSaleBill = (row) => {
+    const vrType = row.VR_TYPE ?? row.vr_type;
+    const ledgerLineType = row.TYPE ?? row.type;
+    const billNo = row.VR_NO ?? row.vr_no;
+    const billDt = row.VR_DATE ?? row.vr_date;
+    const ymd = toInputDateString(billDt);
+    const oracleDt = toOracleDate(ymd);
+    const saleType = vrType != null && String(vrType).trim() !== '' ? String(vrType).trim() : '';
+    if (!saleType) {
+      alert('Cannot open sale bill: missing vr_type (maps to sale.type).');
+      return;
+    }
+    if (billNo == null || String(billNo).trim() === '' || !oracleDt) {
+      alert('Cannot open sale bill: missing vr_no or vr_Date.');
+      return;
+    }
+    const bTypeFromLedger = ledgerLineType != null && String(ledgerLineType).trim() !== '' ? String(ledgerLineType).trim() : ' ';
+    setBillPrintParams({
+      type: saleType,
+      billNo: String(billNo).trim(),
+      bType: bTypeFromLedger,
+      oracleDt,
+      label: `Sale bill — sale.type=${saleType} · bill_no=${String(billNo)} · b_type=${bTypeFromLedger.trim() || ' '} · ${toDisplayDate(ymd)}`,
+    });
+    setBillPrintOpen(true);
+  };
+
+  const runLedgerVoucher = async (row) => {
+    const vrType = row.VR_TYPE ?? row.vr_type;
+    const vrNo = row.VR_NO ?? row.vr_no;
+    const vrDate = row.VR_DATE ?? row.vr_date;
+    if (!vrType) {
+      alert('Cannot open voucher: missing vr_type on this row.');
+      return;
+    }
+    const n = Number(vrNo);
+    if (!Number.isFinite(n) || n <= 0) return;
+    const ymd = toInputDateString(vrDate);
+    if (!ymd) {
+      alert('Could not read voucher date on this line.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await axios.get(`${apiBase}/api/ledger-voucher`, {
+        params: {
+          comp_code: compCode,
+          vr_type: String(vrType),
+          vr_date: toOracleDate(ymd),
+          vr_no: n,
+          comp_uid: compUid,
+        },
+        withCredentials: true,
+      });
+      const rows = Array.isArray(data) ? data : [];
+      if (rows.length === 0) {
+        alert('No voucher lines found for this voucher.');
+        return;
+      }
+      setVoucherRows(rows);
+      setVoucherTitle(`${String(vrType)} ${n} · ${toDisplayDate(ymd)}`);
+      setScreen(SCREEN.VOUCHER);
+    } catch (err) {
+      alert('Error: ' + formatLedgerVoucherApiError(err, apiBase));
     } finally {
       setLoading(false);
     }
@@ -266,29 +384,118 @@ export default function Slide19BalanceSheet({ apiBase, formData = {}, onPrev, on
       return sa - sb;
     });
 
-  if (screen === 'ledger') {
+  if (screen === SCREEN.VOUCHER) {
     return (
       <div className="slide slide-report slide-19">
         <div className="report-toolbar">
-          <h2>Ledger Report</h2>
+          <h2>Voucher entries</h2>
           <div className="toolbar-actions">
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen('accounts')}>
-              ← Back to Accounts
+            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen(SCREEN.LEDGER)}>
+              ← Back to ledger
+            </button>
+            <button
+              type="button"
+              className="btn btn-excel"
+              onClick={() => {
+                try {
+                  downloadExcelRows(voucherRows, 'Voucher', `${compName}_Voucher_${voucherTitle.replace(/\s+/g, '_')}`);
+                } catch (e) {
+                  alert(String(e?.message || e));
+                }
+              }}
+            >
+              📊 Excel
             </button>
           </div>
         </div>
-        <div className="report-info">
-          <p><strong>{ledgerTitle}</strong></p>
-          <p>{compName} | FY {compYear} | {toDisplayDate(toInputDateString(formData.comp_s_dt ?? formData.COMP_S_DT))} - {toDisplayDate(edt)}</p>
-        </div>
+        <LedgerReportHeader
+          compHeader={compLedgerHeader}
+          companyNameFallback={compName}
+          account={ledgerFirstRow}
+          accountNameFallback={ledgerTitle}
+          accountCodeFallback={ledgerCode}
+          periodLine={`Financial year ${compYear} · ${ledgerPeriodStart} – ${ledgerPeriodEnd}`}
+        />
+        <p className="ledger-report-voucher-ref">
+          Voucher: <strong>{voucherTitle}</strong>
+        </p>
+        <p className="compdet-date-hint">All accounts posted on this voucher (LEDGER).</p>
         <div className="report-display">
-          <ReportTable data={ledgerRows} type="ledger" />
+          <ReportTable data={voucherRows} type="ledger-voucher" />
+        </div>
+        <div className="button-group">
+          <button type="button" className="btn btn-secondary" onClick={() => setScreen(SCREEN.LEDGER)}>
+            ← Back to ledger
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => setScreen(SCREEN.ACCOUNTS)}>
+            ← Schedule accounts
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => setScreen(SCREEN.BS)}>
+            ← Balance sheet
+          </button>
+          {typeof onReset === 'function' ? (
+            <button type="button" className="btn btn-primary" onClick={onReset}>
+              🏠 Home
+            </button>
+          ) : null}
         </div>
       </div>
     );
   }
 
-  if (screen === 'accounts') {
+  if (screen === SCREEN.LEDGER) {
+    return (
+      <div className="slide slide-report slide-19">
+        <div className="report-toolbar">
+          <h2>Ledger Report</h2>
+          <div className="toolbar-actions">
+            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen(SCREEN.ACCOUNTS)}>
+              ← Back to Accounts
+            </button>
+          </div>
+        </div>
+        <LedgerReportHeader
+          compHeader={compLedgerHeader}
+          companyNameFallback={compName}
+          account={ledgerFirstRow}
+          accountNameFallback={ledgerTitle}
+          accountCodeFallback={ledgerCode}
+          periodLine={`Financial year ${compYear} · ${ledgerPeriodStart} – ${ledgerPeriodEnd}`}
+          hint="Tap a row for voucher detail; sale bill opens for SL / SE / CN where available."
+        />
+        <div className="report-display">
+          <ReportTable
+            data={ledgerRows}
+            type="ledger"
+            onVoucherClick={runLedgerVoucher}
+            onLedgerSaleBillClick={openLedgerSaleBill}
+          />
+        </div>
+        <div className="button-group">
+          <button type="button" className="btn btn-secondary" onClick={() => setScreen(SCREEN.ACCOUNTS)}>
+            ← Back to Accounts
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => setScreen(SCREEN.BS)}>
+            ← Balance sheet
+          </button>
+        </div>
+        <SaleBillPrintModal
+          open={billPrintOpen}
+          onClose={() => {
+            setBillPrintOpen(false);
+            setBillPrintParams(null);
+          }}
+          apiBase={apiBase}
+          compCode={compCode}
+          compUid={compUid}
+          billParams={billPrintParams}
+          companyName={compName}
+        />
+      </div>
+    );
+  }
+
+  if (screen === SCREEN.ACCOUNTS) {
     const totalDr = scheduleAccounts.reduce((s, r) => s + num(r.DR_AMT), 0);
     const totalCr = scheduleAccounts.reduce((s, r) => s + num(r.CR_AMT), 0);
     return (
@@ -296,7 +503,7 @@ export default function Slide19BalanceSheet({ apiBase, formData = {}, onPrev, on
         <div className="report-toolbar">
           <h2>Schedule Accounts</h2>
           <div className="toolbar-actions">
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen('bs')}>
+            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen(SCREEN.BS)}>
               ← Back to Balance Sheet
             </button>
           </div>
@@ -304,6 +511,7 @@ export default function Slide19BalanceSheet({ apiBase, formData = {}, onPrev, on
         <div className="report-info">
           <p><strong>Schedule:</strong> {scheduleTitle}</p>
           <p>{compName} | FY {compYear} | As on {toDisplayDate(edt)}</p>
+          <p className="compdet-date-hint">Tap a row to highlight it; tap the same row again to open its ledger.</p>
         </div>
         <div className="report-display table-responsive">
           <table className="report-table bs-accounts-table">
@@ -322,17 +530,30 @@ export default function Slide19BalanceSheet({ apiBase, formData = {}, onPrev, on
               </tr>
             </thead>
             <tbody>
-              {scheduleAccounts.map((r, i) => (
-                <tr key={`${r.CODE}_${i}`} className="sale-list-row-clickable" onClick={() => openLedgerForAccount(r)}>
-                  <td className="text-left">{r.CODE}</td>
-                  <td className="text-left">{r.NAME}</td>
-                  <td className="text-right">{num(r.DR_AMT) ? fmt(r.DR_AMT) : ''}</td>
-                  <td className="text-right">{num(r.CR_AMT) ? fmt(r.CR_AMT) : ''}</td>
-                </tr>
-              ))}
+              {scheduleAccounts.map((r, i) => {
+                const rk = `acc-${i}`;
+                return (
+                  <tr
+                    key={`${r.CODE}_${i}`}
+                    className={`sale-list-row-clickable bs-accounts-row--interactive ${selectedAccountRowKey === rk ? 'bs-accounts-row--selected' : ''}`}
+                    onClick={() => {
+                      if (selectedAccountRowKey === rk) openLedgerForAccount(r);
+                      else setSelectedAccountRowKey(rk);
+                    }}
+                  >
+                    <td className="text-left">{r.CODE}</td>
+                    <td className="text-left">{r.NAME}</td>
+                    <td className="text-right">{num(r.DR_AMT) ? fmt(r.DR_AMT) : ''}</td>
+                    <td className="text-right">{num(r.CR_AMT) ? fmt(r.CR_AMT) : ''}</td>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
-              <tr className="stock-sum-grand">
+              <tr
+                className={`stock-sum-grand bs-accounts-row--interactive ${selectedAccountRowKey === 'acc-grand' ? 'bs-accounts-row--selected' : ''}`}
+                onClick={() => setSelectedAccountRowKey('acc-grand')}
+              >
                 <td colSpan={2} className="text-left"><strong>Grand Total</strong></td>
                 <td className="text-right"><strong>{fmt(totalDr)}</strong></td>
                 <td className="text-right"><strong>{fmt(totalCr)}</strong></td>
@@ -415,37 +636,50 @@ export default function Slide19BalanceSheet({ apiBase, formData = {}, onPrev, on
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr key={i} className={`${num(r.L_LEVEL) === 1 || num(r.A_LEVEL) === 1 ? 'pl-pl-sch-header' : 'pl-pl-line'}`}>
-                  <td
-                    className={`pl-pl-particular ${num(r.L_LEVEL) === 1 && num(r.L_SCH_NO) >= 1 && num(r.L_SCH_NO) <= 11 ? 'bs-main-total' : ''} ${num(r.L_LEVEL) === 2 ? 'sale-list-row-clickable bs-drillable' : ''}`}
-                    onClick={() => {
-                      if (num(r.L_LEVEL) === 2) openScheduleAccounts(r.L_SCH_NO, 'Liabilities');
-                    }}
-                    title={num(r.L_LEVEL) === 2 ? 'Open accounts under this schedule' : ''}
-                  >
-                    {`${fmtSch(r.L_SCH_NO)} ${String(r.L_DETAIL || '').trim()}`.trim()}
-                  </td>
-                  <td className={`pl-pl-amt pl-amt text-right ${num(r.L_LEVEL) === 1 && num(r.L_SCH_NO) >= 1 && num(r.L_SCH_NO) <= 11 ? 'bs-main-total' : ''}`}>
-                    {num(r.L_LEVEL) === 1 ? fmtAmtAbs(r.CR_AMT) : fmtAmtAbs(r.L_AMOUNT)}
-                  </td>
-                  <td
-                    className={`pl-pl-particular ${num(r.A_LEVEL) === 1 && num(r.A_SCH_NO) >= 1 && num(r.A_SCH_NO) <= 11 ? 'bs-main-total' : ''} ${num(r.A_LEVEL) === 2 ? 'sale-list-row-clickable bs-drillable' : ''}`}
-                    onClick={() => {
-                      if (num(r.A_LEVEL) === 2) openScheduleAccounts(r.A_SCH_NO, 'Assets');
-                    }}
-                    title={num(r.A_LEVEL) === 2 ? 'Open accounts under this schedule' : ''}
-                  >
-                    {`${fmtSch(r.A_SCH_NO)} ${String(r.A_DETAIL || '').trim()}`.trim()}
-                  </td>
-                  <td className={`pl-pl-amt pl-amt text-right ${num(r.A_LEVEL) === 1 && num(r.A_SCH_NO) >= 1 && num(r.A_SCH_NO) <= 11 ? 'bs-main-total' : ''}`}>
-                    {num(r.A_LEVEL) === 1 ? fmtAmtAbs(r.DR_AMT) : fmtAmtAbs(r.A_AMOUNT)}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r, i) => {
+                const isSchHeader = num(r.L_LEVEL) === 1 || num(r.A_LEVEL) === 1;
+                const rowCls = `${isSchHeader ? 'pl-pl-sch-header' : 'pl-pl-line'} bs-body-row--interactive ${selectedBsRowIndex === i ? 'bs-row--selected' : ''}`;
+                return (
+                  <tr key={i} className={rowCls} onClick={() => setSelectedBsRowIndex(i)}>
+                    <td
+                      className={`pl-pl-particular ${num(r.L_LEVEL) === 1 && num(r.L_SCH_NO) >= 1 && num(r.L_SCH_NO) <= 11 ? 'bs-main-total' : ''} ${num(r.L_LEVEL) === 2 ? 'sale-list-row-clickable bs-drillable' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedBsRowIndex(i);
+                        if (num(r.L_LEVEL) === 2) openScheduleAccounts(r.L_SCH_NO, 'Liabilities');
+                      }}
+                      title={num(r.L_LEVEL) === 2 ? 'Open accounts under this schedule' : ''}
+                      role={num(r.L_LEVEL) === 2 ? 'button' : undefined}
+                    >
+                      {`${fmtSch(r.L_SCH_NO)} ${String(r.L_DETAIL || '').trim()}`.trim()}
+                    </td>
+                    <td className={`pl-pl-amt pl-amt text-right ${num(r.L_LEVEL) === 1 && num(r.L_SCH_NO) >= 1 && num(r.L_SCH_NO) <= 11 ? 'bs-main-total' : ''}`}>
+                      {num(r.L_LEVEL) === 1 ? fmtAmtAbs(r.CR_AMT) : fmtAmtAbs(r.L_AMOUNT)}
+                    </td>
+                    <td
+                      className={`pl-pl-particular ${num(r.A_LEVEL) === 1 && num(r.A_SCH_NO) >= 1 && num(r.A_SCH_NO) <= 11 ? 'bs-main-total' : ''} ${num(r.A_LEVEL) === 2 ? 'sale-list-row-clickable bs-drillable' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedBsRowIndex(i);
+                        if (num(r.A_LEVEL) === 2) openScheduleAccounts(r.A_SCH_NO, 'Assets');
+                      }}
+                      title={num(r.A_LEVEL) === 2 ? 'Open accounts under this schedule' : ''}
+                      role={num(r.A_LEVEL) === 2 ? 'button' : undefined}
+                    >
+                      {`${fmtSch(r.A_SCH_NO)} ${String(r.A_DETAIL || '').trim()}`.trim()}
+                    </td>
+                    <td className={`pl-pl-amt pl-amt text-right ${num(r.A_LEVEL) === 1 && num(r.A_SCH_NO) >= 1 && num(r.A_SCH_NO) <= 11 ? 'bs-main-total' : ''}`}>
+                      {num(r.A_LEVEL) === 1 ? fmtAmtAbs(r.DR_AMT) : fmtAmtAbs(r.A_AMOUNT)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
-              <tr className="pl-pl-foot-grand">
+              <tr
+                className={`pl-pl-foot-grand bs-body-row--interactive ${selectedBsRowIndex === -1 ? 'bs-row--selected' : ''}`}
+                onClick={() => setSelectedBsRowIndex(-1)}
+              >
                 <td className="pl-pl-particular">TOTAL</td>
                 <td className="pl-pl-amt pl-amt text-right">
                   <strong>{fmt(totals.liabilitiesTotal)}</strong>

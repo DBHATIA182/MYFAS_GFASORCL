@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { formatLedgerDateDisplay } from '../utils/dateFormat';
 import { buildBrokerOsDisplayRows } from '../utils/brokerOsDisplay';
 import { buildSaleListDisplayRows, saleListMeas } from '../utils/saleListDisplay';
@@ -30,7 +30,10 @@ export default function ReportTable({
   billLedgerInterest = false,
   billLedgerKind = 'customer',
 }) {
-  if (!data || data.length === 0) return <p className="no-data">No data available.</p>;
+  const [trialSelectedKey, setTrialSelectedKey] = useState(null);
+  const [ledgerSelectedKey, setLedgerSelectedKey] = useState(null);
+  const [ageingListSelectedKey, setAgeingListSelectedKey] = useState(null);
+  const [ageingDrillSelectedKey, setAgeingDrillSelectedKey] = useState(null);
 
   const saleListTopScrollRef = useRef(null);
   const saleListTopInnerRef = useRef(null);
@@ -85,6 +88,24 @@ export default function ReportTable({
       if (ro) ro.disconnect();
     };
   }, [type, data]);
+
+  useEffect(() => {
+    if (type === 'trial-balance') setTrialSelectedKey(null);
+  }, [type, data]);
+
+  useEffect(() => {
+    if (type === 'ledger' || type === 'ledger-interest') setLedgerSelectedKey(null);
+  }, [type, data]);
+
+  useEffect(() => {
+    if (type === 'ageing') setAgeingListSelectedKey(null);
+  }, [type, data]);
+
+  useEffect(() => {
+    if (type === 'ageing-ledger-detail' || type === 'ageing-bills-detail') setAgeingDrillSelectedKey(null);
+  }, [type, data]);
+
+  if (!data || data.length === 0) return <p className="no-data">No data available.</p>;
 
   // Indian Currency Formatter
   const fmt = (val) => {
@@ -171,12 +192,17 @@ export default function ReportTable({
                   : isTotal
                     ? 'trial-subtotal-row'
                     : 'clickable-row';
+              const trialRowKey = `trial-row-${idx}`;
+              const isTrialSelected = trialSelectedKey === trialRowKey;
 
               return (
                 <tr
                   key={idx}
-                  className={rowClassName}
-                  onClick={() => !isTotal && onLedgerClick && onLedgerClick(codeVal, nameVal)}
+                  className={[rowClassName, isTrialSelected ? 'trial-row-selected' : ''].filter(Boolean).join(' ')}
+                  onClick={() => {
+                    setTrialSelectedKey(trialRowKey);
+                    if (!isTotal && onLedgerClick) onLedgerClick(codeVal, nameVal);
+                  }}
                 >
                   <td className="trial-sch">{schVal != null && schVal !== '' ? schVal : '—'}</td>
                   <td className="trial-name">
@@ -193,7 +219,16 @@ export default function ReportTable({
                 </tr>
               );
             })}
-            <tr className="trial-grand-total">
+            <tr
+              className={[
+                'trial-grand-total',
+                'trial-grand-total-footer',
+                trialSelectedKey === 'trial-grand-footer' ? 'trial-row-selected' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => setTrialSelectedKey('trial-grand-footer')}
+            >
               <td colSpan={4}>
                 <strong>GRAND TOTAL</strong>
               </td>
@@ -289,13 +324,22 @@ export default function ReportTable({
                 String(vrNo).trim() !== '' &&
                 Number(vrNo) > 0;
               const clickable = canSaleBill || canDrill;
+              const ledgerRowKey = `ledger-row-${i}`;
+              const isLedgerSelected = ledgerSelectedKey === ledgerRowKey;
               return (
                 <tr
                   key={i}
-                  className={[vrType === 'OP' ? 'opening-row' : '', clickable ? 'clickable-row' : '']
-                    .filter(Boolean)
-                    .join(' ')}
+                  className={
+                    [
+                      vrType === 'OP' ? 'opening-row' : '',
+                      clickable ? 'clickable-row' : 'ledger-row-focusable',
+                      isLedgerSelected ? 'ledger-row-selected' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
                   onClick={() => {
+                    setLedgerSelectedKey(ledgerRowKey);
                     if (canSaleBill) onLedgerSaleBillClick(row);
                     else if (canDrill) onVoucherClick(row);
                   }}
@@ -345,7 +389,15 @@ export default function ReportTable({
                 </tr>
               );
             })}
-            <tr className="ledger-grand-total">
+            <tr
+              className={[
+                'ledger-grand-total',
+                ledgerSelectedKey === 'ledger-footer-total' ? 'ledger-row-selected' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => setLedgerSelectedKey('ledger-footer-total')}
+            >
               <td colSpan={6}>
                 <strong>GRAND TOTAL</strong>
               </td>
@@ -379,7 +431,15 @@ export default function ReportTable({
               ) : null}
             </tr>
             {showInterestCols ? (
-              <tr className="ledger-grand-total">
+              <tr
+                className={[
+                  'ledger-grand-total',
+                  ledgerSelectedKey === 'ledger-footer-net-int' ? 'ledger-row-selected' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                onClick={() => setLedgerSelectedKey('ledger-footer-net-int')}
+              >
                 <td colSpan={9}>
                   <strong>NET INTEREST</strong>
                 </td>
@@ -407,18 +467,18 @@ export default function ReportTable({
     });
 
     return (
-      <div className="table-responsive table-responsive--ledger">
+      <div className="table-responsive table-responsive--ledger table-responsive--ledger-voucher">
         <table className="report-table report-table--ledger report-table--voucher">
           <thead>
             <tr>
-              <th>Account</th>
-              <th>Name</th>
-              <th>City</th>
-              <th>Type</th>
-              <th>Detail</th>
-              <th>DC</th>
-              <th className="text-right">Dr Amt</th>
-              <th className="text-right">Cr Amt</th>
+              <th scope="col" className="col-voucher-code">Account</th>
+              <th scope="col" className="col-voucher-name">Name</th>
+              <th scope="col" className="col-voucher-city">City</th>
+              <th scope="col" className="col-voucher-type">Type</th>
+              <th scope="col" className="col-voucher-detail">Detail</th>
+              <th scope="col" className="col-voucher-dc">DC</th>
+              <th scope="col" className="text-right col-voucher-amt">Dr Amt</th>
+              <th scope="col" className="text-right col-voucher-amt">Cr Amt</th>
             </tr>
           </thead>
           <tbody>
@@ -427,20 +487,27 @@ export default function ReportTable({
               const lineType = row.TYPE ?? row.type;
               return (
                 <tr key={i}>
-                  <td>{code != null && code !== '' ? code : '—'}</td>
-                  <td className="ledger-detail">{row.NAME ?? row.name ?? '—'}</td>
-                  <td>{row.CITY ?? row.city ?? '—'}</td>
-                  <td>
+                  <td className="col-voucher-code">{code != null && code !== '' ? code : '—'}</td>
+                  <td className="ledger-detail col-voucher-name">{row.NAME ?? row.name ?? '—'}</td>
+                  <td className="col-voucher-city">{row.CITY ?? row.city ?? '—'}</td>
+                  <td className="col-voucher-type">
                     <span className="type-label">{lineType != null && lineType !== '' ? lineType : '—'}</span>
                   </td>
-                  <td className="ledger-detail">{row.DETAIL ?? row.detail ?? '—'}</td>
-                  <td className="ledger-detail" title={row.DC_NAME ?? row.dc_name ?? ''}>
+                  <td className="ledger-detail col-voucher-detail">{row.DETAIL ?? row.detail ?? '—'}</td>
+                  <td
+                    className="ledger-detail col-voucher-dc"
+                    title={
+                      (row.DC_CODE ?? row.dc_code) != null && (row.DC_CODE ?? row.dc_code) !== ''
+                        ? `${row.DC_CODE ?? row.dc_code}${(row.DC_NAME ?? row.dc_name) ? ` — ${row.DC_NAME ?? row.dc_name}` : ''}`
+                        : String(row.DC_NAME ?? row.dc_name ?? '')
+                    }
+                  >
                     {(row.DC_CODE ?? row.dc_code) != null && (row.DC_CODE ?? row.dc_code) !== ''
                       ? `${row.DC_CODE ?? row.dc_code}${(row.DC_NAME ?? row.dc_name) ? ` — ${row.DC_NAME ?? row.dc_name}` : ''}`
                       : '—'}
                   </td>
-                  <td className="text-right dr-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
-                  <td className="text-right cr-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
+                  <td className="text-right dr-amt col-voucher-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
+                  <td className="text-right cr-amt col-voucher-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
                 </tr>
               );
             })}
@@ -464,16 +531,16 @@ export default function ReportTable({
   if (type === 'ageing-ledger-detail') {
     let totalPending = 0;
     return (
-      <div className="table-responsive table-responsive--ledger">
-        <table className="report-table report-table--ledger">
+      <div className="table-responsive table-responsive--ledger table-responsive--ageing-drill">
+        <table className="report-table report-table--ledger report-table--ageing-ledger-detail">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Detail</th>
-              <th className="text-right">Dr Amt</th>
-              <th className="text-right">Cr Amt</th>
-              <th className="text-right">Pending Bal</th>
+              <th scope="col" className="col-ageing-ld-date">Date</th>
+              <th scope="col" className="col-ageing-ld-type">Type</th>
+              <th scope="col" className="col-ageing-ld-detail">Detail</th>
+              <th scope="col" className="text-right col-ageing-ld-amt">Dr Amt</th>
+              <th scope="col" className="text-right col-ageing-ld-amt">Cr Amt</th>
+              <th scope="col" className="text-right col-ageing-ld-pending">Pending Bal</th>
             </tr>
           </thead>
           <tbody>
@@ -481,22 +548,36 @@ export default function ReportTable({
               const pending = parseFloat(row.PENDING_BAL ?? row.pending_bal ?? 0) || 0;
               totalPending += pending;
               const vrType = row.VR_TYPE ?? row.vr_type;
+              const rowKey = `ageing-ld-${i}`;
+              const isSel = ageingDrillSelectedKey === rowKey;
               return (
-                <tr key={i}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{formatLedgerDateDisplay(row.VR_DATE ?? row.vr_date)}</td>
-                  <td>
+                <tr
+                  key={i}
+                  className={['ledger-row-focusable', isSel ? 'ledger-row-selected' : ''].filter(Boolean).join(' ') || undefined}
+                  onClick={() => setAgeingDrillSelectedKey(rowKey)}
+                >
+                  <td className="col-ageing-ld-date">{formatLedgerDateDisplay(row.VR_DATE ?? row.vr_date)}</td>
+                  <td className="col-ageing-ld-type">
                     <span className={`badge-type ${vrType}`}>{vrType ?? '—'}</span>
                   </td>
-                  <td className="ledger-detail">{row.DETAIL ?? row.detail ?? '—'}</td>
-                  <td className="text-right dr-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
-                  <td className="text-right cr-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
-                  <td className="text-right" style={{ fontWeight: 'bold', color: '#2c7a7b' }}>
+                  <td className="ledger-detail col-ageing-ld-detail">{row.DETAIL ?? row.detail ?? '—'}</td>
+                  <td className="text-right dr-amt col-ageing-ld-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
+                  <td className="text-right cr-amt col-ageing-ld-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
+                  <td className="text-right col-ageing-ld-pending" style={{ fontWeight: 'bold', color: '#2c7a7b' }}>
                     {fmtAlways(pending)}
                   </td>
                 </tr>
               );
             })}
-            <tr className="ledger-grand-total">
+            <tr
+              className={[
+                'ledger-grand-total',
+                ageingDrillSelectedKey === 'ageing-ld-grand' ? 'ledger-row-selected' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => setAgeingDrillSelectedKey('ageing-ld-grand')}
+            >
               <td colSpan={5}>
                 <strong>GRAND TOTAL</strong>
               </td>
@@ -829,38 +910,54 @@ export default function ReportTable({
   if (type === 'ageing-bills-detail') {
     let totalBal = 0;
     return (
-      <div className="table-responsive table-responsive--bill-ledger">
-        <table className="report-table report-table--bill-ledger">
+      <div className="table-responsive table-responsive--bill-ledger table-responsive--ageing-drill">
+        <table className="report-table report-table--bill-ledger report-table--ageing-bills-detail">
           <thead>
             <tr>
-              <th scope="col">Code</th>
-              <th scope="col">Name</th>
-              <th scope="col">Bill no</th>
-              <th scope="col">Bill date</th>
-              <th scope="col">B type</th>
-              <th className="text-right" scope="col">Dr amt</th>
-              <th className="text-right" scope="col">Cr amt</th>
-              <th className="text-right" scope="col">Pending bal</th>
+              <th scope="col" className="col-ageing-bd-code">Code</th>
+              <th scope="col" className="col-ageing-bd-name">Name</th>
+              <th scope="col" className="col-ageing-bd-bill">Bill no</th>
+              <th scope="col" className="col-ageing-bd-date">Bill date</th>
+              <th scope="col" className="col-ageing-bd-bt">B type</th>
+              <th className="text-right col-ageing-bd-amt" scope="col">Dr amt</th>
+              <th className="text-right col-ageing-bd-amt" scope="col">Cr amt</th>
+              <th className="text-right col-ageing-bd-pending" scope="col">Pending bal</th>
             </tr>
           </thead>
           <tbody>
             {data.map((row, i) => {
               const bal = parseFloat(row.CUR_BAL ?? row.cur_bal ?? 0) || 0;
               totalBal += bal;
+              const rowKey = `ageing-bd-${i}`;
+              const isSel = ageingDrillSelectedKey === rowKey;
               return (
-                <tr key={i}>
-                  <td className="bill-code">{row.CODE ?? row.code ?? '—'}</td>
-                  <td className="ledger-detail">{row.NAME ?? row.name ?? '—'}</td>
-                  <td>{row.BILL_NO ?? row.bill_no ?? '—'}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>{formatLedgerDateDisplay(row.BILL_DATE ?? row.bill_date)}</td>
-                  <td>{row.B_TYPE ?? row.b_type ?? '—'}</td>
-                  <td className="text-right dr-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
-                  <td className="text-right cr-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
-                  <td className="text-right" style={{ fontWeight: 700, color: '#2c7a7b' }}>{fmtAlways(bal)}</td>
+                <tr
+                  key={i}
+                  className={['ledger-row-focusable', isSel ? 'ledger-row-selected' : ''].filter(Boolean).join(' ') || undefined}
+                  onClick={() => setAgeingDrillSelectedKey(rowKey)}
+                >
+                  <td className="bill-code col-ageing-bd-code">{row.CODE ?? row.code ?? '—'}</td>
+                  <td className="ledger-detail col-ageing-bd-name">{row.NAME ?? row.name ?? '—'}</td>
+                  <td className="col-ageing-bd-bill">{row.BILL_NO ?? row.bill_no ?? '—'}</td>
+                  <td className="col-ageing-bd-date">{formatLedgerDateDisplay(row.BILL_DATE ?? row.bill_date)}</td>
+                  <td className="col-ageing-bd-bt">{row.B_TYPE ?? row.b_type ?? '—'}</td>
+                  <td className="text-right dr-amt col-ageing-bd-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
+                  <td className="text-right cr-amt col-ageing-bd-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
+                  <td className="text-right col-ageing-bd-pending" style={{ fontWeight: 700, color: '#2c7a7b' }}>
+                    {fmtAlways(bal)}
+                  </td>
                 </tr>
               );
             })}
-            <tr className="bill-ledger-grand-total">
+            <tr
+              className={[
+                'bill-ledger-grand-total',
+                ageingDrillSelectedKey === 'ageing-bd-grand' ? 'ledger-row-selected' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => setAgeingDrillSelectedKey('ageing-bd-grand')}
+            >
               <td colSpan={7}>
                 <strong>GRAND TOTAL</strong>
               </td>
@@ -889,7 +986,15 @@ export default function ReportTable({
         <div className="sale-list-scroll-sync sale-list-scroll-sync--top" ref={saleListTopScrollRef}>
           <div className="sale-list-scroll-sync-inner" ref={saleListTopInnerRef} />
         </div>
-        <table className="report-table report-table--sale-list">
+        <table
+          className={[
+            'report-table',
+            'report-table--sale-list',
+            saleListSortMode !== 'date' ? 'report-table--sale-list-grouped' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <thead>
             <tr>
               <th scope="col">Tp</th>
@@ -1316,11 +1421,23 @@ export default function ReportTable({
             {data.map((row, idx) => {
               const rawBal = parseFloat(row.CUR_BAL ?? row.cur_bal ?? 0) || 0;
               const curDisp = ageingCurBalDisplay(scheduleRaw, rawBal);
+              const ageingRowKey = `ageing-main-${idx}`;
+              const isAgeingSel = ageingListSelectedKey === ageingRowKey;
               return (
               <tr
                 key={idx}
-                className={typeof onLedgerClick === 'function' ? 'clickable-row' : ''}
-                onClick={() => typeof onLedgerClick === 'function' && onLedgerClick(row.CODE ?? row.code, row.NAME ?? row.name, row)}
+                className={
+                  [
+                    typeof onLedgerClick === 'function' ? 'clickable-row' : '',
+                    isAgeingSel ? 'trial-row-selected' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ') || undefined
+                }
+                onClick={() => {
+                  setAgeingListSelectedKey(ageingRowKey);
+                  if (typeof onLedgerClick === 'function') onLedgerClick(row.CODE ?? row.code, row.NAME ?? row.name, row);
+                }}
               >
                 <td>{row.CODE ?? row.code ?? '—'}</td>
                 <td className="trial-name">
