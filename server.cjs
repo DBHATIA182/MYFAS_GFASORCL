@@ -2416,9 +2416,17 @@ app.get('/api/broker-outstanding', async (req, res) => {
     const partyFilter = party ? 'AND A.CODE = :party_code' : '';
 
     const sql = `
-      SELECT *
+      SELECT
+        x.*,
+        (
+          SELECT MAX(BM.NAME)
+          FROM MASTER BM
+          WHERE BM.COMP_CODE = x.COMP_CODE
+            AND TRIM(BM.CODE) = TRIM(x.BK_CODE)
+        ) AS BK_NAME
       FROM (
         SELECT
+          A.COMP_CODE,
           MAX(TRIM(A.BK_CODE)) OVER (
             PARTITION BY A.COMP_CODE, A.CODE, A.BILL_NO, TRUNC(A.BILL_DATE)
           ) AS BK_CODE,

@@ -1308,10 +1308,13 @@ export default function ReportTable({
                 );
               }
               if (item.kind === 'broker-total') {
+                const bkCode = item.BK_CODE || '—';
+                const bkName = String(item.BK_NAME ?? item.bk_name ?? '').trim();
+                const brokerLabel = bkName ? `${bkCode} — ${bkName}` : bkCode;
                 return (
                   <tr key={`bt-${i}`} className="broker-os-broker-total">
                     <td colSpan={8}>
-                      <strong>Broker total — {item.BK_CODE || '—'}</strong>
+                      <strong>Broker total — {brokerLabel}</strong>
                     </td>
                     <td className="text-right dr-amt">
                       <strong>{fmtAlways(item.DR_AMT)}</strong>
@@ -1331,9 +1334,14 @@ export default function ReportTable({
               const vrDt = row.VR_DATE ?? row.vr_date;
               const runB = parseFloat(row.RUN_BAL ?? row.run_bal ?? 0) || 0;
               const finB = parseFloat(row.FINAL_BAL ?? row.final_bal ?? 0) || 0;
+              const bkCode = row.BK_CODE ?? row.bk_code ?? '—';
+              const bkName = String(row.BK_NAME ?? row.bk_name ?? '').trim();
               return (
                 <tr key={`d-${i}`}>
-                  <td className="bill-code">{row.BK_CODE ?? row.bk_code ?? '—'}</td>
+                  <td className="bill-code" title={bkName ? `${bkCode} — ${bkName}` : String(bkCode)}>
+                    {bkCode}
+                    {bkName ? ` — ${bkName}` : ''}
+                  </td>
                   <td>{row.CODE ?? row.code ?? '—'}</td>
                   <td className="ledger-detail">{row.NAME ?? row.name ?? '—'}</td>
                   <td>{row.BILL_NO ?? row.bill_no ?? '—'}</td>
