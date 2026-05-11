@@ -1,0 +1,19 @@
+{
+  "name": "GRAINFAS Accounting",
+  "short_name": "GRAINFAS",
+  "description": "GRAINFAS Accounting System",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f0f2f5",
+  "theme_color": "#4c51bf",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

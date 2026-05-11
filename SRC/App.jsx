@@ -24,8 +24,8 @@ import { exitApp, performExitWindow } from './utils/exitApp';
 import connectionConfig from '../connection.config.json';
 import './App.css';
 
-// Local: Vite dev uses '' so /api/* is proxied to port 5001 (see vite.config.js). Run `npm run server` in another terminal.
-// Vite preview / static file open on localhost still calls :5001 directly.
+// Local: Vite dev uses '' so /api/* is proxied to port 5002 (see vite.config.js). Run `npm run server` in another terminal.
+// Vite preview / static file open on localhost still calls :5002 directly.
 function getSafeHostname() {
   try {
     return typeof window !== 'undefined' && window.location ? String(window.location.hostname || '') : '';
@@ -118,7 +118,11 @@ const isLocalHost = hostName === 'localhost' || hostName === '127.0.0.1';
 const rootDomain = connectionConfig.domain?.rootDomain || 'fasaccountingsoftware.in';
 const apiSubdomainSuffix = connectionConfig.domain?.apiSubdomainSuffix || '-api';
 const knownClients = connectionConfig.clients || {};
-const configuredClientName = connectionConfig.clientName || connectionConfig.defaultClientKey || '';
+const configuredClientNameRaw = connectionConfig.clientName || connectionConfig.defaultClientKey || '';
+const configuredClientName = (() => {
+  const v = normalizeClientKey(configuredClientNameRaw);
+  return v === 'auto' ? '' : v;
+})();
 
 function getClientKeyFromHost(host, domain) {
   if (!host || !domain) return null;
@@ -156,23 +160,34 @@ function getConnectingClientLabel() {
   return '';
 }
 
-const connectingClientDisplay = getConnectingClientLabel();
-
 const API_BASE = import.meta.env.DEV
   ? ''
   : isLocalHost
-    ? connectionConfig.local?.apiBase || 'http://localhost:5001'
+    ? connectionConfig.local?.apiBase || 'http://localhost:5002'
     : remoteApiBase;
 const TOTAL_STEPS = 20;
 const VIEW_MODE_STORAGE_KEY = 'gfas_view_mode';
 const AUTH_STORAGE_KEY = 'gfas_auth_state_v1';
+/** Restore sign-in after tab reload (mobile often reloads when memory is tight, e.g. after PDF + WhatsApp). */
+const AUTH_MAX_AGE_MS = 45 * 24 * 60 * 60 * 1000;
 
 function readPersistedAuth() {
-  return { authenticated: false, userName: '' };
+  try {
+    const raw = safeStorageGet(AUTH_STORAGE_KEY);
+    if (!raw) return { authenticated: false, userName: '' };
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== 'object' || o.authenticated !== true) return { authenticated: false, userName: '' };
+    const at = Number(o.at) || 0;
+    if (at && Date.now() - at > AUTH_MAX_AGE_MS) return { authenticated: false, userName: '' };
+    const userName = String(o.userName || '').trim();
+    return { authenticated: true, userName };
+  } catch {
+    return { authenticated: false, userName: '' };
+  }
 }
 
 if (import.meta.env.DEV && API_BASE === '') {
-  console.info('API → Vite proxy → http://localhost:5001 — start backend: npm run server');
+  console.info('API → Vite proxy → http://localhost:5002 — start backend: npm run server');
 }
 if (!import.meta.env.DEV && !isLocalHost && !API_BASE) {
   console.warn('No remote API base resolved. Check connection.config.json clientName/domain.');
@@ -180,6 +195,7 @@ if (!import.meta.env.DEV && !isLocalHost && !API_BASE) {
 console.log('Current API Base:', API_BASE || '(same origin /api proxy)');
 
 function App() {
+  const [detectedClientKey, setDetectedClientKey] = useState('');
   const initialAuth = readPersistedAuth();
   const [clientGuardChecked, setClientGuardChecked] = useState(false);
   const [clientGuardMismatch, setClientGuardMismatch] = useState(null);
@@ -206,9 +222,27 @@ function App() {
   const [voiceListening, setVoiceListening] = useState(false);
   const [loginUserName, setLoginUserName] = useState(initialAuth.userName);
 
+
   useEffect(() => {
-    /* Temporarily disabled persisted-auth restore to verify mobile startup path. */
+    let cancelled = false;
+    (async () => {
+      try {
+        const base = API_BASE || '';
+        const response = await axios.get(`${base}/api/client-identity`, { timeout: 8000 });
+        const detected = normalizeClientKey(response?.data?.clientKey);
+        if (!cancelled && detected) setDetectedClientKey(detected);
+      } catch {
+        /* Best-effort label detection; ignore when API is not yet reachable. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const connectingClientDisplay = detectedClientKey && rootDomain
+    ? `${detectedClientKey}.${rootDomain}`
+    : getConnectingClientLabel();
 
   useEffect(() => {
     let cancelled = false;
@@ -442,7 +476,7 @@ function App() {
         setYears(response.data || []);
         setCurrentSlide(2);
       } catch (error) {
-        alert("Error loading financial years. Is server running on port 5001?");
+        alert("Error loading financial years. Is server running on port 5002?");
       } finally {
         setLoading(false);
       }

@@ -219,6 +219,10 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
     endDate: `${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`,
     payEndDate: toDisplayDate(payEndDate),
     brokerRange: `${brokStart.trim()} – ${brokEnd.trim()}`,
+    brokerHead:
+      brokStart.trim() === brokEnd.trim()
+        ? `${brokStart.trim()} — ${(singleBrokerRow?.NAME ?? singleBrokerRow?.name ?? '').trim() || '—'}`
+        : `${brokStart.trim()}–${brokEnd.trim()}`,
     partyLabel: selectedParty
       ? `${selectedParty} — ${selectedPartyRow?.NAME ?? ''}`
       : 'All parties (C/S)',
@@ -279,21 +283,32 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
 
         <div className="report-info">
           <p>
-            <strong>Brokers</strong> {brokStart.trim()} → {brokEnd.trim()}
+            <strong>Broker</strong>{' '}
+            {brokStart.trim() === brokEnd.trim()
+              ? `${brokStart.trim()} — ${singleBrokerRow?.NAME ?? singleBrokerRow?.name ?? '—'}`
+              : `${brokStart.trim()}–${brokEnd.trim()}`}
             {selectedParty ? (
               <>
-                {' '}
-                · Party <strong>{selectedPartyRow?.NAME ?? selectedParty}</strong> ({selectedParty})
+                {' · '}
+                <strong>Party</strong> {selectedPartyRow?.NAME ?? selectedParty} ({selectedParty})
               </>
             ) : (
-              <> · All parties (C/S)</>
+              <>
+                {' · '}
+                <strong>Party</strong> All parties (C/S)
+              </>
             )}
+            {' · '}
+            <strong>Bills</strong> {toDisplayDate(startDate)}–{toDisplayDate(endDate)}
+            {' · '}
+            <strong>Payment to</strong> {toDisplayDate(payEndDate)}
+            {' · '}
+            <strong>Filter</strong> {mco === 'O' ? 'Outstanding only' : 'All bills'}
           </p>
           <p>
             {compName} | FY {compYear}
             <br />
-            Bills {toDisplayDate(startDate)} – {toDisplayDate(endDate)} · Payment cut-off {toDisplayDate(payEndDate)} ·{' '}
-            {mco === 'O' ? 'Outstanding only' : 'All'}
+            Scroll sideways on a phone to see every column, including Detail.
           </p>
         </div>
 

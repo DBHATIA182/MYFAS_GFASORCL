@@ -210,6 +210,21 @@ const PDF_REPORT_STYLES = `
           border-top: 1px solid #5eead4;
           border-bottom: 1px solid #99f6e4;
         }
+        table.table-report tbody tr.broker-os-pdf-section-header td {
+          background: #e0f2fe !important;
+          color: #0c4a6e !important;
+          font-weight: 800;
+          font-size: 9px;
+          border-top: 2px solid #38bdf8;
+          border-bottom: 1px solid #7dd3fc;
+          padding: 8px 6px;
+        }
+        table.table-report td.col-broker-os-pdf-detail {
+          max-width: 150px;
+          white-space: normal;
+          word-wrap: break-word;
+          font-size: 8px;
+        }
         table.table-report tbody tr.op-row { background: #e0f2fe !important; }
         table.table-report tbody tr.sale-list-pdf-cn td {
           background: #ffedd5 !important;
@@ -1073,13 +1088,23 @@ function buildBrokerOsReportHtml(data, metadata) {
   const year = escHtml(metadata.year);
   const period = escHtml(metadata.endDate);
   const payEnd = escHtml(metadata.payEndDate ?? '');
-  const brk = escHtml(metadata.brokerRange ?? '');
+  const brokerHead = escHtml(metadata.brokerHead ?? metadata.brokerRange ?? '');
   const party = escHtml(metadata.partyLabel ?? '');
   const filt = escHtml(metadata.filterLabel ?? '');
   const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
 
   let bodyRows = '';
   displayRows.forEach((item) => {
+    if (item.kind === 'broker-section-header') {
+      const hc = escHtml(item.BK_CODE ?? '');
+      const hn = escHtml(String(item.BK_NAME ?? item.bk_name ?? '').trim());
+      const headLine = hn ? `Broker ${hc} — ${hn}` : `Broker ${hc}`;
+      bodyRows += `
+            <tr class="broker-os-pdf-section-header">
+              <td colspan="12" class="col-name"><strong>${headLine}</strong></td>
+            </tr>`;
+      return;
+    }
     if (item.kind === 'bill-total') {
       const code = escHtml(item.CODE ?? '');
       const billDt = escHtml(formatLedgerDateDisplay(item.BILL_DATE ?? item.bill_date));
@@ -1109,9 +1134,11 @@ function buildBrokerOsReportHtml(data, metadata) {
     }
     if (item.kind === 'broker-total') {
       const bk = escHtml(item.BK_CODE ?? '');
+      const bkNm = String(item.BK_NAME ?? item.bk_name ?? '').trim();
+      const brokerPdfLabel = bkNm ? `${bk} — ${escHtml(bkNm)}` : bk;
       bodyRows += `
             <tr class="broker-os-pdf-broker-total">
-              <td colspan="8" class="col-name"><strong>Broker total — ${bk}</strong></td>
+              <td colspan="8" class="col-name"><strong>Broker total — ${brokerPdfLabel}</strong></td>
               <td class="amount"><strong>${formatAmtPdf(item.DR_AMT)}</strong></td>
               <td class="amount"><strong>${formatAmtPdf(item.CR_AMT)}</strong></td>
               <td class="amount">—</td>
@@ -1122,9 +1149,9 @@ function buildBrokerOsReportHtml(data, metadata) {
     const row = item.row;
     const billDt = escHtml(formatLedgerDateDisplay(row.BILL_DATE ?? row.bill_date));
     const vrDt = escHtml(formatLedgerDateDisplay(row.VR_DATE ?? row.vr_date));
+    const det = escHtml(String(row.DETAIL ?? row.detail ?? '').trim());
     bodyRows += `
             <tr>
-              <td class="col-code">${escHtml(row.BK_CODE ?? row.bk_code ?? '')}</td>
               <td class="col-code">${escHtml(row.CODE ?? row.code ?? '')}</td>
               <td class="col-name">${escHtml(row.NAME ?? row.name ?? '')}</td>
               <td class="col-vr">${escHtml(row.BILL_NO ?? row.bill_no ?? '')}</td>
@@ -1132,6 +1159,7 @@ function buildBrokerOsReportHtml(data, metadata) {
               <td class="col-type">${escHtml(row.VR_TYPE ?? row.vr_type ?? '')}</td>
               <td class="col-date">${vrDt}</td>
               <td class="col-vr">${escHtml(row.VR_NO ?? row.vr_no ?? '')}</td>
+              <td class="col-name col-broker-os-pdf-detail">${det || '—'}</td>
               <td class="amount">${formatAmtPdf(row.DR_AMT ?? row.dr_amt)}</td>
               <td class="amount">${formatAmtPdf(row.CR_AMT ?? row.cr_amt)}</td>
               <td class="amount bal">${formatAmtPdf(row.RUN_BAL ?? row.run_bal)}</td>
@@ -1147,7 +1175,7 @@ function buildBrokerOsReportHtml(data, metadata) {
         <h1>BROKER-WISE OUTSTANDING</h1>
         <div class="company">${company}</div>
         <table class="report-grid">
-          <tr><td class="lbl">Financial year</td><td class="val">${year}</td><td class="lbl">Broker range</td><td class="val">${brk}</td></tr>
+          <tr><td class="lbl">Financial year</td><td class="val">${year}</td><td class="lbl">Broker</td><td class="val">${brokerHead}</td></tr>
           <tr><td class="lbl">Party filter</td><td class="val" colspan="3">${party}</td></tr>
           <tr><td class="lbl">Bill dates</td><td class="val">${period}</td><td class="lbl">Payment ending</td><td class="val">${payEnd}</td></tr>
           <tr><td class="lbl">Filter</td><td class="val" colspan="3">${filt}</td></tr>
@@ -1158,7 +1186,6 @@ function buildBrokerOsReportHtml(data, metadata) {
       <table class="table-report">
         <thead>
           <tr>
-            <th>Bk</th>
             <th>Code</th>
             <th>Party</th>
             <th>Bill</th>
@@ -1166,6 +1193,7 @@ function buildBrokerOsReportHtml(data, metadata) {
             <th>Vr typ</th>
             <th>Vr dt</th>
             <th>Vr no</th>
+            <th>Detail</th>
             <th class="amount">Dr</th>
             <th class="amount">Cr</th>
             <th class="amount">Run</th>
@@ -1696,6 +1724,15 @@ function buildSaleBillReportHtml(data, metadata) {
   const topRightLogo2Html = logo2Safe
     ? `<div class="sb-pdf-top-right"><div class="sb-pdf-logo2"><img src="${logo2Safe}" alt="" /></div></div>`
     : '<div class="sb-pdf-top-right sb-pdf-top-right--empty"></div>';
+  const irnNoPdf = String(rowFieldCI(f, 'irn_no') || '').trim();
+  const ackNoPdf = String(rowFieldCI(f, 'ack_no') || '').trim();
+  const ewayNoPdf = String(rowFieldCI(f, 'eway_no') || '').trim();
+  const irnRowsPdf = [
+    irnNoPdf ? `<div>Irn No.: ${escHtml(irnNoPdf)}</div>` : '',
+    ackNoPdf ? `<div>Ack.No.: ${escHtml(ackNoPdf)}</div>` : '',
+    ewayNoPdf ? `<div>Eway No.: ${escHtml(ewayNoPdf)}</div>` : '',
+  ].filter(Boolean).join('');
+  const irnBlockPdf = irnRowsPdf ? `<div class="sb-pdf-irn">${irnRowsPdf}</div>` : '';
 
   return `
     <div class="report-doc sb-pdf${isBillOfSupplyNoTax ? ' sb-pdf-bos' : ''}">
@@ -1727,11 +1764,7 @@ function buildSaleBillReportHtml(data, metadata) {
       </div>`
       }
       <hr class="sb-pdf-inv-rule" />
-      <div class="sb-pdf-irn">
-        <div>IRN: ${escHtml(rowFieldCI(f, 'irn_no') || '—')}</div>
-        <div>ACK: ${escHtml(rowFieldCI(f, 'ack_no') || '—')}</div>
-        <div>E-Way: ${escHtml(rowFieldCI(f, 'eway_no') || '—')}</div>
-      </div>
+      ${irnBlockPdf}
 
       <div class="sb-pdf-two ${dispatchColHtml ? 'sb-pdf-three' : ''}">
         <div>
@@ -3053,5 +3086,19 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
 
   downloadBlob(blob, filename);
   const url = buildWhatsAppWebUrl(hasTargetPhone ? waDigits : '', body);
-  window.open(url, '_blank', 'noopener,noreferrer');
+  /* Mobile: avoid window.open right on the heels of a large download — some WebViews navigate or reload the SPA tab.
+     Short delay + <a target="_blank"> keeps the accounting tab in place more reliably than window.open after async work. */
+  await new Promise((r) => setTimeout(r, 200));
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
 }

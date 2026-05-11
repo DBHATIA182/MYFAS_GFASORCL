@@ -70,7 +70,7 @@ export function sortBrokerOsRawRows(rows) {
 }
 
 /**
- * @returns {{ displayRows: Array<{kind:'detail',row}|{kind:'party-total',...}|{kind:'broker-total',...}>, grandDr: number, grandCr: number }}
+ * @returns {{ displayRows: Array<{kind:'broker-section-header',BK_CODE,BK_NAME}|{kind:'detail',row}|...>, grandDr: number, grandCr: number }}
  */
 export function buildBrokerOsDisplayRows(rawRows) {
   const sorted = sortBrokerOsRawRows(rawRows);
@@ -83,6 +83,11 @@ export function buildBrokerOsDisplayRows(rawRows) {
   while (i < n) {
     const bk = bkOf(sorted[i]);
     const bkName = brokerNameOf(sorted[i]);
+    displayRows.push({
+      kind: 'broker-section-header',
+      BK_CODE: bk,
+      BK_NAME: bkName,
+    });
     let brokerDr = 0;
     let brokerCr = 0;
 

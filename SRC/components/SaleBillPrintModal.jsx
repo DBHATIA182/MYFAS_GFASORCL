@@ -451,6 +451,10 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
   const cgstLabel = formatTaxLabel('CGST', first?.CGST_PER ?? first?.cgst_per);
   const sgstLabel = formatTaxLabel('SGST', first?.SGST_PER ?? first?.sgst_per);
   const igstLabel = formatTaxLabel('IGST', first?.IGST_PER ?? first?.igst_per);
+  const irnNo = String(rowFieldCI(first || {}, 'irn_no') || v(first || {}, 'IRN_NO', 'irn_no') || '').trim();
+  const ackNo = String(rowFieldCI(first || {}, 'ack_no') || v(first || {}, 'ACK_NO', 'ack_no') || '').trim();
+  const ewayNo = String(rowFieldCI(first || {}, 'eway_no') || v(first || {}, 'EWAY_NO', 'eway_no') || '').trim();
+  const showIrnBlock = !!(irnNo || ackNo || ewayNo);
 
   return (
     <div className="sale-bill-modal-backdrop sale-bill-print-backdrop" role="presentation" onClick={onClose}>
@@ -572,12 +576,15 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
                   </div>
                 ) : null}
               </div>
+              <div className="sale-bill-print-inv-rule" />
 
-              <div className="sale-bill-print-irn">
-                <div>IRN: {rowFieldCI(first, 'irn_no') || v(first, 'IRN_NO', 'irn_no') || '—'}</div>
-                <div>ACK: {rowFieldCI(first, 'ack_no') || v(first, 'ACK_NO', 'ack_no') || '—'}</div>
-                <div>E-Way: {rowFieldCI(first, 'eway_no') || v(first, 'EWAY_NO', 'eway_no') || '—'}</div>
-              </div>
+              {showIrnBlock ? (
+                <div className="sale-bill-print-irn">
+                  {irnNo ? <div>Irn No.: {irnNo}</div> : null}
+                  {ackNo ? <div>Ack.No.: {ackNo}</div> : null}
+                  {ewayNo ? <div>Eway No.: {ewayNo}</div> : null}
+                </div>
+              ) : null}
 
               <div className={`sale-bill-print-two-col${showDispatchBlock ? ' sale-bill-print-three-col' : ''}`}>
                 <div className="sale-bill-print-col">

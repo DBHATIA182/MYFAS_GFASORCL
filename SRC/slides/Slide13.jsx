@@ -23,9 +23,11 @@ function highlightMatch(text, q) {
 
 export default function Slide13({ apiBase, formData, onPrev, onReset }) {
   const [type, setType] = useState('SL');
-  const [billNo, setBillNo] = useState('');
+  const [billNoStart, setBillNoStart] = useState('');
+  const [billNoEnd, setBillNoEnd] = useState('');
   const [bType, setBType] = useState('');
-  const [billDate, setBillDate] = useState('');
+  const [billDateStart, setBillDateStart] = useState('');
+  const [billDateEnd, setBillDateEnd] = useState('');
   const [printGrossDane, setPrintGrossDane] = useState('N');
   const [printPacking, setPrintPacking] = useState('N');
 
@@ -82,6 +84,27 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
     });
   }, [parties, partySearch]);
 
+  /** Bill date then bill no (then b_type, code) — same order on desktop and mobile. */
+  const printingListSorted = useMemo(() => {
+    if (!rows.length) return rows;
+    return [...rows].sort((a, b) => {
+      const da = toInputDateString(a.BILL_DATE ?? a.bill_date);
+      const db = toInputDateString(b.BILL_DATE ?? b.bill_date);
+      const cmpDate = da.localeCompare(db);
+      if (cmpDate !== 0) return cmpDate;
+      const na = Number(a.BILL_NO ?? a.bill_no);
+      const nb = Number(b.BILL_NO ?? b.bill_no);
+      if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+      const sa = String(a.BILL_NO ?? a.bill_no ?? '');
+      const sb = String(b.BILL_NO ?? b.bill_no ?? '');
+      if (sa !== sb) return sa.localeCompare(sb, undefined, { numeric: true });
+      const ba = String(a.B_TYPE ?? a.b_type ?? '');
+      const bb = String(b.B_TYPE ?? b.b_type ?? '');
+      if (ba !== bb) return ba.localeCompare(bb);
+      return String(a.CODE ?? a.code ?? '').localeCompare(String(b.CODE ?? b.code ?? ''));
+    });
+  }, [rows]);
+
   useEffect(() => {
     setPartyHi(0);
   }, [partySearch]);
@@ -136,9 +159,23 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
         comp_uid: compUid,
         type: String(type).trim().toUpperCase(),
       };
-      if (billNo.trim()) params.bill_no = billNo.trim();
       if (bType.trim()) params.b_type = bType.trim();
-      if (billDate) params.bill_date = toOracleDate(billDate);
+      let bnS = billNoStart.trim();
+      let bnE = billNoEnd.trim();
+      if (bnS && !bnE) bnE = bnS;
+      if (bnE && !bnS) bnS = bnE;
+      if (bnS && bnE) {
+        params.bill_no_from = bnS;
+        params.bill_no_to = bnE;
+      }
+      let dS = billDateStart.trim();
+      let dE = billDateEnd.trim();
+      if (dS && !dE) dE = dS;
+      if (dE && !dS) dS = dE;
+      if (dS && dE) {
+        params.bill_date_from = toOracleDate(dS);
+        params.bill_date_to = toOracleDate(dE);
+      }
       if (selectedMcode.trim()) params.mcode = selectedMcode.trim();
 
       const { data } = await axios.get(`${apiBase}/api/sale-bill-printing-list`, {
@@ -188,24 +225,40 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
         <div className="report-info">
           <p>
             <strong>Type</strong> {type}
-            {billNo.trim() ? (
-              <>
-                {' · '}
-                <strong>Bill no</strong> {billNo.trim()}
-              </>
-            ) : null}
+            {(() => {
+              let bnS = billNoStart.trim();
+              let bnE = billNoEnd.trim();
+              if (bnS && !bnE) bnE = bnS;
+              if (bnE && !bnS) bnS = bnE;
+              if (!bnS || !bnE) return null;
+              return (
+                <>
+                  {' · '}
+                  <strong>Bill no</strong> {bnS === bnE ? bnS : `${bnS}–${bnE}`}
+                </>
+              );
+            })()}
             {bType.trim() ? (
               <>
                 {' · '}
                 <strong>B type</strong> {bType.trim()}
               </>
             ) : null}
-            {billDate ? (
-              <>
-                {' · '}
-                <strong>Bill date</strong> {toDisplayDate(billDate)}
-              </>
-            ) : null}
+            {(() => {
+              let dS = billDateStart.trim();
+              let dE = billDateEnd.trim();
+              if (dS && !dE) dE = dS;
+              if (dE && !dS) dS = dE;
+              if (!dS || !dE) return null;
+              const ds = toDisplayDate(dS);
+              const de = toDisplayDate(dE);
+              return (
+                <>
+                  {' · '}
+                  <strong>Bill date</strong> {ds === de ? ds : `${ds}–${de}`}
+                </>
+              );
+            })()}
             {' · '}
             <strong>Print Gross/Dane</strong> {printGrossDane}
             {' · '}
@@ -220,7 +273,7 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
 
         <div className="report-display">
           <div className="table-responsive table-responsive--bill-ledger">
-            <table className="report-table report-table--bill-ledger">
+            <table className="report-table report-table--bill-ledger report-table--sale-bill-printing-list">
               <thead>
                 <tr>
                   <th>Type</th>
@@ -235,9 +288,9 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, idx) => (
+                {printingListSorted.map((row) => (
                   <tr
-                    key={idx}
+                    key={`${row.TYPE ?? row.type}-${toInputDateString(row.BILL_DATE ?? row.bill_date)}-${row.BILL_NO ?? row.bill_no}-${row.B_TYPE ?? row.b_type}-${row.CODE ?? row.code}`}
                     className="clickable-row"
                     onClick={() => openSaleBill(row)}
                     onKeyDown={(ev) => {
@@ -289,7 +342,8 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
         {compName} | FY {compYear}
         <br />
         <span className="compdet-date-hint">
-          Choose <strong>TYPE</strong> and optional bill filters. You can also select a specific party by code, name, or city.
+          Choose <strong>TYPE</strong> and optional filters: bill no / bill date ranges (enter only the starting value to use a single bill no or single day). You can
+          also select a specific party by code, name, or city.
         </span>
       </p>
 
@@ -318,14 +372,78 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
             </select>
           </div>
           <div className="form-group">
-            <label htmlFor="sbp-bill-no">Bill no</label>
+            <label htmlFor="sbp-b-type">B type</label>
             <input
-              id="sbp-bill-no"
+              id="sbp-b-type"
               type="text"
               className="form-input"
-              value={billNo}
-              onChange={(e) => setBillNo(e.target.value)}
+              value={bType}
+              onChange={(e) => setBType(e.target.value)}
               placeholder="Optional"
+            />
+          </div>
+        </div>
+
+        <div className="form-row-broker">
+          <div className="form-group">
+            <label htmlFor="sbp-bill-no-start">Starting bill no</label>
+            <input
+              id="sbp-bill-no-start"
+              type="text"
+              inputMode="numeric"
+              className="form-input"
+              value={billNoStart}
+              onChange={(e) => {
+                const v = e.target.value;
+                setBillNoStart(v);
+                setBillNoEnd((end) => (String(end).trim() ? end : v));
+              }}
+              placeholder="Optional"
+              title="If ending bill no is empty, it is set the same as starting"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="sbp-bill-no-end">Ending bill no</label>
+            <input
+              id="sbp-bill-no-end"
+              type="text"
+              inputMode="numeric"
+              className="form-input"
+              value={billNoEnd}
+              onChange={(e) => setBillNoEnd(e.target.value)}
+              placeholder="Optional"
+              title="Leave blank to use the same as starting bill no"
+            />
+          </div>
+        </div>
+
+        <div className="form-row-broker">
+          <div className="form-group">
+            <label htmlFor="sbp-bill-date-start">Starting bill date</label>
+            <input
+              id="sbp-bill-date-start"
+              type="date"
+              lang="en-GB"
+              className="form-input"
+              value={billDateStart}
+              onChange={(e) => {
+                const v = e.target.value;
+                setBillDateStart(v);
+                setBillDateEnd((end) => (String(end).trim() ? end : v));
+              }}
+              title="If ending bill date is empty, it is set the same as starting"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="sbp-bill-date-end">Ending bill date</label>
+            <input
+              id="sbp-bill-date-end"
+              type="date"
+              lang="en-GB"
+              className="form-input"
+              value={billDateEnd}
+              onChange={(e) => setBillDateEnd(e.target.value)}
+              title="Leave blank to use the same as starting bill date"
             />
           </div>
         </div>
@@ -344,32 +462,6 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
               <option value="N">No</option>
               <option value="Y">Yes</option>
             </select>
-          </div>
-        </div>
-
-        <div className="form-row-broker">
-          <div className="form-group">
-            <label htmlFor="sbp-b-type">B type</label>
-            <input
-              id="sbp-b-type"
-              type="text"
-              className="form-input"
-              value={bType}
-              onChange={(e) => setBType(e.target.value)}
-              placeholder="Optional"
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="sbp-bill-date">Bill date</label>
-            <input
-              id="sbp-bill-date"
-              type="date"
-              lang="en-GB"
-              className="form-input"
-              value={billDate}
-              onChange={(e) => setBillDate(e.target.value)}
-              title="Optional: leave blank to search all dates for this type / filters"
-            />
           </div>
         </div>
 

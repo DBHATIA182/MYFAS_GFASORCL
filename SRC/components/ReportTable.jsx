@@ -1238,7 +1238,6 @@ export default function ReportTable({
         <table className="report-table report-table--broker-os">
           <thead>
             <tr>
-              <th scope="col">Broker</th>
               <th scope="col">Code</th>
               <th scope="col">Party</th>
               <th scope="col">Bill no</th>
@@ -1246,6 +1245,9 @@ export default function ReportTable({
               <th scope="col">Vr type</th>
               <th scope="col">Vr date</th>
               <th scope="col">Vr no</th>
+              <th scope="col" className="col-broker-os-detail">
+                Detail
+              </th>
               <th className="text-right" scope="col">
                 Dr amt
               </th>
@@ -1262,6 +1264,18 @@ export default function ReportTable({
           </thead>
           <tbody>
             {displayRows.map((item, i) => {
+              if (item.kind === 'broker-section-header') {
+                const hCode = item.BK_CODE || '—';
+                const hName = String(item.BK_NAME ?? item.bk_name ?? '').trim();
+                const hLabel = hName ? `Broker ${hCode} — ${hName}` : `Broker ${hCode}`;
+                return (
+                  <tr key={`bh-${i}-${hCode}`} className="broker-os-section-header">
+                    <td colSpan={12}>
+                      <strong>{hLabel}</strong>
+                    </td>
+                  </tr>
+                );
+              }
               if (item.kind === 'bill-total') {
                 const code = item.CODE || '—';
                 const billDt = formatLedgerDateDisplay(item.BILL_DATE ?? item.bill_date);
@@ -1334,14 +1348,8 @@ export default function ReportTable({
               const vrDt = row.VR_DATE ?? row.vr_date;
               const runB = parseFloat(row.RUN_BAL ?? row.run_bal ?? 0) || 0;
               const finB = parseFloat(row.FINAL_BAL ?? row.final_bal ?? 0) || 0;
-              const bkCode = row.BK_CODE ?? row.bk_code ?? '—';
-              const bkName = String(row.BK_NAME ?? row.bk_name ?? '').trim();
               return (
                 <tr key={`d-${i}`}>
-                  <td className="bill-code" title={bkName ? `${bkCode} — ${bkName}` : String(bkCode)}>
-                    {bkCode}
-                    {bkName ? ` — ${bkName}` : ''}
-                  </td>
                   <td>{row.CODE ?? row.code ?? '—'}</td>
                   <td className="ledger-detail">{row.NAME ?? row.name ?? '—'}</td>
                   <td>{row.BILL_NO ?? row.bill_no ?? '—'}</td>
@@ -1353,6 +1361,9 @@ export default function ReportTable({
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>{formatLedgerDateDisplay(vrDt)}</td>
                   <td>{row.VR_NO ?? row.vr_no ?? '—'}</td>
+                  <td className="col-broker-os-detail ledger-detail" title={String(row.DETAIL ?? row.detail ?? '')}>
+                    {clampText(String(row.DETAIL ?? row.detail ?? '').trim() || '—', 80)}
+                  </td>
                   <td className="text-right dr-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
                   <td className="text-right cr-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
                   <td className="text-right" style={{ fontWeight: 700, color: '#2c7a7b' }}>

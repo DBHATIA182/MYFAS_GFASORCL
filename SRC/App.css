@@ -863,19 +863,48 @@ body {
 .report-table--bill-ledger {
   table-layout: fixed;
   width: 100%;
-  min-width: 0;
-  max-width: 100%;
+  /* Always keep a sensible minimum so narrow viewports scroll inside .table-responsive--bill-ledger instead of squashing columns (overlap). */
+  min-width: 680px;
 }
 
-.report-table--bill-ledger-no-interest,
-.report-table--bill-ledger-with-interest {
-  min-width: 0;
+/* Sale Bill Printing list (Slide13): auto column widths + min width so party name/tax columns stay readable when scrolling on phone */
+.report-table--bill-ledger.report-table--sale-bill-printing-list {
+  table-layout: auto;
+  width: max-content;
+  max-width: none;
+  min-width: 900px;
 }
 
-@media (min-width: 640px) {
-  .report-table--bill-ledger {
-    min-width: 680px;
-  }
+.report-table--sale-bill-printing-list thead th,
+.report-table--sale-bill-printing-list tbody td {
+  vertical-align: top;
+}
+
+.report-table--sale-bill-printing-list thead th:nth-child(1),
+.report-table--sale-bill-printing-list tbody td:nth-child(1),
+.report-table--sale-bill-printing-list thead th:nth-child(2),
+.report-table--sale-bill-printing-list tbody td:nth-child(2),
+.report-table--sale-bill-printing-list thead th:nth-child(3),
+.report-table--sale-bill-printing-list tbody td:nth-child(3),
+.report-table--sale-bill-printing-list thead th:nth-child(4),
+.report-table--sale-bill-printing-list tbody td:nth-child(4),
+.report-table--sale-bill-printing-list thead th:nth-child(5),
+.report-table--sale-bill-printing-list tbody td:nth-child(5),
+.report-table--sale-bill-printing-list thead th:nth-child(7),
+.report-table--sale-bill-printing-list tbody td:nth-child(7),
+.report-table--sale-bill-printing-list thead th:nth-child(8),
+.report-table--sale-bill-printing-list tbody td:nth-child(8),
+.report-table--sale-bill-printing-list thead th:nth-child(9),
+.report-table--sale-bill-printing-list tbody td:nth-child(9) {
+  white-space: nowrap;
+}
+
+.report-table--sale-bill-printing-list thead th:nth-child(6),
+.report-table--sale-bill-printing-list tbody td:nth-child(6) {
+  white-space: normal;
+  max-width: 18rem;
+  min-width: 10rem;
+  word-break: break-word;
 }
 
 /* Mobile: keep bill-ledger wide and scrollable so columns don't overlap */
@@ -886,6 +915,10 @@ body {
 
   .report-table--bill-ledger-with-interest {
     min-width: 1240px;
+  }
+
+  .report-table--bill-ledger.report-table--sale-bill-printing-list {
+    min-width: 920px;
   }
 
   .report-table--bill-ledger thead th {
@@ -999,6 +1032,32 @@ body {
 
 .report-table--broker-os {
   min-width: 1080px;
+}
+
+.report-table--broker-os tr.broker-os-section-header td {
+  background: #e0f2fe !important;
+  color: #0c4a6e !important;
+  font-weight: 800;
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+  border-top: 2px solid #38bdf8;
+  border-bottom: 1px solid #bae6fd;
+  padding: 10px 12px;
+}
+
+.report-table--broker-os .col-broker-os-detail {
+  min-width: 8.5rem;
+  max-width: 20rem;
+  white-space: normal;
+  word-break: break-word;
+  font-size: 0.78rem;
+  vertical-align: top;
+}
+
+@media (max-width: 767px) {
+  .report-table--broker-os {
+    min-width: 1120px;
+  }
 }
 
 .report-table--ledger,
@@ -3261,6 +3320,12 @@ td.sale-list-total-pad {
   margin-top: 0.35rem;
   padding-top: 0.45rem;
   border-top: 1px dashed #94a3b8;
+}
+
+.sale-bill-print-inv-rule {
+  width: 100%;
+  border-top: 2px solid #1e3a5f;
+  margin: 0.1rem 0 0.45rem;
 }
 
 .sale-bill-print-irn {

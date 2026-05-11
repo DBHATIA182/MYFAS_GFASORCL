@@ -8,7 +8,7 @@ export default defineConfig({
     // Forward /api to Node (npm run server). Avoids 404 when the UI hits 5173 without a matching route.
     proxy: {
       '/api': {
-        target: 'http://localhost:5001',
+        target: 'http://localhost:5002',
         changeOrigin: true,
       },
     },

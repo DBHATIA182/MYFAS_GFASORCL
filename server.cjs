@@ -27,7 +27,46 @@ try {
 
 const rootDomain = connectionConfig.domain?.rootDomain || 'fasaccountingsoftware.in';
 const localOrigin = connectionConfig.local?.webOrigin;
-const configuredClientName = connectionConfig.clientName || connectionConfig.defaultClientKey || '';
+const apiSubdomainSuffix = connectionConfig.domain?.apiSubdomainSuffix || '-api';
+
+function normalizeClientKey(v) {
+  return String(v || '').trim().toLowerCase();
+}
+
+function readClientKeyFromTunnelConfig() {
+  try {
+    const cfgPath = path.join(__dirname, 'config.yml');
+    const txt = fs.readFileSync(cfgPath, 'utf8');
+    const lines = txt.split(/\r?\n/);
+    for (const line of lines) {
+      const m = line.match(/^\s*-\s*hostname:\s*([^\s#]+)\s*$/i);
+      if (!m) continue;
+      const host = String(m[1] || '').trim().toLowerCase();
+      if (!host || !host.endsWith(`.${rootDomain}`)) continue;
+      const sub = host.slice(0, -(`.${rootDomain}`).length);
+      if (!sub) continue;
+      const base = sub.split('.')[0];
+      if (!base) continue;
+      if (base.endsWith(apiSubdomainSuffix)) {
+        return base.slice(0, -apiSubdomainSuffix.length);
+      }
+      return base;
+    }
+  } catch (_) {
+    /* optional: config.yml may not exist in some deployments */
+  }
+  return '';
+}
+
+function resolveClientKey() {
+  const explicit = normalizeClientKey(connectionConfig.clientName || connectionConfig.defaultClientKey || '');
+  if (explicit && explicit !== 'auto') return explicit;
+  const fromTunnel = normalizeClientKey(readClientKeyFromTunnelConfig());
+  if (fromTunnel) return fromTunnel;
+  return '';
+}
+
+const configuredClientName = resolveClientKey();
 const autoWebOrigin = configuredClientName ? `https://${configuredClientName}.${rootDomain}` : null;
 const configuredClientOrigins = Object.values(connectionConfig.clients || {})
   .map((client) => client.webOrigin)
@@ -2437,6 +2476,7 @@ app.get('/api/broker-outstanding', async (req, res) => {
           A.VR_TYPE,
           A.VR_DATE,
           A.VR_NO,
+          NVL(A.DETAIL, '') AS DETAIL,
           NVL(A.DR_AMT,0) AS DR_AMT,
           CASE
             WHEN A.VR_DATE <= TO_DATE(:p_edt,'DD-MM-YYYY') THEN NVL(A.CR_AMT,0)
@@ -2631,19 +2671,91 @@ app.get('/api/sale-list', async (req, res) => {
 
 /**
  * Sale Bill Printing list (header-level rows) for one TYPE: SL / SE / CN.
- * Optional filters: bill_no, b_type, bill_date, mcode (party code).
+ * Optional filters: bill_no_from / bill_no_to, bill_date_from / bill_date_to (DD-MM-YYYY),
+ * legacy bill_no / bill_date (single), b_type, mcode (party code).
  */
 app.get('/api/sale-bill-printing-list', async (req, res) => {
   try {
-    const { comp_code, comp_uid, type, bill_no, b_type, bill_date, mcode } = req.query;
+    const {
+      comp_code,
+      comp_uid,
+      type,
+      bill_no,
+      bill_no_from,
+      bill_no_to,
+      b_type,
+      bill_date,
+      bill_date_from,
+      bill_date_to,
+      mcode,
+    } = req.query;
     const t = String(type ?? '').trim().toUpperCase();
     if (!['SL', 'SE', 'CN'].includes(t)) {
       return res.status(400).json({ error: "type is required and must be one of 'SL', 'SE', 'CN'." });
     }
-    const bn = bill_no != null ? String(bill_no).trim() : '';
     const bt = b_type != null ? String(b_type).trim() : '';
-    const bd = bill_date != null ? String(bill_date).trim() : '';
     const m = mcode != null ? String(mcode).trim() : '';
+
+    let bdf = bill_date_from != null ? String(bill_date_from).trim() : '';
+    let bdt = bill_date_to != null ? String(bill_date_to).trim() : '';
+    const bdLegacy = bill_date != null ? String(bill_date).trim() : '';
+    if (!bdf && !bdt && bdLegacy) {
+      bdf = bdLegacy;
+      bdt = bdLegacy;
+    }
+    if (bdf && !bdt) bdt = bdf;
+    if (bdt && !bdf) bdf = bdt;
+
+    const oracleDmyKey = (dmy) => {
+      const p = String(dmy).split('-');
+      if (p.length !== 3) return 0;
+      const [dd, mm, yy] = p.map((x) => parseInt(x, 10));
+      if (!yy || !mm || !dd) return 0;
+      return yy * 10000 + mm * 100 + dd;
+    };
+    if (bdf && bdt && oracleDmyKey(bdf) > oracleDmyKey(bdt)) {
+      const x = bdf;
+      bdf = bdt;
+      bdt = x;
+    }
+
+    let nobf = bill_no_from != null ? String(bill_no_from).trim() : '';
+    let nobt = bill_no_to != null ? String(bill_no_to).trim() : '';
+    const bnLegacy = bill_no != null ? String(bill_no).trim() : '';
+    if (!nobf && !nobt && bnLegacy) {
+      nobf = bnLegacy;
+      nobt = bnLegacy;
+    }
+    if (nobf && !nobt) nobt = nobf;
+    if (nobt && !nobf) nobf = nobt;
+
+    const billNosNumeric = (a, b) => {
+      const ta = String(a).trim();
+      const tb = String(b).trim();
+      if (!/^-?\d+$/.test(ta) || !/^-?\d+$/.test(tb)) return null;
+      const na = Number(ta);
+      const nb = Number(tb);
+      if (!Number.isFinite(na) || !Number.isFinite(nb)) return null;
+      return na <= nb ? { lo: na, hi: nb } : { lo: nb, hi: na };
+    };
+
+    let billNoSql = '';
+    const nums = nobf && nobt ? billNosNumeric(nobf, nobt) : null;
+    if (nums) {
+      billNoSql = 'AND A.BILL_NO BETWEEN :bill_no_lo AND :bill_no_hi';
+    } else if (nobf && nobt) {
+      billNoSql = 'AND TRIM(TO_CHAR(A.BILL_NO)) BETWEEN TRIM(:bill_no_from) AND TRIM(:bill_no_to)';
+      if (nobf > nobt) {
+        const z = nobf;
+        nobf = nobt;
+        nobt = z;
+      }
+    }
+
+    const dateSql =
+      bdf && bdt
+        ? "AND TRUNC(A.BILL_DATE) BETWEEN TRUNC(TO_DATE(:bill_date_from, 'DD-MM-YYYY')) AND TRUNC(TO_DATE(:bill_date_to, 'DD-MM-YYYY'))"
+        : '';
 
     const sql = `
       SELECT
@@ -2660,9 +2772,9 @@ app.get('/api/sale-bill-printing-list', async (req, res) => {
       JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND TRIM(A.CODE) = TRIM(B.CODE)
       WHERE A.COMP_CODE = :comp_code
         AND UPPER(TRIM(A.TYPE)) = :type
-        ${bn ? 'AND TRIM(TO_CHAR(A.BILL_NO)) = TRIM(:bill_no)' : ''}
+        ${billNoSql}
         ${bt ? 'AND NVL(TRIM(A.B_TYPE), \' \') = NVL(TRIM(:b_type), \' \')' : ''}
-        ${bd ? "AND TRUNC(A.BILL_DATE) = TRUNC(TO_DATE(:bill_date, 'DD-MM-YYYY'))" : ''}
+        ${dateSql}
         ${m ? 'AND TRIM(A.CODE) = TRIM(:mcode)' : ''}
       GROUP BY
         A.TYPE,
@@ -2672,12 +2784,21 @@ app.get('/api/sale-bill-printing-list', async (req, res) => {
         A.CODE,
         B.NAME,
         B.CITY
-      ORDER BY TRUNC(A.BILL_DATE) DESC, A.BILL_NO DESC, A.B_TYPE, A.CODE`;
+      ORDER BY TRUNC(A.BILL_DATE) ASC, A.BILL_NO ASC, A.B_TYPE, A.CODE`;
 
     const binds = { comp_code, type: t };
-    if (bn) binds.bill_no = bn;
+    if (nums) {
+      binds.bill_no_lo = nums.lo;
+      binds.bill_no_hi = nums.hi;
+    } else if (nobf && nobt) {
+      binds.bill_no_from = nobf;
+      binds.bill_no_to = nobt;
+    }
     if (bt) binds.b_type = bt;
-    if (bd) binds.bill_date = bd;
+    if (bdf && bdt) {
+      binds.bill_date_from = bdf;
+      binds.bill_date_to = bdt;
+    }
     if (m) binds.mcode = m;
 
     const rows = await runQuery(sql, binds, comp_uid);
