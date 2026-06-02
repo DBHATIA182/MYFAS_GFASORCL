@@ -1342,10 +1342,22 @@ async function insertItemMasterRow(binds, comp_uid) {
       },
     },
   ];
+  const attemptMeta = [
+    { required: ['COMP_CODE', 'COMP_YEAR', 'ITEM_CODE', 'ITEM_NAME', 'CAT', 'CAT_CODE', 'R_F', 'HSN_CODE', 'TAX_PER', 'S_CODE', 'P_CODE', 'AMT_CAL', 'USER_NAME', 'ENT_DATE'], omitUser: false, avoidsRf: false },
+    { required: ['COMP_CODE', 'COMP_YEAR', 'ITEM_CODE', 'ITEM_NAME', 'CAT', 'CAT_CODE', 'R_F', 'HSN_CODE', 'TAX_PER', 'S_CODE', 'P_CODE', 'AMT_CAL', 'USER_NAME'], omitUser: false, avoidsRf: false },
+    { required: ['COMP_CODE', 'COMP_YEAR', 'ITEM_CODE', 'ITEM_NAME', 'S_CODE', 'CAT_CODE', 'GRP_CODE', 'USER_NAME', 'ENT_DATE', 'P_CODE', 'ITEM_HEAD', 'SAP_CODE_R1', 'SAP_CODE_R2', 'TAX_PER', 'HSN_CODE', 'HSN_UNIT', 'BARD_ITEM_CODE', 'BARD_OP_STOCK', 'BARD_OP_RATE', 'BARD_OP_VALUE', 'TDG_Q_W', 'U_ITEM_CODE', 'BROK_CAL', 'AMT_CAL', 'HSN_NAME', 'UNIT_TYPE', 'E_D'], omitUser: false, avoidsRf: true },
+    { required: ['COMP_CODE', 'COMP_YEAR', 'ITEM_CODE', 'ITEM_NAME', 'CAT', 'CAT_CODE', 'R_F', 'HSN_CODE', 'TAX_PER', 'S_CODE', 'P_CODE', 'AMT_CAL'], omitUser: true, avoidsRf: false },
+    { required: ['COMP_CODE', 'COMP_YEAR', 'ITEM_CODE', 'ITEM_NAME', 'S_CODE', 'CAT_CODE', 'GRP_CODE', 'P_CODE', 'TAX_PER', 'HSN_CODE'], omitUser: true, avoidsRf: true },
+  ];
+  const allAttempts = attemptMeta.map((meta, i) => ({ ...meta, ...attempts[i] }));
+  const viable = allAttempts.filter((a) => insertAttemptHasColumns(a.required, cols));
+  const tryList = (viable.length ? viable : allAttempts).sort((a, b) => Number(b.avoidsRf) - Number(a.avoidsRf));
+
   let lastErr;
-  for (const { sql, binds: b } of attempts) {
+  for (const { sql, binds: b, omitUser } of tryList) {
     try {
-      await runQuery(sql, b, comp_uid, { autoCommit: true });
+      const b2 = omitUser ? (({ user_name, ...rest }) => rest)(b) : b;
+      await runQuery(sql, b2, comp_uid, { autoCommit: true, suppressDbErrorLog: true });
       return;
     } catch (err) {
       lastErr = err;
@@ -8776,7 +8788,7 @@ app.get('/api/item-master-list', async (req, res) => {
              ${selectExpr('CAT_CODE', 'NVL(I.CAT_CODE, \'\')', '\'\'')} AS CAT_CODE,
              ${selectExpr('GRP_CODE', 'NVL(I.GRP_CODE, \'\')', '\'\'')} AS GRP_CODE,
              CAST('' AS VARCHAR2(50)) AS CAT_NAME,
-             ${selectExpr('R_F', 'NVL(I.R_F, \'F\')', '\'F\'')} AS R_F,
+             'F' AS R_F,
              ${hsnExpr} AS HSN_CODE,
              ${selectExpr('HSN_NAME', 'NVL(I.HSN_NAME, \'\')', '\'\'')} AS HSN_NAME,
              ${selectExpr('HSN_UNIT', 'NVL(I.HSN_UNIT, \'\')', '\'\'')} AS HSN_UNIT,
