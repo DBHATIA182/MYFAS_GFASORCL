@@ -20,9 +20,19 @@ import Slide16 from './slides/Slide16';
 import Slide17TradingAc from './slides/Slide17TradingAc';
 import Slide18PlProfitLoss from './slides/Slide18PlProfitLoss';
 import Slide19BalanceSheet from './slides/Slide19BalanceSheet';
+import Slide33SaleGraph from './slides/Slide33SaleGraph';
+import Slide34OverdueCustomers from './slides/Slide34OverdueCustomers';
+import Slide26AccountMaster from './slides/Slide26AccountMaster';
+import Slide27ItemMaster from './slides/Slide27ItemMaster';
+import { AppSessionContext } from './components/AppSessionContext';
+import { IconSettings, IconVoice } from './components/ToolbarIcons';
 import { exitApp, performExitWindow } from './utils/exitApp';
 import connectionConfig from '../connection.config.json';
 import './App.css';
+import './styles/fasFlowTheme.css';
+import './styles/windalInitialFlow.css';
+import './styles/windalDashboard.css';
+import { getWindalDocumentTitle } from './utils/windalBrand';
 
 // Local: Vite dev uses '' so /api/* is proxied to port 5002 (see vite.config.js). Run `npm run server` in another terminal.
 // Vite preview / static file open on localhost still calls :5002 directly.
@@ -123,6 +133,8 @@ const configuredClientName = (() => {
   const v = normalizeClientKey(configuredClientNameRaw);
   return v === 'auto' ? '' : v;
 })();
+const APP_DISPLAY_NAME = String(connectionConfig.product?.displayName || '').trim() || 'GRAINFAS Accounting';
+const APP_DOCUMENT_TITLE = getWindalDocumentTitle(connectionConfig.product?.displayTitle);
 
 function getClientKeyFromHost(host, domain) {
   if (!host || !domain) return null;
@@ -195,6 +207,12 @@ if (!import.meta.env.DEV && !isLocalHost && !API_BASE) {
 console.log('Current API Base:', API_BASE || '(same origin /api proxy)');
 
 function App() {
+  const renderMinimalHeaderActions = () => (
+    <header className="app-header app-header--minimal">
+      <div className="app-header-actions">{renderViewSettings()}</div>
+    </header>
+  );
+
   const [detectedClientKey, setDetectedClientKey] = useState('');
   const initialAuth = readPersistedAuth();
   const [clientGuardChecked, setClientGuardChecked] = useState(false);
@@ -222,6 +240,11 @@ function App() {
   const [voiceListening, setVoiceListening] = useState(false);
   const [loginUserName, setLoginUserName] = useState(initialAuth.userName);
 
+  useEffect(() => {
+    if (typeof document !== 'undefined' && APP_DOCUMENT_TITLE) {
+      document.title = APP_DOCUMENT_TITLE;
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -519,7 +542,58 @@ function App() {
     else if (reportType === 'trading-ac') setCurrentSlide(18);
     else if (reportType === 'pl-profit-loss') setCurrentSlide(19);
     else if (reportType === 'balance-sheet') setCurrentSlide(20);
+    else if (reportType === 'sale-chart' || reportType === 'sale-graph') setCurrentSlide(33);
+    else if (reportType === 'overdue-customers') setCurrentSlide(34);
+    else if (reportType === 'account-master') setCurrentSlide(26);
+    else if (reportType === 'item-master') setCurrentSlide(27);
     else setCurrentSlide(4);
+  };
+
+  const openCustomerLedgerFromOverdue = (payload) => {
+    setFormData((prev) => ({
+      ...prev,
+      reportType: 'customer-ledger',
+      customerLedgerDrilldown: {
+        code: payload.code,
+        name: payload.name || '',
+        city: payload.city || '',
+        asOfDate: payload.asOfDate,
+        returnReport: 'overdue-customers',
+        returnSlide: 34,
+        autoRun: true,
+        at: Date.now(),
+      },
+    }));
+    setCurrentSlide(6);
+  };
+
+  const backFromCustomerLedger = () => {
+    if (formData.customerLedgerDrilldown?.returnReport === 'overdue-customers') {
+      setFormData((prev) => {
+        const { customerLedgerDrilldown, ...rest } = prev;
+        return { ...rest, reportType: 'overdue-customers' };
+      });
+      setCurrentSlide(34);
+      return;
+    }
+    setCurrentSlide(3);
+  };
+
+  const openSaleListFromChart = (payload) => {
+    setFormData((prev) => ({
+      ...prev,
+      reportType: 'sale-list',
+      saleChartDrilldown: {
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        itemCode: payload.itemCode || '',
+        itemName: payload.itemName || '',
+        monthLabel: payload.monthLabel || '',
+        autoRun: true,
+        at: Date.now(),
+      },
+    }));
+    setCurrentSlide(8);
   };
 
   const handlePrev = () => setCurrentSlide(prev => prev - 1);
@@ -593,6 +667,10 @@ function App() {
         { phrases: ['open trading account', 'trading account', 'open trading a c', 'trading a c'], reportType: 'trading-ac', slideNo: 18, title: 'Trading Account' },
         { phrases: ['open p and l', 'p and l', 'open profit and loss', 'profit and loss', 'open p l', 'p l'], reportType: 'pl-profit-loss', slideNo: 19, title: 'P&L' },
         { phrases: ['open balance sheet', 'balance sheet'], reportType: 'balance-sheet', slideNo: 20, title: 'Balance Sheet' },
+        { phrases: ['open sale chart', 'sale chart', 'open sale graph', 'sale graph'], reportType: 'sale-chart', slideNo: 33, title: 'Sale Chart' },
+        { phrases: ['open overdue customers', 'overdue customers', 'overdue customer'], reportType: 'overdue-customers', slideNo: 34, title: 'Overdue Customers' },
+        { phrases: ['open account master', 'account master', 'open a c master', 'a c master', 'ac master'], reportType: 'account-master', slideNo: 26, title: 'A/c Master' },
+        { phrases: ['open item master', 'item master'], reportType: 'item-master', slideNo: 27, title: 'Item Master' },
       ];
 
       for (const cmd of voiceCommands) {
@@ -610,10 +688,12 @@ function App() {
     <div className="view-settings">
       <button
         type="button"
-        className="view-settings-btn"
+        className="toolbar-icon-btn toolbar-icon-btn--settings view-settings-btn"
         onClick={() => setShowViewSettings((prev) => !prev)}
+        title="Settings"
+        aria-label="Settings"
       >
-        Settings
+        <IconSettings />
       </button>
       {showViewSettings ? (
         <div className="view-settings-menu">
@@ -725,6 +805,25 @@ function App() {
       </div>
     ) : null;
 
+  const flowHeaderActions = (
+    <>
+      {renderViewSettings()}
+      {voiceSupported ? (
+        <button
+          type="button"
+          className={`toolbar-icon-btn toolbar-icon-btn--voice voice-command-btn${
+            voiceListening ? ' voice-command-btn--listening toolbar-icon-btn--listening' : ''
+          }`}
+          onClick={handleVoiceCommand}
+          title={voiceListening ? 'Listening…' : 'Voice command'}
+          aria-label={voiceListening ? 'Listening for voice command' : 'Voice command'}
+        >
+          <IconVoice />
+        </button>
+      ) : null}
+    </>
+  );
+
   if (!viewMode) {
     return (
       <>
@@ -752,7 +851,13 @@ function App() {
     );
   }
 
-  const appClassName = `app ${viewMode === 'desktop' ? 'app--desktop' : 'app--mobile'}`;
+  const hideAppHeaderChrome = authenticated && currentSlide >= 1;
+  const useWindalInitial =
+    !authenticated || (authenticated && currentSlide >= 1 && currentSlide <= 2);
+  const useWindalDashboard = authenticated && currentSlide === 3;
+  /** All report screens after the menu (not login/company/year/dashboard). */
+  const useFasFlowFullScreen = authenticated && currentSlide > 3;
+  const appClassName = `app ${viewMode === 'desktop' ? 'app--desktop' : 'app--mobile'}${hideAppHeaderChrome ? ' app--no-header' : ''}${useWindalInitial ? ' app--windal-initial' : ''}${useWindalDashboard ? ' app--windal-dashboard' : ''}${useFasFlowFullScreen ? ' app--fas-flow' : ''}`;
 
   if (!clientGuardChecked) {
     return (
@@ -794,15 +899,13 @@ function App() {
     return (
       <>
       <div className={appClassName}>
-        <header className="app-header">
-          <h1>GRAINFAS Accounting</h1>
-          <div className="app-header-actions">
-            {renderViewSettings()}
-            <div className="status-badge">Sign in</div>
-          </div>
-        </header>
         <main className="app-main">
-          <LoginSlide apiBase={API_BASE} onSuccess={handleLoginSuccess} onExit={exitApp} />
+          <LoginSlide
+            apiBase={API_BASE}
+            onSuccess={handleLoginSuccess}
+            onExit={exitApp}
+            settingsSlot={renderViewSettings()}
+          />
         </main>
       </div>
       {renderDeployUpdateModal()}
@@ -814,12 +917,7 @@ function App() {
     return (
       <>
       <div className={appClassName}>
-        <header className="app-header">
-          <h1>GRAINFAS Accounting</h1>
-          <div className="app-header-actions">
-            {renderViewSettings()}
-          </div>
-        </header>
+        {renderMinimalHeaderActions()}
         <main className="app-main">
           <div className="app-loading">
             <h2>Connecting to client</h2>
@@ -837,32 +935,39 @@ function App() {
   return (
     <>
     <div className={appClassName}>
-      <header className="app-header">
-        <h1>GRAINFAS Accounting</h1>
-        <div className="app-header-actions">
-          {renderViewSettings()}
-          {voiceSupported ? (
-            <button
-              type="button"
-              className={`voice-command-btn${voiceListening ? ' voice-command-btn--listening' : ''}`}
-              onClick={handleVoiceCommand}
-            >
-              {voiceListening ? 'Listening...' : 'Voice'}
-            </button>
-          ) : null}
-        </div>
+      {!hideAppHeaderChrome ? (
+      <header className="app-header app-header--minimal">
+        <div className="app-header-actions">{flowHeaderActions}</div>
       </header>
+      ) : null}
 
+      <AppSessionContext.Provider value={{ formData, userName: loginUserName, headerActions: flowHeaderActions }}>
       <main className="app-main">
         {currentSlide === 1 && (
-          <Slide1 companies={companies} onNext={handleSlide1Next} onExit={handleExitApp} />
+          <Slide1
+            companies={companies}
+            onNext={handleSlide1Next}
+            onExit={handleExitApp}
+            userName={loginUserName}
+            flowHeaderActions={flowHeaderActions}
+          />
         )}
-        {currentSlide === 2 && <Slide2 years={years} formData={formData} onPrev={handlePrev} onNext={handleSlide2Next} />}
-        {currentSlide === 3 && <Slide3 formData={formData} onPrev={handlePrev} onNext={handleSlide3Next} />}
+        {currentSlide === 2 && (
+          <Slide2
+            years={years}
+            formData={formData}
+            onPrev={handlePrev}
+            onNext={handleSlide2Next}
+            flowHeaderActions={flowHeaderActions}
+          />
+        )}
+        {currentSlide === 3 && (
+          <Slide3 formData={formData} onPrev={handlePrev} onNext={handleSlide3Next} onExit={handleExitApp} />
+        )}
         {currentSlide === 4 && <Slide4 apiBase={API_BASE} formData={formData} onPrev={handlePrev} onReset={handleReset} />}
         {currentSlide === 5 && <Slide5 apiBase={API_BASE} formData={formData} onPrev={handlePrev} onReset={handleReset} />}
         {currentSlide === 6 && (
-          <Slide6 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+          <Slide6 apiBase={API_BASE} formData={formData} onPrev={backFromCustomerLedger} onReset={handleReset} />
         )}
         {currentSlide === 7 && (
           <Slide7 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
@@ -906,7 +1011,44 @@ function App() {
         {currentSlide === 20 && (
           <Slide19BalanceSheet apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
+        {currentSlide === 33 && (
+          <Slide33SaleGraph
+            apiBase={API_BASE}
+            formData={formData}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+            onOpenSaleList={openSaleListFromChart}
+          />
+        )}
+        {currentSlide === 34 && (
+          <Slide34OverdueCustomers
+            apiBase={API_BASE}
+            formData={formData}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+            onOpenCustomerLedger={openCustomerLedgerFromOverdue}
+          />
+        )}
+        {currentSlide === 26 && (
+          <Slide26AccountMaster
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+          />
+        )}
+        {currentSlide === 27 && (
+          <Slide27ItemMaster
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+          />
+        )}
       </main>
+      </AppSessionContext.Provider>
     </div>
     {renderDeployUpdateModal()}
     </>

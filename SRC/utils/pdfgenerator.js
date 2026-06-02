@@ -2834,6 +2834,96 @@ function buildProfitLossReportHtml(data, metadata) {
   `;
 }
 
+function buildAccountMasterReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'A/c Master List');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const grouped = new Map();
+  for (const r of rows) {
+    const schRaw = Number(r?.SCHEDULE ?? r?.SCH_NO ?? r?.schedule ?? r?.sch_no);
+    const schNo = Number.isFinite(schRaw) ? schRaw.toFixed(2) : '';
+    const schName = String(r?.SCH_NAME ?? r?.sch_name ?? '').trim();
+    const key = `${schNo}||${schName}`;
+    if (!grouped.has(key)) grouped.set(key, { schNo, schName, rows: [] });
+    grouped.get(key).rows.push(r);
+  }
+
+  const groups = Array.from(grouped.values()).sort((a, b) => {
+    const an = Number(a.schNo);
+    const bn = Number(b.schNo);
+    if (Number.isFinite(an) && Number.isFinite(bn) && an !== bn) return an - bn;
+    return String(a.schName).localeCompare(String(b.schName));
+  });
+
+  const body = groups
+    .map((g) => {
+      const schedHead = `${g.schNo || '—'} ${g.schName || ''}`.trim();
+      const detailRows = g.rows
+        .map(
+          (r) => `<tr>
+        <td>${escHtml(r?.CODE ?? r?.code ?? '')}</td>
+        <td>${escHtml(r?.NAME ?? r?.name ?? '')}</td>
+        <td>${escHtml(r?.CITY ?? r?.city ?? '')}</td>
+        <td>${escHtml(r?.GST_NO ?? r?.gst_no ?? '')}</td>
+        <td>${escHtml(r?.PAN ?? r?.pan ?? '')}</td>
+        <td>${escHtml(r?.L_C ?? r?.l_c ?? '')}</td>
+      </tr>`
+        )
+        .join('');
+      return `
+        <tr class="acm-schedule-head"><td colspan="6">SCHEDULE: ${escHtml(schedHead || '—')}</td></tr>
+        ${detailRows}
+      `;
+    })
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .acm-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .acm-pdf .acm-header { text-align: center; margin-bottom: 10px; }
+        .acm-pdf .acm-company { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .acm-pdf .acm-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .acm-pdf .acm-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .acm-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .acm-pdf .table-report th, .acm-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; line-height: 1.15; vertical-align: top; }
+        .acm-pdf .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+        .acm-pdf .table-report .acm-schedule-head td {
+          background: #e5e7eb;
+          color: #111827;
+          font-weight: 700;
+          border-top: 2px solid #9ca3af;
+          padding: 5px 6px;
+        }
+      </style>
+      <div class="acm-pdf report-doc">
+        <div class="acm-header">
+          <div class="acm-company">${company}</div>
+          <div class="acm-title">${title}</div>
+          <div class="acm-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>City</th>
+              <th>GST No</th>
+              <th>PAN</th>
+              <th>L/C</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="6">(No rows)</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'ledger') return buildLedgerReportHtml(data, metadata);
   if (reportType === 'trading-ledger') return buildTradingLedgerReportHtml(data, metadata);
@@ -2853,6 +2943,7 @@ export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'balance-sheet') return buildBalanceSheetReportHtml(data, metadata);
   if (reportType === 'trading-account') return buildTradingAccountReportHtml(data, metadata);
   if (reportType === 'profit-loss') return buildProfitLossReportHtml(data, metadata);
+  if (reportType === 'account-master') return buildAccountMasterReportHtml(data, metadata);
   return buildTrialBalanceReportHtml(data, metadata);
 }
 
@@ -2887,6 +2978,16 @@ function getPdfOptions(metadata, reportType) {
             scrollX: 0,
             scrollY: 0,
           }
+        : reportType === 'account-master'
+          ? {
+              // Large master lists can produce blank PDF pages at high canvas scales.
+              scale: 1,
+              useCORS: true,
+              logging: false,
+              windowWidth: 1800,
+              scrollX: 0,
+              scrollY: 0,
+            }
         : reportType === 'balance-sheet'
           ? {
               scale: 1.35,
@@ -2904,7 +3005,10 @@ function getPdfOptions(metadata, reportType) {
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas,
     jsPDF: {
-      orientation: reportType === 'sale-bill' || reportType === 'purchase-bill' ? 'portrait' : 'landscape',
+      orientation:
+        reportType === 'sale-bill' || reportType === 'purchase-bill' || reportType === 'account-master'
+          ? 'portrait'
+          : 'landscape',
       unit: 'mm',
       format: 'a4',
     },
@@ -3027,6 +3131,8 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
         ? metadata?.billLedgerTitle || 'CustomerLedger'
         : reportType === 'broker-os'
           ? 'Broker outstanding'
+          : reportType === 'account-master'
+            ? 'A/c Master List'
           : reportType === 'sale-list'
             ? 'Sale list'
             : reportType === 'sale-bill'

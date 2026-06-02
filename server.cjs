@@ -589,6 +589,897 @@ function isLoginOptionalTableError(err) {
   );
 }
 
+function isOracleMissingObjectError(err) {
+  return isLoginOptionalTableError(err);
+}
+
+function rightsPermissionsFromString(s, legacyFlag, flagName) {
+  const str = String(s || '');
+  const ch = (i) => (str.length > i ? str.charAt(i) : '');
+  const bit = (i) => ch(i) === '1';
+  if (!str) {
+    return { canOpen: true, canAdd: true, canEdit: true, canDelete: true, flags: legacyFlag };
+  }
+  return {
+    canOpen: bit(0),
+    canAdd: bit(1),
+    canEdit: bit(2),
+    canDelete: bit(3),
+    flags: flagName,
+  };
+}
+
+function masterPartyScheduleBind(schedule) {
+  const sch = Number(schedule);
+  return Number.isFinite(sch) ? Math.round(sch * 100) / 100 : 0;
+}
+
+/** VFP: SCH_NO must be non-zero and not a whole number (e.g. 8.10 ok, 8 not). */
+function isValidMasterScheduleNoServer(schedule) {
+  const n = Number(schedule);
+  if (!Number.isFinite(n) || n === 0) return false;
+  return Math.abs(n - Math.trunc(n)) > 1e-9;
+}
+
+function normalizeMasterPartyCodeKey(code) {
+  return String(code ?? '')
+    .trim()
+    .toUpperCase()
+    .slice(0, 6);
+}
+
+function isValidMasterPartyCodeFormat(code) {
+  const c = normalizeMasterPartyCodeKey(code);
+  return /^[A-Z][0-9]{5}$/.test(c);
+}
+
+function nextMasterCodeFromLastVfp(lastCode, rangePrefix) {
+  const prefix = String(rangePrefix ?? '')
+    .trim()
+    .toUpperCase()
+    .charAt(0);
+  if (!prefix) return '';
+  const mcode = normalizeMasterPartyCodeKey(lastCode);
+  if (!mcode) return `${prefix}00001`;
+  const suffix = mcode.length >= 6 ? mcode.slice(1, 6) : mcode.slice(1);
+  const num = (parseInt(suffix.replace(/\D/g, ''), 10) || 0) + 1;
+  if (num > 99999) {
+    const err = new Error('Maximum account code reached for this range.');
+    err.status = 400;
+    throw err;
+  }
+  return `${prefix}${String(num).padStart(5, '0')}`;
+}
+
+async function fetchMasterPartyScheduleRows(comp_code, comp_uid) {
+  const sqlSched = `
+      SELECT NVL(S.NO, 0) AS NO, NVL(S.NAME, '') AS NAME, NVL(S.RANGE, '') AS RANGE
+      FROM SCHEDULE S
+      WHERE S.COMP_CODE = :comp_code
+      ORDER BY S.NAME, S.NO`;
+  try {
+    const rows = await runQuery(sqlSched, { comp_code }, comp_uid);
+    if (Array.isArray(rows) && rows.length > 0) {
+      // VFP9 parity: schedules must be non-integer decimals (e.g. 8.10, not 8).
+      return rows.filter((r) => isValidMasterScheduleNoServer(r.NO ?? r.no));
+    }
+  } catch (err) {
+    if (!isOracleMissingObjectError(err)) throw err;
+  }
+  const sqlMaster = `
+      SELECT DISTINCT ROUND(NVL(M.SCHEDULE, 0), 2) AS NO,
+             TO_CHAR(ROUND(NVL(M.SCHEDULE, 0), 2)) AS NAME,
+             '' AS RANGE
+      FROM MASTER M
+      WHERE M.COMP_CODE = :comp_code
+        AND NVL(M.SCHEDULE, 0) <> 0
+      ORDER BY 1`;
+  const rows = await runQuery(sqlMaster, { comp_code }, comp_uid);
+  return (rows || []).filter((r) => isValidMasterScheduleNoServer(r.NO ?? r.no));
+}
+
+async function fetchMasterPartyStateRows(comp_uid, comp_code) {
+  const tableSqls = [
+    `SELECT TRIM(STATE) AS STATE, TRIM(STATE_CODE) AS STATE_CODE FROM GST_STATE WHERE TRIM(NVL(STATE_CODE, '')) IS NOT NULL ORDER BY STATE`,
+    `SELECT TRIM(STATE) AS STATE, TRIM(STATE_CODE) AS STATE_CODE FROM STATE WHERE TRIM(NVL(STATE_CODE, '')) IS NOT NULL ORDER BY STATE`,
+    `SELECT TRIM(STATE) AS STATE, TRIM(STATE_CODE) AS STATE_CODE FROM STATES WHERE TRIM(NVL(STATE_CODE, '')) IS NOT NULL ORDER BY STATE`,
+  ];
+  for (const sql of tableSqls) {
+    try {
+      const rows = await runQuery(sql, {}, comp_uid, { suppressDbErrorLog: true });
+      if (Array.isArray(rows) && rows.length > 0) return rows;
+    } catch (err) {
+      if (!isOracleMissingObjectError(err)) throw err;
+    }
+  }
+  if (comp_code) {
+    const sqlMaster = `
+        SELECT DISTINCT TRIM(M.STATE) AS STATE, TRIM(M.STATE_CODE) AS STATE_CODE
+        FROM MASTER M
+        WHERE M.COMP_CODE = :comp_code
+          AND TRIM(NVL(M.STATE_CODE, '')) IS NOT NULL
+        ORDER BY M.STATE`;
+    try {
+      const rows = await runQuery(sqlMaster, { comp_code }, comp_uid, { suppressDbErrorLog: true });
+      if (Array.isArray(rows) && rows.length > 0) return rows;
+    } catch (err) {
+      if (!isOracleMissingObjectError(err)) throw err;
+    }
+  }
+  return [];
+}
+
+async function fetchScheduleRowForMaster(comp_code, schedNo, comp_uid) {
+  const sched = masterPartyScheduleBind(schedNo);
+  const sql = `
+    SELECT NVL(S.NAME, '') AS NAME, NVL(S.RANGE, '') AS RANGE, NVL(S.NO, 0) AS NO
+    FROM SCHEDULE S
+    WHERE S.COMP_CODE = :comp_code
+      AND (ROUND(NVL(S.NO, 0), 2) = :sched OR NVL(S.NO, 0) = :sched_raw)
+      AND ROWNUM = 1`;
+  try {
+    const rows = await runQuery(sql, { comp_code, sched, sched_raw: schedNo }, comp_uid);
+    if (rows?.[0]) return rows[0];
+  } catch (err) {
+    if (!isOracleMissingObjectError(err)) throw err;
+  }
+  return null;
+}
+
+/** VFP: RANGE prefix + MAX(CODE) by first character → next VARCHAR2(6) code. */
+async function computeVfpMasterPartyNextCode(comp_code, comp_uid, schedNo) {
+  if (!isValidMasterScheduleNoServer(schedNo)) {
+    const err = new Error('Select Valid Schedule');
+    err.status = 400;
+    throw err;
+  }
+  const schedRow = await fetchScheduleRowForMaster(comp_code, schedNo, comp_uid);
+  if (!schedRow) {
+    const err = new Error('!!! Invalid Schedule !!!');
+    err.status = 400;
+    throw err;
+  }
+  const scheduleName = String(schedRow.NAME ?? schedRow.name ?? '').trim();
+  const mrange = String(schedRow.RANGE ?? schedRow.range ?? '')
+    .trim()
+    .toUpperCase()
+    .charAt(0);
+  if (!mrange) {
+    const err = new Error('Schedule has no RANGE prefix.');
+    err.status = 400;
+    throw err;
+  }
+  const maxRows = await runQuery(
+    `SELECT MAX(TRIM(M.CODE)) AS CODE
+     FROM MASTER M
+     WHERE M.COMP_CODE = :comp_code
+       AND UPPER(SUBSTR(TRIM(M.CODE), 1, 1)) = :mrange`,
+    { comp_code, mrange },
+    comp_uid
+  );
+  const lastCode = String(maxRows?.[0]?.CODE ?? maxRows?.[0]?.code ?? '').trim();
+  const next_code = nextMasterCodeFromLastVfp(lastCode, mrange);
+  const schedule = masterPartyScheduleBind(schedNo);
+  return {
+    next_code,
+    NEXT_CODE: next_code,
+    last_code: lastCode,
+    LAST_CODE: lastCode,
+    schedule_name: scheduleName,
+    SCHEDULE_NAME: scheduleName,
+    range_prefix: mrange,
+    schedule,
+  };
+}
+
+async function insertMasterPartyRow(binds, comp_uid) {
+  const attempts = [
+    {
+      sql: `
+      INSERT INTO MASTER (
+        COMP_CODE, COMP_YEAR, SCHEDULE, CODE, NAME, ADD1, ADD2, ADD3, CITY,
+        GST_NO, STATE_CODE, STATE, PAN, TEL_NO_O, L_C, USER_NAME, ENT_DATE
+      ) VALUES (
+        :comp_code, :comp_year, :schedule, :code, :name, :add1, :add2, :add3, :city,
+        :gst_no, :state_code, :state, :pan, :tel_no_o, :l_c, :user_name, SYSDATE
+      )`,
+      binds,
+    },
+    {
+      sql: `
+      INSERT INTO MASTER (
+        COMP_CODE, COMP_YEAR, SCHEDULE, CODE, NAME, ADD1, ADD2, ADD3, CITY,
+        GST_NO, STATE_CODE, STATE, PAN, TEL_NO_O, L_C, USER_NAME
+      ) VALUES (
+        :comp_code, :comp_year, :schedule, :code, :name, :add1, :add2, :add3, :city,
+        :gst_no, :state_code, :state, :pan, :tel_no_o, :l_c, :user_name
+      )`,
+      binds,
+    },
+    {
+      sql: `
+      INSERT INTO MASTER (
+        COMP_CODE, COMP_YEAR, SCHEDULE, CODE, NAME, ADD1, ADD2, ADD3, CITY,
+        GST_NO, STATE_CODE, STATE, PAN, TEL_NO_O, L_C
+      ) VALUES (
+        :comp_code, :comp_year, :schedule, :code, :name, :add1, :add2, :add3, :city,
+        :gst_no, :state_code, :state, :pan, :tel_no_o, :l_c
+      )`,
+      binds: (({ user_name, ...rest }) => rest)(binds),
+    },
+    {
+      sql: `
+      INSERT INTO MASTER (
+        COMP_CODE, COMP_YEAR, SCHEDULE, CODE, NAME, ADD1, ADD2, ADD3, CITY,
+        GST_NO, STATE_CODE, STATE, PAN, TEL_NO_O
+      ) VALUES (
+        :comp_code, :comp_year, :schedule, :code, :name, :add1, :add2, :add3, :city,
+        :gst_no, :state_code, :state, :pan, :tel_no_o
+      )`,
+      binds: (({ user_name, l_c, ...rest }) => rest)(binds),
+    },
+  ];
+  const attemptMeta = [
+    { required: ['COMP_CODE', 'COMP_YEAR', 'ITEM_CODE', 'ITEM_NAME', 'CAT', 'CAT_CODE', 'R_F', 'HSN_CODE', 'TAX_PER', 'S_CODE', 'P_CODE', 'AMT_CAL', 'USER_NAME', 'ENT_DATE'], omitUser: false, avoidsRf: false },
+    { required: ['COMP_CODE', 'COMP_YEAR', 'ITEM_CODE', 'ITEM_NAME', 'CAT', 'CAT_CODE', 'R_F', 'HSN_CODE', 'TAX_PER', 'S_CODE', 'P_CODE', 'AMT_CAL', 'USER_NAME'], omitUser: false, avoidsRf: false },
+    { required: ['COMP_CODE', 'COMP_YEAR', 'ITEM_CODE', 'ITEM_NAME', 'S_CODE', 'CAT_CODE', 'GRP_CODE', 'USER_NAME', 'ENT_DATE', 'P_CODE', 'ITEM_HEAD', 'SAP_CODE_R1', 'SAP_CODE_R2', 'TAX_PER', 'HSN_CODE', 'HSN_UNIT', 'BARD_ITEM_CODE', 'BARD_OP_STOCK', 'BARD_OP_RATE', 'BARD_OP_VALUE', 'TDG_Q_W', 'U_ITEM_CODE', 'BROK_CAL', 'AMT_CAL', 'HSN_NAME', 'UNIT_TYPE', 'E_D'], omitUser: false, avoidsRf: true },
+    { required: ['COMP_CODE', 'COMP_YEAR', 'ITEM_CODE', 'ITEM_NAME', 'CAT', 'CAT_CODE', 'R_F', 'HSN_CODE', 'TAX_PER', 'S_CODE', 'P_CODE', 'AMT_CAL'], omitUser: true, avoidsRf: false },
+    { required: ['COMP_CODE', 'COMP_YEAR', 'ITEM_CODE', 'ITEM_NAME', 'S_CODE', 'CAT_CODE', 'GRP_CODE', 'P_CODE', 'TAX_PER', 'HSN_CODE'], omitUser: true, avoidsRf: true },
+  ];
+  const allAttempts = attemptMeta.map((meta, i) => ({ ...meta, ...attempts[i] }));
+  const viable = allAttempts.filter((a) => insertAttemptHasColumns(a.required, cols));
+  let tryList = viable.length ? viable : allAttempts;
+  tryList = [...tryList].sort((a, b) => Number(b.avoidsRf) - Number(a.avoidsRf));
+
+  let lastErr;
+  for (const { sql, binds: b, omitUser } of tryList) {
+    try {
+      const b2 = omitUser ? (({ user_name, ...rest }) => rest)(b) : b;
+      await runQuery(sql, b2, comp_uid, { autoCommit: true, suppressDbErrorLog: true });
+      return;
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err?.message || '');
+      if (!msg.includes('00904') && !/invalid identifier/i.test(msg)) throw err;
+    }
+  }
+  throw lastErr || new Error('MASTER insert failed');
+}
+
+async function deleteMasterPartyByCode(comp_code, code, comp_uid) {
+  const codeKey = normalizeMasterPartyCodeKey(code);
+  await runQuery(
+    `DELETE FROM MASTER WHERE COMP_CODE = :comp_code AND TRIM(CODE) = :code`,
+    { comp_code, code: codeKey },
+    comp_uid,
+    { autoCommit: true }
+  );
+}
+
+function trimMasterPartyField(v, maxLen) {
+  const s = String(v ?? '').trim();
+  if (!maxLen || s.length <= maxLen) return s;
+  return s.slice(0, maxLen);
+}
+
+function normalizeMasterPartyLc(v) {
+  const x = String(v ?? 'L')
+    .trim()
+    .toUpperCase();
+  if (x === 'C' || x === 'CENTRAL') return 'C';
+  if (x === 'I' || x === 'IMPORT') return 'I';
+  return 'L';
+}
+
+function buildMasterPartyInsertBinds(body, { comp_code, comp_year, user_name, schedule, codeKey }) {
+  const name = trimMasterPartyField(body.name, 50).toUpperCase();
+  if (!name) {
+    const err = new Error('Name is required');
+    err.status = 400;
+    throw err;
+  }
+  const lcRaw = String(body.l_c ?? body.L_C ?? '').trim();
+  if (!lcRaw) {
+    const err = new Error('L_C (Local/Central/Import) is required. Use L, C, or I.');
+    err.status = 400;
+    throw err;
+  }
+  const code = normalizeMasterPartyCodeKey(codeKey);
+  if (!isValidMasterPartyCodeFormat(code)) {
+    const err = new Error('Account code must be 6 characters: 1 letter (schedule range) + 5 digits.');
+    err.status = 400;
+    throw err;
+  }
+  return {
+    comp_code,
+    comp_year,
+    schedule,
+    code,
+    name,
+    add1: trimMasterPartyField(body.add1, 40),
+    add2: trimMasterPartyField(body.add2, 40),
+    add3: trimMasterPartyField(body.add3, 40),
+    city: trimMasterPartyField(body.city, 20),
+    gst_no: trimMasterPartyField(body.gst_no, 15),
+    state_code: trimMasterPartyField(body.state_code, 2),
+    state: trimMasterPartyField(body.state, 30).toUpperCase(),
+    pan: trimMasterPartyField(body.pan, 10).toUpperCase(),
+    tel_no_o: trimMasterPartyField(body.tel_no_o ?? body.tel_no, 30),
+    l_c: normalizeMasterPartyLc(lcRaw),
+    user_name,
+  };
+}
+
+function masterPartySavedJson(binds, schedule) {
+  return {
+    ok: true,
+    CODE: binds.code,
+    code: binds.code,
+    NAME: binds.name,
+    name: binds.name,
+    CITY: binds.city,
+    city: binds.city,
+    GST_NO: binds.gst_no,
+    gst_no: binds.gst_no,
+    PAN: binds.pan,
+    pan: binds.pan,
+    L_C: binds.l_c,
+    l_c: binds.l_c,
+    SCHEDULE: schedule,
+    schedule,
+    ADD1: binds.add1,
+    add1: binds.add1,
+    ADD2: binds.add2,
+    add2: binds.add2,
+    ADD3: binds.add3,
+    add3: binds.add3,
+    STATE_CODE: binds.state_code,
+    state_code: binds.state_code,
+    STATE: binds.state,
+    state: binds.state,
+    TEL_NO_O: binds.tel_no_o,
+    tel_no_o: binds.tel_no_o,
+  };
+}
+
+function trimItemMasterField(v, maxLen) {
+  const s = String(v ?? '').trim();
+  return maxLen > 0 && s.length > maxLen ? s.slice(0, maxLen) : s;
+}
+
+function normalizeMasterCodeField(v) {
+  const s = trimItemMasterField(v, 20).toUpperCase();
+  return s === '0' ? '' : s;
+}
+
+function normalizeItemMasterRf(v) {
+  const x = String(v ?? '').trim().toUpperCase();
+  if (!x) return '';
+  if (x === 'R' || x === 'F') return x;
+  return '';
+}
+
+function normalizeItemMasterAmtCal(v) {
+  const x = String(v ?? 'W').trim().toUpperCase();
+  if (x !== 'Q' && x !== 'W' && x !== 'K') {
+    const err = new Error('Amt basis must be Q, W, or K.');
+    err.status = 400;
+    throw err;
+  }
+  return x;
+}
+
+function normalizeItemMasterBrokCal(v) {
+  const x = String(v ?? 'Q').trim().toUpperCase();
+  if (x !== 'Q' && x !== 'W' && x !== 'A') {
+    const err = new Error('Brok Cal must be Q, W, or A.');
+    err.status = 400;
+    throw err;
+  }
+  return x;
+}
+
+function normalizeItemMasterTdgQW(v) {
+  const x = String(v ?? 'W').trim().toUpperCase();
+  if (x !== 'Q' && x !== 'W') {
+    const err = new Error('TDG Qty/Wgt must be Q or W.');
+    err.status = 400;
+    throw err;
+  }
+  return x;
+}
+
+function normalizeItemMasterUnitType(v) {
+  const x = String(v ?? 'Q').trim().toUpperCase();
+  if (x !== 'Q' && x !== 'K' && x !== 'P') {
+    const err = new Error('Unit Type must be Q, K, or P.');
+    err.status = 400;
+    throw err;
+  }
+  return x;
+}
+
+function buildItemMasterInsertBinds(body, { comp_code, comp_year, user_name, itemCode }) {
+  const item_code = trimItemMasterField(itemCode ?? body.item_code ?? body.ITEM_CODE, 13);
+  if (!item_code) {
+    const err = new Error('Item code is required.');
+    err.status = 400;
+    throw err;
+  }
+  const item_name = trimItemMasterField(body.item_name ?? body.ITEM_NAME, 50).toUpperCase();
+  if (!item_name) {
+    const err = new Error('Item name is required.');
+    err.status = 400;
+    throw err;
+  }
+  const r_f = normalizeItemMasterRf(body.r_f ?? body.R_F ?? '');
+  const amt_cal = normalizeItemMasterAmtCal(body.amt_cal ?? body.AMT_CAL ?? 'W');
+  const tax_per = Number(body.tax_per ?? body.TAX_PER ?? 0);
+  const s_code = normalizeMasterCodeField(body.s_code ?? body.S_CODE);
+  const p_code = normalizeMasterCodeField(body.p_code ?? body.P_CODE);
+  const bard_item_code = Math.floor(Number(body.bard_item_code ?? body.BARD_ITEM_CODE ?? 0)) || 0;
+  const bard_op_stock = Number(body.bard_op_stock ?? body.BARD_OP_STOCK ?? 0) || 0;
+  const bard_op_rate = Number(body.bard_op_rate ?? body.BARD_OP_RATE ?? 0) || 0;
+  const bard_op_value = Number(body.bard_op_value ?? body.BARD_OP_VALUE ?? 0) || 0;
+  const brok_cal = normalizeItemMasterBrokCal(body.brok_cal ?? body.BROK_CAL ?? 'Q');
+  const tdg_q_w = normalizeItemMasterTdgQW(body.tdg_q_w ?? body.TDG_Q_W ?? 'W');
+  const unit_type = normalizeItemMasterUnitType(body.unit_type ?? body.UNIT_TYPE ?? 'Q');
+  return {
+    comp_code,
+    comp_year,
+    item_code,
+    item_name,
+    cat: trimItemMasterField(body.cat ?? body.CAT, 1).toUpperCase(),
+    cat_code: trimItemMasterField(body.cat_code ?? body.CAT_CODE, 6).toUpperCase(),
+    grp_code: trimItemMasterField(body.grp_code ?? body.GRP_CODE ?? body.mcat ?? body.MCAT ?? body.cat_code ?? body.CAT_CODE, 6).toUpperCase(),
+    r_f,
+    hsn_code: trimItemMasterField(body.hsn_code ?? body.HSN_CODE, 8).toUpperCase(),
+    hsn_unit: trimItemMasterField(body.hsn_unit ?? body.HSN_UNIT, 6).toUpperCase(),
+    hsn_name: trimItemMasterField(body.hsn_name ?? body.HSN_NAME, 60).toUpperCase(),
+    tax_per: Number.isFinite(tax_per) ? tax_per : 0,
+    s_code,
+    p_code,
+    amt_cal,
+    item_head: trimItemMasterField(body.item_head ?? body.ITEM_HEAD, 8).toUpperCase(),
+    sap_code_r1: trimItemMasterField(body.sap_code_r1 ?? body.SAP_CODE_R1, 20).toUpperCase(),
+    sap_code_r2: trimItemMasterField(body.sap_code_r2 ?? body.SAP_CODE_R2, 20).toUpperCase(),
+    u_item_code: trimItemMasterField(body.u_item_code ?? body.U_ITEM_CODE, 20).toUpperCase(),
+    bard_item_code,
+    bard_op_stock,
+    bard_op_rate,
+    bard_op_value,
+    tdg_q_w,
+    unit_type,
+    brok_cal,
+    e_d: trimItemMasterField(body.e_d ?? body.E_D, 1).toUpperCase(),
+    user_name,
+  };
+}
+
+function itemMasterSavedJson(binds) {
+  return {
+    ok: true,
+    ITEM_CODE: binds.item_code,
+    item_code: binds.item_code,
+    ITEM_NAME: binds.item_name,
+    item_name: binds.item_name,
+    CAT: binds.cat,
+    cat: binds.cat,
+    CAT_CODE: binds.cat_code,
+    cat_code: binds.cat_code,
+    R_F: binds.r_f,
+    r_f: binds.r_f,
+    HSN_CODE: binds.hsn_code,
+    hsn_code: binds.hsn_code,
+    TAX_PER: binds.tax_per,
+    tax_per: binds.tax_per,
+    S_CODE: binds.s_code,
+    s_code: binds.s_code,
+    P_CODE: binds.p_code,
+    p_code: binds.p_code,
+    AMT_CAL: binds.amt_cal,
+    amt_cal: binds.amt_cal,
+  };
+}
+
+async function deleteItemMasterByCode(comp_code, item_code, comp_uid) {
+  await runQuery(
+    `DELETE FROM ITEMMAST WHERE COMP_CODE = :comp_code AND ITEM_CODE = :item_code`,
+    { comp_code, item_code: trimItemMasterField(item_code, 13) },
+    comp_uid,
+    { autoCommit: true }
+  );
+}
+
+async function countItemStockEntries(comp_code, item_code, comp_uid) {
+  const code = trimItemMasterField(item_code, 13);
+  const checks = [
+    `SELECT COUNT(*) AS CNT FROM LOTSTOCK
+     WHERE COMP_CODE = :comp_code AND ITEM_CODE = :item_code`,
+    `SELECT COUNT(*) AS CNT FROM STOCK
+     WHERE COMP_CODE = :comp_code AND ITEM_CODE = :item_code AND NVL(TYPE, ' ') <> 'OP'`,
+  ];
+  for (const sql of checks) {
+    try {
+      const rows = await runQuery(sql, { comp_code, item_code: code }, comp_uid);
+      const cnt = Number(rows?.[0]?.CNT ?? rows?.[0]?.cnt ?? 0);
+      if (cnt > 0) return cnt;
+    } catch (err) {
+      if (!isOracleMissingObjectError(err)) throw err;
+    }
+  }
+  return 0;
+}
+
+async function fetchItemMasterCatRows(comp_code, comp_uid) {
+  const attempts = [
+    { sql: `SELECT CAT_NAME, CAT_CODE FROM CATMAST WHERE COMP_CODE = :comp_code ORDER BY CAT_NAME`, binds: { comp_code } },
+    { sql: `SELECT CAT_NAME, CAT_CODE FROM CATMAST ORDER BY CAT_NAME`, binds: {} },
+    { sql: `SELECT CAT_NAME, CAT_CODE, NVL(MAIN_CAT, CAT) AS CAT FROM CAT WHERE COMP_CODE = :comp_code ORDER BY CAT_NAME`, binds: { comp_code } },
+    { sql: `SELECT CAT_NAME, CAT_CODE, NVL(MAIN_CAT, CAT) AS CAT FROM CAT ORDER BY CAT_NAME`, binds: {} },
+    { sql: `SELECT CAT_NAME, CAT_CODE FROM CAT WHERE COMP_CODE = :comp_code ORDER BY CAT_NAME`, binds: { comp_code } },
+    {
+      sql: `SELECT DISTINCT NVL(CAT_CODE, '') AS CAT_CODE, NVL(CAT_CODE, '') AS CAT_NAME
+            FROM ITEMMAST WHERE COMP_CODE = :comp_code AND NVL(CAT_CODE, '') <> ''
+            ORDER BY CAT_CODE`,
+      binds: { comp_code },
+    },
+  ];
+  for (const { sql, binds } of attempts) {
+    try {
+      const rows = await runQuery(sql, binds, comp_uid);
+      if (Array.isArray(rows) && rows.length > 0) return rows;
+    } catch (err) {
+      if (!isOracleMissingObjectError(err) && !/invalid identifier/i.test(String(err?.message || ''))) {
+        throw err;
+      }
+    }
+  }
+  return [];
+}
+
+const itemMastColCache = new Map();
+
+async function getItemMastColumns(comp_uid) {
+  const key = String(comp_uid || '_').trim() || '_';
+  if (itemMastColCache.has(key)) return itemMastColCache.get(key);
+  const colRows = await runQuery(
+    `SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = 'ITEMMAST' ORDER BY COLUMN_ID`,
+    {},
+    comp_uid,
+    { suppressDbErrorLog: true }
+  ).catch(() => []);
+  const cols = new Set(
+    (colRows || []).map((r) => String(r.COLUMN_NAME ?? r.column_name ?? '').toUpperCase())
+  );
+  itemMastColCache.set(key, cols);
+  return cols;
+}
+
+function insertAttemptHasColumns(required, cols) {
+  return required.every((c) => cols.has(c));
+}
+
+async function validateItemMasterSaveFields(comp_code, comp_uid, binds) {
+  const tasks = [];
+  if (binds.s_code) {
+    tasks.push(validateMasterCodeIfPresent(comp_code, comp_uid, binds.s_code, 'Trading A/c'));
+  }
+  if (binds.p_code) {
+    tasks.push(validateMasterCodeIfPresent(comp_code, comp_uid, binds.p_code, 'Purchase Code A/c'));
+  }
+  if (binds.grp_code) {
+    tasks.push(validateItemGroupIfPresent(comp_code, comp_uid, binds.grp_code));
+  }
+  if (binds.cat_code) {
+    tasks.push(validateCatCodeIfPresent(comp_code, comp_uid, binds.cat_code));
+  }
+  if (tasks.length) await Promise.all(tasks);
+}
+
+async function fetchItemMasterItemGrpRows(comp_code, comp_uid) {
+  const attempts = [
+    { sql: `SELECT GRP_NAME, GRP_CODE FROM ITEM_GRP WHERE COMP_CODE = :comp_code ORDER BY GRP_NAME`, binds: { comp_code } },
+    { sql: `SELECT GRP_NAME, GRP_CODE FROM ITEM_GRP ORDER BY GRP_NAME`, binds: {} },
+    { sql: `SELECT CAT_NAME AS GRP_NAME, CAT_CODE AS GRP_CODE FROM CATMAST WHERE COMP_CODE = :comp_code ORDER BY CAT_NAME`, binds: { comp_code } },
+    {
+      sql: `SELECT DISTINCT NVL(GRP_CODE, '') AS GRP_CODE, NVL(GRP_CODE, '') AS GRP_NAME
+            FROM ITEMMAST WHERE COMP_CODE = :comp_code AND NVL(GRP_CODE, '') <> ''
+            ORDER BY GRP_CODE`,
+      binds: { comp_code },
+    },
+  ];
+  for (const { sql, binds } of attempts) {
+    try {
+      const rows = await runQuery(sql, binds, comp_uid);
+      if (Array.isArray(rows) && rows.length > 0) return rows;
+    } catch (err) {
+      if (!isOracleMissingObjectError(err) && !/invalid identifier/i.test(String(err?.message || ''))) {
+        throw err;
+      }
+    }
+  }
+  return [];
+}
+
+/** INSERT ITEMMAST — one SQL chosen from cached USER_TAB_COLUMNS (avoids slow trial inserts). */
+async function insertItemMasterRow(binds, comp_uid) {
+  const cols = await getItemMastColumns(comp_uid);
+  const attempts = [
+    {
+      sql: `
+      INSERT INTO ITEMMAST (
+        COMP_CODE, COMP_YEAR, ITEM_CODE, ITEM_NAME, CAT, CAT_CODE, R_F, HSN_CODE,
+        TAX_PER, S_CODE, P_CODE, AMT_CAL, USER_NAME, ENT_DATE
+      ) VALUES (
+        :comp_code, :comp_year, TRIM(:item_code), TRIM(:item_name), TRIM(:cat), TRIM(:cat_code),
+        TRIM(:r_f), RTRIM(:hsn_code), :tax_per, :s_code, :p_code, RTRIM(:amt_cal),
+        :user_name, SYSDATE
+      )`,
+      binds: {
+        comp_code: binds.comp_code,
+        comp_year: binds.comp_year,
+        item_code: binds.item_code,
+        item_name: binds.item_name,
+        cat: binds.cat,
+        cat_code: binds.cat_code,
+        r_f: binds.r_f || 'F',
+        hsn_code: binds.hsn_code,
+        tax_per: binds.tax_per,
+        s_code: binds.s_code,
+        p_code: binds.p_code,
+        amt_cal: binds.amt_cal || 'W',
+        user_name: binds.user_name,
+      },
+    },
+    {
+      sql: `
+      INSERT INTO ITEMMAST (
+        COMP_CODE, COMP_YEAR, ITEM_CODE, ITEM_NAME, CAT, CAT_CODE, R_F, HSN_CODE,
+        TAX_PER, S_CODE, P_CODE, AMT_CAL, USER_NAME
+      ) VALUES (
+        :comp_code, :comp_year, TRIM(:item_code), TRIM(:item_name), TRIM(:cat), TRIM(:cat_code),
+        TRIM(:r_f), RTRIM(:hsn_code), :tax_per, :s_code, :p_code, RTRIM(:amt_cal), :user_name
+      )`,
+      binds: {
+        comp_code: binds.comp_code,
+        comp_year: binds.comp_year,
+        item_code: binds.item_code,
+        item_name: binds.item_name,
+        cat: binds.cat,
+        cat_code: binds.cat_code,
+        r_f: binds.r_f || 'F',
+        hsn_code: binds.hsn_code,
+        tax_per: binds.tax_per,
+        s_code: binds.s_code,
+        p_code: binds.p_code,
+        amt_cal: binds.amt_cal || 'W',
+        user_name: binds.user_name,
+      },
+    },
+    {
+      sql: `
+      INSERT INTO ITEMMAST (
+        COMP_CODE, COMP_YEAR, ITEM_CODE, ITEM_NAME, S_CODE, CAT_CODE, GRP_CODE, USER_NAME, ENT_DATE,
+        P_CODE, ITEM_HEAD, SAP_CODE_R1, SAP_CODE_R2, TAX_PER, HSN_CODE, HSN_UNIT, BARD_ITEM_CODE,
+        BARD_OP_STOCK, BARD_OP_RATE, BARD_OP_VALUE, TDG_Q_W, U_ITEM_CODE, BROK_CAL, AMT_CAL, HSN_NAME, UNIT_TYPE, E_D
+      ) VALUES (
+        :comp_code, :comp_year, TRIM(:item_code), TRIM(:item_name), :s_code, TRIM(:cat_code), TRIM(:grp_code), :user_name, SYSDATE,
+        :p_code, TRIM(:item_head), TRIM(:sap_code_r1), TRIM(:sap_code_r2), :tax_per, TRIM(:hsn_code), TRIM(:hsn_unit), :bard_item_code,
+        :bard_op_stock, :bard_op_rate, :bard_op_value, TRIM(:tdg_q_w), TRIM(:u_item_code), TRIM(:brok_cal), TRIM(:amt_cal), TRIM(:hsn_name), TRIM(:unit_type), TRIM(:e_d)
+      )`,
+      binds: {
+        comp_code: binds.comp_code,
+        comp_year: binds.comp_year,
+        item_code: binds.item_code,
+        item_name: binds.item_name,
+        s_code: binds.s_code,
+        cat_code: binds.cat_code,
+        grp_code: binds.grp_code,
+        user_name: binds.user_name,
+        p_code: binds.p_code,
+        item_head: binds.item_head,
+        sap_code_r1: binds.sap_code_r1,
+        sap_code_r2: binds.sap_code_r2,
+        tax_per: binds.tax_per,
+        hsn_code: binds.hsn_code,
+        hsn_unit: binds.hsn_unit,
+        bard_item_code: binds.bard_item_code,
+        bard_op_stock: binds.bard_op_stock,
+        bard_op_rate: binds.bard_op_rate,
+        bard_op_value: binds.bard_op_value,
+        tdg_q_w: binds.tdg_q_w || 'Q',
+        u_item_code: binds.u_item_code,
+        brok_cal: binds.brok_cal || 'Q',
+        amt_cal: binds.amt_cal || 'W',
+        hsn_name: binds.hsn_name,
+        unit_type: binds.unit_type,
+        e_d: binds.e_d,
+      },
+    },
+    {
+      sql: `
+      INSERT INTO ITEMMAST (
+        COMP_CODE, COMP_YEAR, ITEM_CODE, ITEM_NAME, CAT, CAT_CODE, R_F, HSN_CODE,
+        TAX_PER, S_CODE, P_CODE, AMT_CAL
+      ) VALUES (
+        :comp_code, :comp_year, TRIM(:item_code), TRIM(:item_name), TRIM(:cat), TRIM(:cat_code),
+        TRIM(:r_f), RTRIM(:hsn_code), :tax_per, :s_code, :p_code, RTRIM(:amt_cal)
+      )`,
+      binds: {
+        comp_code: binds.comp_code,
+        comp_year: binds.comp_year,
+        item_code: binds.item_code,
+        item_name: binds.item_name,
+        cat: binds.cat,
+        cat_code: binds.cat_code,
+        r_f: binds.r_f || 'F',
+        hsn_code: binds.hsn_code,
+        tax_per: binds.tax_per,
+        s_code: binds.s_code,
+        p_code: binds.p_code,
+        amt_cal: binds.amt_cal || 'W',
+      },
+    },
+    {
+      sql: `
+      INSERT INTO ITEMMAST (
+        COMP_CODE, COMP_YEAR, ITEM_CODE, ITEM_NAME, S_CODE, CAT_CODE, GRP_CODE, P_CODE, TAX_PER, HSN_CODE
+      ) VALUES (
+        :comp_code, :comp_year, TRIM(:item_code), TRIM(:item_name), :s_code, TRIM(:cat_code), TRIM(:grp_code), :p_code, :tax_per, TRIM(:hsn_code)
+      )`,
+      binds: {
+        comp_code: binds.comp_code,
+        comp_year: binds.comp_year,
+        item_code: binds.item_code,
+        item_name: binds.item_name,
+        s_code: binds.s_code,
+        cat_code: binds.cat_code,
+        grp_code: binds.grp_code,
+        p_code: binds.p_code,
+        tax_per: binds.tax_per,
+        hsn_code: binds.hsn_code,
+      },
+    },
+  ];
+  let lastErr;
+  for (const { sql, binds: b } of attempts) {
+    try {
+      await runQuery(sql, b, comp_uid, { autoCommit: true });
+      return;
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err?.message || '');
+      if (!msg.includes('00904') && !/invalid identifier/i.test(msg)) throw err;
+    }
+  }
+  throw lastErr || new Error('ITEMMAST insert failed');
+}
+
+async function fetchMasterPartyUserF4String(user_name, comp_uid) {
+  const u = String(user_name || '').trim().toUpperCase();
+  if (!u) return { f4: '', source: 'empty_user' };
+  const schemas = isEffectiveCompUid(comp_uid) ? [String(comp_uid).trim(), null] : [null];
+  const tables = ['DAL.USERS', 'USERS'];
+  for (const sch of schemas) {
+    for (const t of tables) {
+      const sql = `SELECT F4 FROM ${t} WHERE UPPER(TRIM(USER_NAME)) = :u AND ROWNUM = 1`;
+      try {
+        const rows = await runQuery(sql, { u }, sch, { suppressDbErrorLog: true });
+        const raw = rows?.[0]?.F4 ?? rows?.[0]?.f4;
+        if (raw != null && String(raw).trim() !== '') {
+          return { f4: String(raw).trim(), source: t };
+        }
+      } catch (err) {
+        if (!isLoginOptionalTableError(err) && !isUnknownUsersColumnError(err)) {
+          /* ignore */
+        }
+      }
+    }
+  }
+  return { f4: '', source: 'none' };
+}
+
+function masterPartyPermissionsFromF4(f4) {
+  return rightsPermissionsFromString(f4, 'legacy_no_f4', 'f4');
+}
+
+/** Item master: DAL.USERS / USERS F5 — pos 1–4 = open, add, edit, delete. */
+async function fetchItemMasterUserF5String(user_name, comp_uid) {
+  const u = String(user_name || '').trim().toUpperCase();
+  if (!u) return { f5: '', source: 'empty_user' };
+  const schemas = isEffectiveCompUid(comp_uid) ? [String(comp_uid).trim(), null] : [null];
+  const tables = ['DAL.USERS', 'USERS'];
+  for (const sch of schemas) {
+    for (const t of tables) {
+      const sql = `SELECT F5 FROM ${t} WHERE UPPER(TRIM(USER_NAME)) = :u AND ROWNUM = 1`;
+      try {
+        const rows = await runQuery(sql, { u }, sch, { suppressDbErrorLog: true });
+        const raw = rows?.[0]?.F5 ?? rows?.[0]?.f5;
+        if (raw != null && String(raw).trim() !== '') {
+          return { f5: String(raw).trim(), source: t };
+        }
+      } catch (err) {
+        if (!isLoginOptionalTableError(err) && !isUnknownUsersColumnError(err)) {
+          /* ignore */
+        }
+      }
+    }
+  }
+  return { f5: '', source: 'none' };
+}
+
+function itemMasterPermissionsFromF5(f5) {
+  return rightsPermissionsFromString(f5, 'legacy_no_f5', 'f5');
+}
+
+async function fetchNextItemMasterCode(comp_code, comp_uid) {
+  const rows = await runQuery(
+    `SELECT MAX(NVL(TO_NUMBER(TRIM(ITEM_CODE)), 0)) AS ICODE FROM ITEMMAST WHERE COMP_CODE = :comp_code`,
+    { comp_code },
+    comp_uid
+  );
+  const maxCode = Number(rows?.[0]?.ICODE ?? rows?.[0]?.icode ?? 0) || 0;
+  const nextCode = String(maxCode + 1);
+  return { next_code: nextCode, NEXT_CODE: nextCode, max_code: maxCode, MAX_CODE: maxCode };
+}
+
+async function validateMasterCodeIfPresent(comp_code, comp_uid, code, label) {
+  const c = normalizeMasterCodeField(code);
+  if (!c) return;
+  const rows = await runQuery(
+    `SELECT COUNT(*) AS CNT FROM MASTER WHERE COMP_CODE = :comp_code AND TRIM(CODE) = :code`,
+    { comp_code, code: c },
+    comp_uid
+  );
+  const cnt = Number(rows?.[0]?.CNT ?? rows?.[0]?.cnt ?? 0);
+  if (cnt < 1) {
+    const err = new Error(`Invalid ${label}`);
+    err.status = 400;
+    throw err;
+  }
+}
+
+async function validateItemGroupIfPresent(comp_code, comp_uid, grpCode) {
+  const g = trimItemMasterField(grpCode, 6);
+  if (!g) return;
+  const rows = await runQuery(
+    `SELECT COUNT(*) AS CNT FROM ITEM_GRP WHERE COMP_CODE = :comp_code AND GRP_CODE = :grp_code`,
+    { comp_code, grp_code: g },
+    comp_uid
+  ).catch(async (err) => {
+    if (!isOracleMissingObjectError(err)) throw err;
+    return [{ CNT: 1 }];
+  });
+  const cnt = Number(rows?.[0]?.CNT ?? rows?.[0]?.cnt ?? 0);
+  if (cnt < 1) {
+    const err = new Error('Invalid Category');
+    err.status = 400;
+    throw err;
+  }
+}
+
+async function validateCatCodeIfPresent(comp_code, comp_uid, catCode) {
+  const c = trimItemMasterField(catCode, 6);
+  if (!c) return;
+  const checks = [
+    `SELECT COUNT(*) AS CNT FROM CATMAST WHERE COMP_CODE = :comp_code AND CAT_CODE = :cat_code`,
+    `SELECT COUNT(*) AS CNT FROM CAT WHERE COMP_CODE = :comp_code AND CAT_CODE = :cat_code`,
+  ];
+  for (const sql of checks) {
+    try {
+      const rows = await runQuery(sql, { comp_code, cat_code: c }, comp_uid);
+      const cnt = Number(rows?.[0]?.CNT ?? rows?.[0]?.cnt ?? 0);
+      if (cnt > 0) return;
+    } catch (err) {
+      if (!isOracleMissingObjectError(err)) throw err;
+    }
+  }
+  const err = new Error('Invalid Item Group Category');
+  err.status = 400;
+  throw err;
+}
+
 /**
  * App login: USERS / GRAIN.USERS (matches SQL*Plus GRAIN.USERS while connected as GRAINFAS if grants allow),
  * then USERNAME column variant for older tables.
@@ -1569,6 +2460,361 @@ app.get('/api/years', async (req, res) => {
   }
 });
 
+function formatDateDmyFromRaw(raw) {
+  const d = parseDateOnly(raw);
+  if (!d) return '';
+  return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+}
+
+function buildMonthSlotsBetween(sDateDmy, eDateDmy) {
+  const start = parseDateOnly(sDateDmy);
+  const end = parseDateOnly(eDateDmy);
+  if (!start || !end) return [];
+  const slots = [];
+  let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+  const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+  while (cur.getTime() <= endMonth.getTime()) {
+    const y = cur.getFullYear();
+    const m = cur.getMonth() + 1;
+    slots.push({
+      monthKey: `${y}-${String(m).padStart(2, '0')}`,
+      label: cur.toLocaleString('en-IN', { month: 'short' }),
+      calYear: y,
+      calMonth: m,
+    });
+    cur = new Date(y, cur.getMonth() + 1, 1);
+  }
+  return slots;
+}
+
+/** GFASORCL: SALE.TYPE is SL/SE/CN; ITEM_CODE is NUMBER (join ITEMMAST on A.ITEM_CODE = C.ITEM_CODE). */
+const SALE_GRAPH_TYPE_SQL = "UPPER(TRIM(A.TYPE)) IN ('SL', 'SE', 'CN')";
+const SALE_GRAPH_WT_EXPR =
+  "CASE WHEN UPPER(TRIM(A.TYPE)) = 'CN' THEN -NVL(A.WEIGHT, 0) ELSE NVL(A.WEIGHT, 0) END";
+const SALE_GRAPH_AMT_EXPR =
+  "CASE WHEN UPPER(TRIM(A.TYPE)) = 'CN' THEN -NVL(A.BILL_AMT, 0) ELSE NVL(A.BILL_AMT, 0) END";
+
+function parseItemCodeForSql(raw) {
+  if (raw == null) return undefined;
+  const s = String(raw).trim();
+  if (s === '') return undefined;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : s;
+}
+
+function saleGraphItemFilterSql(item_code) {
+  const code = parseItemCodeForSql(item_code);
+  if (code === undefined) return { sql: '', binds: {} };
+  return {
+    sql: ' AND A.ITEM_CODE = :item_code ',
+    binds: { item_code: code },
+  };
+}
+
+async function fetchSaleMonthlyAggregate(comp_code, comp_uid, s_date, e_date, item_code = '') {
+  const itemFilter = saleGraphItemFilterSql(item_code);
+  const sql = `
+    SELECT
+      TO_CHAR(TRUNC(A.BILL_DATE, 'MM'), 'YYYY-MM') AS MONTH_KEY,
+      TRIM(TO_CHAR(A.BILL_DATE, 'MON', 'NLS_DATE_LANGUAGE=ENGLISH')) AS MONTH_NAME,
+      SUM(${SALE_GRAPH_WT_EXPR}) AS TOTAL_WEIGHT,
+      SUM(${SALE_GRAPH_AMT_EXPR}) AS TOTAL_AMOUNT,
+      COUNT(*) AS LINE_COUNT
+    FROM SALE A
+    WHERE A.COMP_CODE = :comp_code
+      AND ${SALE_GRAPH_TYPE_SQL}
+      AND TRUNC(A.BILL_DATE) BETWEEN TRUNC(TO_DATE(:s_date, 'DD-MM-YYYY'))
+                                  AND TRUNC(TO_DATE(:e_date, 'DD-MM-YYYY'))
+      ${itemFilter.sql}
+    GROUP BY TRUNC(A.BILL_DATE, 'MM'),
+             TO_CHAR(A.BILL_DATE, 'MON', 'NLS_DATE_LANGUAGE=ENGLISH')
+    ORDER BY MONTH_KEY`;
+  return runQuery(sql, { comp_code, s_date, e_date, ...itemFilter.binds }, comp_uid);
+}
+
+/** All items × month in one query (for item-wise charts). */
+async function fetchSaleMonthlyByItemRows(comp_code, comp_uid, s_date, e_date) {
+  const sql = `
+    SELECT
+      A.ITEM_CODE,
+      NVL(MAX(C.ITEM_NAME), TO_CHAR(A.ITEM_CODE)) AS ITEM_NAME,
+      TO_CHAR(TRUNC(A.BILL_DATE, 'MM'), 'YYYY-MM') AS MONTH_KEY,
+      SUM(${SALE_GRAPH_WT_EXPR}) AS TOTAL_WEIGHT,
+      SUM(${SALE_GRAPH_AMT_EXPR}) AS TOTAL_AMOUNT,
+      COUNT(*) AS LINE_COUNT
+    FROM SALE A
+    LEFT JOIN ITEMMAST C
+      ON A.COMP_CODE = C.COMP_CODE
+     AND A.ITEM_CODE = C.ITEM_CODE
+    WHERE A.COMP_CODE = :comp_code
+      AND ${SALE_GRAPH_TYPE_SQL}
+      AND A.ITEM_CODE IS NOT NULL
+      AND TRUNC(A.BILL_DATE) BETWEEN TRUNC(TO_DATE(:s_date, 'DD-MM-YYYY'))
+                                  AND TRUNC(TO_DATE(:e_date, 'DD-MM-YYYY'))
+    GROUP BY A.ITEM_CODE,
+             TRUNC(A.BILL_DATE, 'MM'),
+             TO_CHAR(A.BILL_DATE, 'MON', 'NLS_DATE_LANGUAGE=ENGLISH')
+    ORDER BY A.ITEM_CODE, MONTH_KEY`;
+  return runQuery(sql, { comp_code, s_date, e_date }, comp_uid);
+}
+
+function mapSaleMonthlyByItem(rows) {
+  const byItem = new Map();
+  for (const row of rows || []) {
+    const itemCode = String(row.ITEM_CODE ?? row.item_code ?? '').trim();
+    if (!itemCode) continue;
+    const monthKey = String(row.MONTH_KEY ?? row.month_key ?? '').trim();
+    if (!monthKey) continue;
+    if (!byItem.has(itemCode)) {
+      byItem.set(itemCode, {
+        itemCode,
+        itemName: String(row.ITEM_NAME ?? row.item_name ?? itemCode).trim(),
+        months: new Map(),
+      });
+    }
+    const entry = byItem.get(itemCode);
+    if (row.ITEM_NAME ?? row.item_name) {
+      entry.itemName = String(row.ITEM_NAME ?? row.item_name).trim();
+    }
+    entry.months.set(monthKey, {
+      weight: Number(row.TOTAL_WEIGHT ?? row.total_weight ?? 0) || 0,
+      amount: Number(row.TOTAL_AMOUNT ?? row.total_amount ?? 0) || 0,
+      lineCount: Number(row.LINE_COUNT ?? row.line_count ?? 0) || 0,
+    });
+  }
+  return byItem;
+}
+
+function buildItemMonthSeries(slots, prevSlots, curItemMonths, prevItemMonths, hasPrevious) {
+  const curMap = curItemMonths instanceof Map ? curItemMonths : mapSaleMonthlyRows([]);
+  const prevMap = prevItemMonths instanceof Map ? prevItemMonths : new Map();
+  return buildSaleGraphPayload({
+    slots,
+    prevSlots,
+    currentMap: curMap,
+    previousMap: prevMap,
+    currentYearLabel: '',
+    previousYearLabel: '',
+    hasPrevious,
+  });
+}
+
+async function resolveSaleGraphPreviousYear(comp_code, comp_uid, slots) {
+  let previousMap = new Map();
+  let prevSlots = [];
+  let previousYearLabel = '';
+  let hasPrevious = false;
+  let prevUid = null;
+  let ps = '';
+  let pe = '';
+
+  const yearRows = await runQuery(
+    'SELECT comp_uid, comp_year, comp_s_dt, comp_e_dt FROM compdet WHERE comp_code = :code ORDER BY comp_year DESC',
+    { code: comp_code }
+  );
+  const uidNorm = String(comp_uid).trim();
+  const idx = (yearRows || []).findIndex((r) => String(r.COMP_UID ?? r.comp_uid ?? '').trim() === uidNorm);
+  const prevRow = idx >= 0 && idx + 1 < yearRows.length ? yearRows[idx + 1] : null;
+
+  if (prevRow) {
+    prevUid = prevRow.COMP_UID ?? prevRow.comp_uid;
+    ps = formatDateDmyFromRaw(prevRow.COMP_S_DT ?? prevRow.comp_s_dt);
+    pe = formatDateDmyFromRaw(prevRow.COMP_E_DT ?? prevRow.comp_e_dt);
+    if (prevUid != null && String(prevUid).trim() !== '' && ps && pe) {
+      previousYearLabel = String(prevRow.COMP_YEAR ?? prevRow.comp_year ?? '').trim();
+      hasPrevious = true;
+      prevSlots = buildMonthSlotsBetween(ps, pe);
+      while (prevSlots.length < slots.length) {
+        const i = prevSlots.length;
+        prevSlots.push({
+          monthKey: `__prev_pad_${i}`,
+          label: slots[i]?.label || '',
+          calYear: 0,
+          calMonth: 0,
+        });
+      }
+    }
+  }
+
+  return { previousMap, prevSlots, previousYearLabel, hasPrevious, prevUid, ps, pe };
+}
+
+function mapSaleMonthlyRows(rows) {
+  const map = new Map();
+  for (const row of rows || []) {
+    const key = String(row.MONTH_KEY ?? row.month_key ?? '').trim();
+    if (!key) continue;
+    map.set(key, {
+      weight: Number(row.TOTAL_WEIGHT ?? row.total_weight ?? 0) || 0,
+      amount: Number(row.TOTAL_AMOUNT ?? row.total_amount ?? 0) || 0,
+      lineCount: Number(row.LINE_COUNT ?? row.line_count ?? 0) || 0,
+    });
+  }
+  return map;
+}
+
+function buildSaleGraphPayload({
+  slots,
+  prevSlots,
+  currentMap,
+  previousMap,
+  currentYearLabel,
+  previousYearLabel,
+  hasPrevious,
+}) {
+  const months = slots.map((slot, index) => {
+    const cur = currentMap.get(slot.monthKey) || { weight: 0, amount: 0, lineCount: 0 };
+    let previous = null;
+    if (hasPrevious && prevSlots && prevSlots[index]) {
+      const prevSlot = prevSlots[index];
+      const pv = previousMap.get(prevSlot.monthKey) || { weight: 0, amount: 0, lineCount: 0 };
+      previous = { weight: pv.weight, amount: pv.amount, lineCount: pv.lineCount };
+    }
+    return {
+      monthKey: slot.monthKey,
+      label: slot.label,
+      fyIndex: index,
+      current: { weight: cur.weight, amount: cur.amount, lineCount: cur.lineCount },
+      previous,
+    };
+  });
+
+  const sumSeries = (key) =>
+    months.reduce(
+      (acc, m) => {
+        const part = m[key];
+        if (!part) return acc;
+        acc.weight += part.weight || 0;
+        acc.amount += part.amount || 0;
+        return acc;
+      },
+      { weight: 0, amount: 0 }
+    );
+
+  return {
+    currentYearLabel: currentYearLabel || '',
+    previousYearLabel: previousYearLabel || '',
+    hasPrevious: Boolean(hasPrevious),
+    months,
+    totals: {
+      current: sumSeries('current'),
+      previous: hasPrevious ? sumSeries('previous') : null,
+    },
+  };
+}
+
+/** Month-wise sale weight & amount (current FY + previous FY; optional item_code filter). */
+app.get('/api/sale-graph-monthly', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, s_date, e_date, comp_year, item_code, include_items } = req.query;
+    if (!comp_code || comp_uid == null || String(comp_uid).trim() === '') {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    if (!s_date || !e_date) {
+      return res.status(400).json({ error: 's_date and e_date (DD-MM-YYYY) are required' });
+    }
+
+    const itemCode = item_code != null ? String(item_code).trim() : '';
+    const wantItems = String(include_items || '').trim() === '1' || String(include_items || '').toLowerCase() === 'true';
+
+    const slots = buildMonthSlotsBetween(s_date, e_date);
+    const prevCtx = await resolveSaleGraphPreviousYear(comp_code, comp_uid, slots);
+    const { prevSlots, previousYearLabel, hasPrevious, prevUid, ps, pe } = prevCtx;
+
+    const currentRows = await fetchSaleMonthlyAggregate(comp_code, comp_uid, s_date, e_date, itemCode);
+    const currentMap = mapSaleMonthlyRows(currentRows);
+
+    let previousMap = prevCtx.previousMap;
+    if (hasPrevious && prevUid && ps && pe) {
+      const prevRows = await fetchSaleMonthlyAggregate(comp_code, prevUid, ps, pe, itemCode);
+      previousMap = mapSaleMonthlyRows(prevRows);
+    }
+
+    const summary = buildSaleGraphPayload({
+      slots,
+      prevSlots,
+      currentMap,
+      previousMap,
+      currentYearLabel: String(comp_year || '').trim(),
+      previousYearLabel,
+      hasPrevious,
+    });
+    summary.view = itemCode ? 'item' : 'all';
+    summary.itemCode = itemCode;
+    if (itemCode) {
+      const curItemRows = await fetchSaleMonthlyByItemRows(comp_code, comp_uid, s_date, e_date);
+      const curByItem = mapSaleMonthlyByItem(curItemRows);
+      const hit = curByItem.get(itemCode);
+      if (hit) {
+        summary.itemName = hit.itemName;
+      }
+    }
+
+    if (!wantItems || itemCode) {
+      return res.json(summary);
+    }
+
+    const curItemRows = await fetchSaleMonthlyByItemRows(comp_code, comp_uid, s_date, e_date);
+    const curByItem = mapSaleMonthlyByItem(curItemRows);
+    let prevByItem = new Map();
+    if (hasPrevious && prevUid && ps && pe) {
+      const prevItemRows = await fetchSaleMonthlyByItemRows(comp_code, prevUid, ps, pe);
+      prevByItem = mapSaleMonthlyByItem(prevItemRows);
+    }
+
+    const itemList = [];
+    for (const [code, entry] of curByItem.entries()) {
+      const prevEntry = prevByItem.get(code);
+      const series = buildItemMonthSeries(
+        slots,
+        prevSlots,
+        entry.months,
+        prevEntry?.months || new Map(),
+        hasPrevious
+      );
+      itemList.push({
+        itemCode: code,
+        itemName: entry.itemName,
+        totals: series.totals,
+      });
+    }
+    itemList.sort(
+      (a, b) => (b.totals?.current?.amount || 0) - (a.totals?.current?.amount || 0)
+    );
+
+    const topLimit = 12;
+    const topItems = itemList.slice(0, topLimit).map((it) => {
+      const curEntry = curByItem.get(it.itemCode);
+      const prevEntry = prevByItem.get(it.itemCode);
+      const chart = buildItemMonthSeries(
+        slots,
+        prevSlots,
+        curEntry?.months || new Map(),
+        prevEntry?.months || new Map(),
+        hasPrevious
+      );
+      chart.currentYearLabel = summary.currentYearLabel;
+      chart.previousYearLabel = summary.previousYearLabel;
+      chart.hasPrevious = hasPrevious;
+      chart.itemCode = it.itemCode;
+      chart.itemName = it.itemName;
+      return chart;
+    });
+
+    summary.items = itemList.map((it) => ({
+      itemCode: it.itemCode,
+      itemName: it.itemName,
+      totals: it.totals,
+    }));
+    summary.topItems = topItems;
+    res.json(summary);
+  } catch (err) {
+    console.error('❌ sale-graph-monthly error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // 3. Trial Balance (The Main Report)
 // 3. Trial Balance (The Main Report with Totals)
 app.get('/api/trial-balance', async (req, res) => {
@@ -1987,6 +3233,73 @@ app.get('/api/ageing', async (req, res) => {
   }
 });
 
+/** Customers with bill-wise pending balance older than min_days (default 30). CODE is VARCHAR2 in GFASORCL. */
+app.get('/api/overdue-customers', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, e_date, min_days, min_amount } = req.query;
+    if (!comp_code || comp_uid == null || String(comp_uid).trim() === '') {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    if (!e_date) {
+      return res.status(400).json({ error: 'e_date (DD-MM-YYYY) is required' });
+    }
+    const minDays = Math.max(1, parseInt(String(min_days ?? '30').trim(), 10) || 30);
+    const minAmount = Math.max(0, Number(String(min_amount ?? '0').trim().replace(/,/g, '')) || 0);
+
+    const sql = `
+      WITH bill_pending AS (
+        SELECT
+          TRIM(A.CODE) AS CODE,
+          B.NAME,
+          B.CITY,
+          B.TEL_NO_O,
+          A.BILL_DATE,
+          A.BILL_NO,
+          A.B_TYPE,
+          SUM(NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0)) AS BAL
+        FROM BILLS A
+        INNER JOIN MASTER B
+          ON A.COMP_CODE = B.COMP_CODE
+         AND TRIM(A.CODE) = TRIM(B.CODE)
+        WHERE A.COMP_CODE = :comp_code
+          AND A.VR_DATE <= TRUNC(TO_DATE(:e_date, 'DD-MM-YYYY'))
+          AND ROUND(NVL(B.SCHEDULE, 0), 2) >= 8
+          AND ROUND(NVL(B.SCHEDULE, 0), 2) < 9
+        GROUP BY TRIM(A.CODE), B.NAME, B.CITY, B.TEL_NO_O, A.BILL_DATE, A.BILL_NO, A.B_TYPE
+        HAVING SUM(NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0)) > 0.0001
+      )
+      SELECT
+        CODE,
+        NAME,
+        CITY,
+        TEL_NO_O,
+        SUM(BAL) AS OVERDUE_BAL,
+        COUNT(*) AS BILL_COUNT,
+        MAX(TRUNC(TO_DATE(:e_date, 'DD-MM-YYYY')) - TRUNC(BILL_DATE)) AS MAX_DAYS,
+        MIN(BILL_DATE) AS OLDEST_BILL_DATE
+      FROM bill_pending
+      WHERE TRUNC(TO_DATE(:e_date, 'DD-MM-YYYY')) - TRUNC(BILL_DATE) > :min_days
+      GROUP BY CODE, NAME, CITY, TEL_NO_O
+      HAVING SUM(BAL) > :min_amount
+      ORDER BY UPPER(TRIM(NAME)), UPPER(TRIM(CODE))`;
+
+    const rows = await runQuery(
+      sql,
+      { comp_code, e_date, min_days: minDays, min_amount: minAmount },
+      comp_uid
+    );
+    res.json({
+      rows: rows || [],
+      e_date,
+      min_days: minDays,
+      min_amount: minAmount,
+    });
+  } catch (err) {
+    console.error('❌ overdue-customers error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/ageing-bills-detail', async (req, res) => {
   try {
     const { comp_code, comp_uid, code, schedule, e_date } = req.query;
@@ -2177,9 +3490,9 @@ app.get('/api/bill-ledger', async (req, res) => {
           NVL(A.CR_AMT,0) CR_AMT
         FROM BILLS A, MASTER B
         WHERE A.COMP_CODE = B.COMP_CODE
-          AND A.CODE = B.CODE
+          AND TRIM(A.CODE) = TRIM(B.CODE)
           AND A.COMP_CODE = :comp_code
-          AND A.CODE = :code
+          AND TRIM(A.CODE) = TRIM(:code)
           AND (
             A.BILL_DATE BETWEEN TO_DATE(:s_date,'DD-MM-YYYY') AND TO_DATE(:e_date,'DD-MM-YYYY')
             OR (
@@ -2613,7 +3926,7 @@ app.get('/api/sale-list', async (req, res) => {
     const { comp_code, comp_uid, s_date, e_date, mcode, bk_code, item_code } = req.query;
     const m = mcode != null ? String(mcode).trim() : '';
     const b = bk_code != null ? String(bk_code).trim() : '';
-    const it = item_code != null ? String(item_code).trim() : '';
+    const it = parseItemCodeForSql(item_code);
 
     const sql = `
       SELECT
@@ -2653,13 +3966,13 @@ app.get('/api/sale-list', async (req, res) => {
         ${SALE_LIST_DATE_FILTER_SQL}
         ${m ? 'AND TRIM(A.CODE) = TRIM(:mcode)' : ''}
         ${b ? 'AND TRIM(A.BK_CODE) = TRIM(:bk_code)' : ''}
-        ${it ? 'AND TRIM(TO_CHAR(A.ITEM_CODE)) = TRIM(:item_code)' : ''}
+        ${it !== undefined ? 'AND A.ITEM_CODE = :item_code' : ''}
       ORDER BY A.BILL_DATE, A.BILL_NO, A.B_TYPE, A.TRN_NO`;
 
     const binds = { comp_code, s_date, e_date };
     if (m) binds.mcode = m;
     if (b) binds.bk_code = b;
-    if (it) binds.item_code = it;
+    if (it !== undefined) binds.item_code = it;
 
     const rows = await runQuery(sql, binds, comp_uid);
     res.json(rows);
@@ -7080,6 +8393,585 @@ app.get('/api/gstr1-hsn-detail', async (req, res) => {
     res.json({ ok: true, rows: details, total });
   } catch (err) {
     console.error('❌ gstr1-hsn-detail error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/master-party-user-permissions', async (req, res) => {
+  try {
+    const { comp_uid, user_name } = req.query;
+    if (comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_uid and user_name are required' });
+    }
+    const { f4, source } = await fetchMasterPartyUserF4String(String(user_name), comp_uid);
+    res.json({ f4, source, ...masterPartyPermissionsFromF4(f4) });
+  } catch (err) {
+    console.error('❌ master-party-user-permissions error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/master-party-schedules', async (req, res) => {
+  try {
+    const { comp_code, comp_uid } = req.query;
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const rows = await fetchMasterPartyScheduleRows(comp_code, comp_uid);
+    res.json(rows || []);
+  } catch (err) {
+    console.error('❌ master-party-schedules error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/master-party-states', async (req, res) => {
+  try {
+    const { comp_uid, comp_code } = req.query;
+    if (comp_uid == null) {
+      return res.status(400).json({ error: 'comp_uid is required' });
+    }
+    const rows = await fetchMasterPartyStateRows(comp_uid, comp_code ? String(comp_code).trim() : '');
+    res.json(rows || []);
+  } catch (err) {
+    console.error('❌ master-party-states error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/master-party-next-code', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, schedule } = req.query;
+    if (!comp_code || comp_uid == null || schedule == null || String(schedule).trim() === '') {
+      return res.status(400).json({ error: 'comp_code, comp_uid, and schedule are required' });
+    }
+    const result = await computeVfpMasterPartyNextCode(comp_code, comp_uid, schedule);
+    res.json(result);
+  } catch (err) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
+    console.error('❌ master-party-next-code error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/master-party', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const comp_code = String(body.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid;
+    const user_name = String(body.user_name ?? '').trim();
+    const comp_year = Number(body.comp_year ?? body.compYear ?? 0) || 0;
+    if (!comp_code || comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, comp_year, and user_name are required' });
+    }
+    const { f4 } = await fetchMasterPartyUserF4String(user_name, comp_uid);
+    const perms = masterPartyPermissionsFromF4(f4);
+    if (!perms.canOpen) return res.status(403).json({ error: 'Access Denied' });
+    if (!perms.canAdd) return res.status(403).json({ error: 'You Can Not Add' });
+
+    const schedule = masterPartyScheduleBind(body.schedule);
+    if (!schedule) return res.status(400).json({ error: 'schedule is required' });
+
+    let codeKey = normalizeMasterPartyCodeKey(body.code);
+    if (!codeKey) {
+      const next = await computeVfpMasterPartyNextCode(comp_code, comp_uid, body.schedule);
+      codeKey = normalizeMasterPartyCodeKey(next.next_code);
+    }
+    if (!isValidMasterPartyCodeFormat(codeKey)) {
+      return res.status(400).json({
+        error: 'Account code must be 6 characters: 1 letter (schedule range) + 5 digits.',
+      });
+    }
+
+    const dup = await runQuery(
+      `SELECT COUNT(*) AS CNT FROM MASTER M
+       WHERE M.COMP_CODE = :comp_code AND TRIM(M.CODE) = :code AND ROWNUM = 1`,
+      { comp_code, code: codeKey },
+      comp_uid
+    );
+    const dupCnt = Number(dup?.[0]?.CNT ?? dup?.[0]?.cnt ?? 0);
+    if (dupCnt > 0) {
+      return res.status(409).json({ error: `Account code ${codeKey} already exists for this company.` });
+    }
+
+    let binds;
+    try {
+      binds = buildMasterPartyInsertBinds(body, { comp_code, comp_year, user_name, schedule, codeKey });
+    } catch (buildErr) {
+      return res.status(buildErr.status || 400).json({ error: buildErr.message });
+    }
+
+    await insertMasterPartyRow(binds, comp_uid);
+
+    const verifyRows = await runQuery(
+      `SELECT COUNT(*) AS CNT FROM MASTER M
+       WHERE M.COMP_CODE = :comp_code AND TRIM(M.CODE) = :code AND ROWNUM = 1`,
+      { comp_code, code: codeKey },
+      comp_uid
+    );
+    const savedCnt = Number(verifyRows?.[0]?.CNT ?? verifyRows?.[0]?.cnt ?? 0);
+    if (savedCnt < 1) {
+      return res.status(500).json({
+        error: 'Account was not saved to MASTER. Restart the API server and try again.',
+      });
+    }
+
+    res.json(masterPartySavedJson(binds, schedule));
+  } catch (err) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
+    console.error('❌ master-party POST error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/master-accounts', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, schedule, q } = req.query;
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const schedRaw = schedule != null && String(schedule).trim() !== '' ? masterPartyScheduleBind(schedule) : null;
+    const qTrim = String(q ?? '').trim();
+    const binds = { comp_code };
+    let sql = `
+      SELECT TRIM(M.CODE) AS CODE, M.NAME, M.SCHEDULE, M.ADD1, M.ADD2, M.ADD3, M.CITY,
+             M.GST_NO, M.STATE_CODE, M.STATE, M.PAN, M.TEL_NO_O, NVL(M.L_C, 'L') AS L_C
+      FROM MASTER M
+      WHERE M.COMP_CODE = :comp_code`;
+    if (schedRaw) {
+      binds.schedule = schedRaw;
+      sql += ` AND ROUND(NVL(M.SCHEDULE, 0), 2) = :schedule`;
+    }
+    if (qTrim) {
+      binds.q = `%${qTrim.toUpperCase()}%`;
+      binds.q_code = `%${qTrim.toUpperCase()}%`;
+      sql += ` AND (UPPER(M.NAME) LIKE :q OR UPPER(TRIM(M.CODE)) LIKE :q_code OR UPPER(NVL(M.CITY, '')) LIKE :q)`;
+    }
+    sql += ` ORDER BY M.SCHEDULE, M.NAME, TRIM(M.CODE)`;
+    const rows = await runQuery(sql, binds, comp_uid);
+    res.json(rows || []);
+  } catch (err) {
+    console.error('❌ master-accounts error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** A/c Master list by specific schedule (MASTER + SCHEDULE join). */
+app.get('/api/master-accounts-list', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, schedule } = req.query;
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const hasSchedule = schedule != null && String(schedule).trim() !== '';
+    const sched = hasSchedule ? masterPartyScheduleBind(schedule) : null;
+    if (hasSchedule && !isValidMasterScheduleNoServer(sched)) {
+      return res.status(400).json({ error: 'Select valid schedule like 1.10, 8.10, 9.10, or leave blank for all' });
+    }
+    const sql = `
+      SELECT
+        A.SCHEDULE AS SCH_NO,
+        B.NAME AS SCH_NAME,
+        TRIM(A.CODE) AS CODE,
+        A.NAME,
+        A.ADD1,
+        A.ADD2,
+        A.ADD3,
+        A.CITY,
+        A.GST_NO,
+        A.PAN,
+        NVL(A.L_C, 'L') AS L_C
+      FROM MASTER A, SCHEDULE B
+      WHERE A.COMP_CODE = :comp_code
+        AND A.COMP_CODE = B.COMP_CODE
+        AND ROUND(NVL(A.SCHEDULE, 0), 2) = ROUND(NVL(B.NO, 0), 2)
+        ${hasSchedule ? 'AND ROUND(NVL(A.SCHEDULE, 0), 2) = :schedule' : ''}
+      ORDER BY A.NAME, TRIM(A.CODE)`;
+    const binds = hasSchedule ? { comp_code, schedule: sched } : { comp_code };
+    const rows = await runQuery(sql, binds, comp_uid);
+    res.json(rows || []);
+  } catch (err) {
+    console.error('❌ master-accounts-list error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/master-party', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const comp_code = String(body.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid;
+    const user_name = String(body.user_name ?? '').trim();
+    const comp_year = Number(body.comp_year ?? body.compYear ?? 0) || 0;
+    if (!comp_code || comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, comp_year, and user_name are required' });
+    }
+    const { f4 } = await fetchMasterPartyUserF4String(user_name, comp_uid);
+    const perms = masterPartyPermissionsFromF4(f4);
+    if (!perms.canOpen) return res.status(403).json({ error: 'Access Denied' });
+    if (!perms.canEdit) return res.status(403).json({ error: 'You Can Not Edit' });
+
+    const codeKey = normalizeMasterPartyCodeKey(body.code);
+    if (!isValidMasterPartyCodeFormat(codeKey)) {
+      return res.status(400).json({ error: 'code is required for edit (6 characters)' });
+    }
+
+    const schedule = masterPartyScheduleBind(body.schedule);
+    if (!schedule) return res.status(400).json({ error: 'schedule is required' });
+
+    const exists = await runQuery(
+      `SELECT COUNT(*) AS CNT FROM MASTER M
+       WHERE M.COMP_CODE = :comp_code AND TRIM(M.CODE) = :code AND ROWNUM = 1`,
+      { comp_code, code: codeKey },
+      comp_uid
+    );
+    const existsCnt = Number(exists?.[0]?.CNT ?? exists?.[0]?.cnt ?? 0);
+    if (existsCnt < 1) {
+      return res.status(404).json({ error: `Account code ${codeKey} not found.` });
+    }
+
+    let binds;
+    try {
+      binds = buildMasterPartyInsertBinds(body, { comp_code, comp_year, user_name, schedule, codeKey });
+    } catch (buildErr) {
+      return res.status(buildErr.status || 400).json({ error: buildErr.message });
+    }
+
+    await deleteMasterPartyByCode(comp_code, codeKey, comp_uid);
+    await insertMasterPartyRow(binds, comp_uid);
+
+    const verifyRows = await runQuery(
+      `SELECT COUNT(*) AS CNT FROM MASTER M
+       WHERE M.COMP_CODE = :comp_code AND TRIM(M.CODE) = :code AND ROWNUM = 1`,
+      { comp_code, code: codeKey },
+      comp_uid
+    );
+    const savedCnt = Number(verifyRows?.[0]?.CNT ?? verifyRows?.[0]?.cnt ?? 0);
+    if (savedCnt < 1) {
+      return res.status(500).json({
+        error: 'Account was not saved to MASTER after edit. Restart the API server and try again.',
+      });
+    }
+
+    res.json(masterPartySavedJson(binds, schedule));
+  } catch (err) {
+    console.error('❌ master-party PUT error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/master-party', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const comp_code = String(body.comp_code ?? req.query.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid ?? req.query.comp_uid;
+    const user_name = String(body.user_name ?? req.query.user_name ?? '').trim();
+    const codeKey = normalizeMasterPartyCodeKey(body.code ?? req.query.code);
+    if (!comp_code || comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, and user_name are required' });
+    }
+    if (!isValidMasterPartyCodeFormat(codeKey)) {
+      return res.status(400).json({ error: 'code is required' });
+    }
+    const { f4 } = await fetchMasterPartyUserF4String(user_name, comp_uid);
+    const perms = masterPartyPermissionsFromF4(f4);
+    if (!perms.canOpen) return res.status(403).json({ error: 'Access Denied' });
+    if (!perms.canDelete) return res.status(403).json({ error: 'You Can Not Delete' });
+
+    const exists = await runQuery(
+      `SELECT COUNT(*) AS CNT FROM MASTER M
+       WHERE M.COMP_CODE = :comp_code AND TRIM(M.CODE) = :code AND ROWNUM = 1`,
+      { comp_code, code: codeKey },
+      comp_uid
+    );
+    const existsCnt = Number(exists?.[0]?.CNT ?? exists?.[0]?.cnt ?? 0);
+    if (existsCnt < 1) {
+      return res.status(404).json({ error: `Account code ${codeKey} not found.` });
+    }
+
+    await deleteMasterPartyByCode(comp_code, codeKey, comp_uid);
+    res.json({ ok: true, code: codeKey, CODE: codeKey });
+  } catch (err) {
+    console.error('❌ master-party DELETE error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/item-master-user-permissions', async (req, res) => {
+  try {
+    const { comp_uid, user_name } = req.query;
+    if (comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_uid and user_name are required' });
+    }
+    const { f5, source } = await fetchItemMasterUserF5String(String(user_name), comp_uid);
+    res.json({ f5, source, ...itemMasterPermissionsFromF5(f5) });
+  } catch (err) {
+    console.error('❌ item-master-user-permissions error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/item-master-lookups', async (req, res) => {
+  try {
+    const { comp_code, comp_uid } = req.query;
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const saleSched = 12.1;
+    const purchaseSched = 14.1;
+    const accountSql = `
+      SELECT M.CODE, M.NAME
+      FROM MASTER M
+      WHERE M.COMP_CODE = :comp_code
+        AND ROUND(NVL(M.SCHEDULE, 0), 2) IN (:sale_sched, :purchase_sched)
+      ORDER BY M.NAME, M.CODE`;
+    const [cats, itemGroups, accountRows] = await Promise.all([
+      fetchItemMasterCatRows(comp_code, comp_uid),
+      fetchItemMasterItemGrpRows(comp_code, comp_uid),
+      runQuery(accountSql, { comp_code, sale_sched: saleSched, purchase_sched: purchaseSched }, comp_uid).catch(() => []),
+    ]);
+    const mergedAccounts = Array.isArray(accountRows) ? accountRows : [];
+    res.json({
+      cats: cats || [],
+      itemGroups: itemGroups || [],
+      saleAccounts: mergedAccounts,
+      purchaseAccounts: mergedAccounts,
+    });
+  } catch (err) {
+    console.error('❌ item-master-lookups error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/item-master-list', async (req, res) => {
+  try {
+    const { comp_code, comp_uid, q } = req.query;
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const qTrim = String(q ?? '').trim();
+    const binds = { comp_code };
+
+    // Legacy VFP ITEMMAST schemas vary by client; build SELECT only with columns that exist.
+    const colRows = await runQuery(
+      `SELECT UPPER(COLUMN_NAME) AS COLUMN_NAME
+       FROM USER_TAB_COLUMNS
+       WHERE TABLE_NAME = 'ITEMMAST'`,
+      {},
+      comp_uid,
+      { suppressDbErrorLog: true }
+    ).catch(() => []);
+    const cols = new Set((colRows || []).map((r) => String(r.COLUMN_NAME ?? r.column_name ?? '').toUpperCase()));
+    const has = (c) => cols.has(String(c).toUpperCase());
+
+    const selectExpr = (col, exprIfPresent, fallbackExpr) => (has(col) ? exprIfPresent : fallbackExpr);
+    const itemNameExpr = has('ITEM_NAME') ? 'NVL(I.ITEM_NAME, \'\')' : '\'\'';
+    const itemCodeExpr = has('ITEM_CODE') ? 'I.ITEM_CODE' : '0';
+    const hsnExpr = selectExpr('HSN_CODE', 'NVL(I.HSN_CODE, \'\')', '\'\'');
+
+    let sql = `
+      SELECT ${itemCodeExpr} AS ITEM_CODE,
+             ${itemNameExpr} AS ITEM_NAME,
+             ${selectExpr('CAT', 'NVL(I.CAT, \'\')', '\'\'')} AS CAT,
+             ${selectExpr('CAT_CODE', 'NVL(I.CAT_CODE, \'\')', '\'\'')} AS CAT_CODE,
+             ${selectExpr('GRP_CODE', 'NVL(I.GRP_CODE, \'\')', '\'\'')} AS GRP_CODE,
+             CAST('' AS VARCHAR2(50)) AS CAT_NAME,
+             ${selectExpr('R_F', 'NVL(I.R_F, \'F\')', '\'F\'')} AS R_F,
+             ${hsnExpr} AS HSN_CODE,
+             ${selectExpr('HSN_NAME', 'NVL(I.HSN_NAME, \'\')', '\'\'')} AS HSN_NAME,
+             ${selectExpr('HSN_UNIT', 'NVL(I.HSN_UNIT, \'\')', '\'\'')} AS HSN_UNIT,
+             ${selectExpr('TAX_PER', 'NVL(I.TAX_PER, 0)', '0')} AS TAX_PER,
+             ${selectExpr('S_CODE', 'NVL(TO_CHAR(I.S_CODE), \'\')', '\'\'')} AS S_CODE,
+             ${selectExpr('P_CODE', 'NVL(TO_CHAR(I.P_CODE), \'\')', '\'\'')} AS P_CODE,
+             ${selectExpr('SAP_CODE_R1', 'NVL(I.SAP_CODE_R1, \'\')', '\'\'')} AS SAP_CODE_R1,
+             ${selectExpr('SAP_CODE_R2', 'NVL(I.SAP_CODE_R2, \'\')', '\'\'')} AS SAP_CODE_R2,
+             ${selectExpr('BARD_ITEM_CODE', 'NVL(I.BARD_ITEM_CODE, 0)', '0')} AS BARD_ITEM_CODE,
+             ${selectExpr('BARD_OP_STOCK', 'NVL(I.BARD_OP_STOCK, 0)', '0')} AS BARD_OP_STOCK,
+             ${selectExpr('BARD_OP_RATE', 'NVL(I.BARD_OP_RATE, 0)', '0')} AS BARD_OP_RATE,
+             ${selectExpr('BARD_OP_VALUE', 'NVL(I.BARD_OP_VALUE, 0)', '0')} AS BARD_OP_VALUE,
+             ${selectExpr('U_ITEM_CODE', 'NVL(I.U_ITEM_CODE, \'\')', '\'\'')} AS U_ITEM_CODE,
+             ${selectExpr('TDG_Q_W', 'NVL(I.TDG_Q_W, \'\')', '\'\'')} AS TDG_Q_W,
+             ${selectExpr('UNIT_TYPE', 'NVL(I.UNIT_TYPE, \'\')', '\'\'')} AS UNIT_TYPE,
+             ${selectExpr('ITEM_HEAD', 'NVL(I.ITEM_HEAD, \'\')', '\'\'')} AS ITEM_HEAD,
+             ${selectExpr('COMMISSION', 'NVL(I.COMMISSION, 0)', '0')} AS COMMISSION,
+             ${selectExpr('BROKERAGE', 'NVL(I.BROKERAGE, 0)', '0')} AS BROKERAGE,
+             ${selectExpr('BROK_CAL', 'NVL(I.BROK_CAL, \'\')', '\'\'')} AS BROK_CAL,
+             ${selectExpr('SALE_RATE', 'NVL(I.S_RATE, 0)', '0')} AS SALE_RATE,
+             ${selectExpr('PACKING', 'NVL(I.PACKING, 0)', '0')} AS PACKING,
+             ${selectExpr('UNIT', 'NVL(I.UNIT, \'\')', '\'\'')} AS UNIT,
+             ${selectExpr('AMT_CAL', 'NVL(I.AMT_CAL, \'W\')', '\'W\'')} AS AMT_CAL
+      FROM ITEMMAST I
+      WHERE I.COMP_CODE = :comp_code`;
+    if (qTrim) {
+      binds.q = `%${qTrim.toUpperCase()}%`;
+      binds.q_code = `%${qTrim}%`;
+      sql += ` AND (UPPER(${itemNameExpr}) LIKE :q OR UPPER(TO_CHAR(${itemCodeExpr})) LIKE :q_code OR UPPER(${hsnExpr}) LIKE :q)`;
+    }
+    sql += ` ORDER BY ${itemNameExpr}, TO_CHAR(${itemCodeExpr})`;
+    const rows = await runQuery(sql, binds, comp_uid);
+    res.json(rows || []);
+  } catch (err) {
+    console.error('❌ item-master-list error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/item-master-next-code', async (req, res) => {
+  try {
+    const { comp_code, comp_uid } = req.query;
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const data = await fetchNextItemMasterCode(comp_code, comp_uid);
+    res.json(data);
+  } catch (err) {
+    console.error('❌ item-master-next-code error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/item-master', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const comp_code = String(body.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid;
+    const user_name = String(body.user_name ?? '').trim();
+    const comp_year = Number(body.comp_year ?? body.compYear ?? 0) || 0;
+    if (!comp_code || comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, comp_year, and user_name are required' });
+    }
+    const { f5 } = await fetchItemMasterUserF5String(user_name, comp_uid);
+    const perms = itemMasterPermissionsFromF5(f5);
+    if (!perms.canOpen) return res.status(403).json({ error: 'Access Denied' });
+    if (!perms.canAdd) return res.status(403).json({ error: 'You Can Not Add' });
+
+    let binds;
+    try {
+      const autoCode = await fetchNextItemMasterCode(comp_code, comp_uid);
+      const itemCode = trimItemMasterField(body.item_code ?? body.ITEM_CODE, 13) || autoCode.next_code;
+      binds = buildItemMasterInsertBinds(body, { comp_code, comp_year, user_name, itemCode });
+      await validateItemMasterSaveFields(comp_code, comp_uid, binds);
+      if (binds.u_item_code) {
+        const udup = await runQuery(
+          `SELECT COUNT(*) AS CNT FROM ITEMMAST WHERE COMP_CODE = :comp_code AND U_ITEM_CODE = :u_item_code`,
+          { comp_code, u_item_code: binds.u_item_code },
+          comp_uid
+        );
+        const ucnt = Number(udup?.[0]?.CNT ?? udup?.[0]?.cnt ?? 0);
+        if (ucnt > 0) return res.status(409).json({ error: 'Udaan Item Code Already Entered' });
+      }
+    } catch (buildErr) {
+      return res.status(buildErr.status || 400).json({ error: buildErr.message });
+    }
+
+    const dup = await runQuery(
+      `SELECT COUNT(*) AS CNT FROM ITEMMAST
+       WHERE COMP_CODE = :comp_code AND ITEM_CODE = :item_code AND ROWNUM = 1`,
+      { comp_code, item_code: binds.item_code },
+      comp_uid
+    );
+    const dupCnt = Number(dup?.[0]?.CNT ?? dup?.[0]?.cnt ?? 0);
+    if (dupCnt > 0) {
+      return res.status(409).json({ error: `Item code ${binds.item_code} already exists.` });
+    }
+
+    await insertItemMasterRow(binds, comp_uid);
+    res.json(itemMasterSavedJson(binds));
+  } catch (err) {
+    console.error('❌ item-master POST error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/item-master', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const comp_code = String(body.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid;
+    const user_name = String(body.user_name ?? '').trim();
+    const comp_year = Number(body.comp_year ?? body.compYear ?? 0) || 0;
+    if (!comp_code || comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, comp_year, and user_name are required' });
+    }
+    const { f5 } = await fetchItemMasterUserF5String(user_name, comp_uid);
+    const perms = itemMasterPermissionsFromF5(f5);
+    if (!perms.canOpen) return res.status(403).json({ error: 'Access Denied' });
+    if (!perms.canEdit) return res.status(403).json({ error: 'You Can Not Edit' });
+
+    const itemCode = trimItemMasterField(body.item_code ?? body.ITEM_CODE, 13);
+    if (!itemCode) return res.status(400).json({ error: 'item_code is required for edit' });
+
+    const exists = await runQuery(
+      `SELECT COUNT(*) AS CNT FROM ITEMMAST
+       WHERE COMP_CODE = :comp_code AND ITEM_CODE = :item_code AND ROWNUM = 1`,
+      { comp_code, item_code: itemCode },
+      comp_uid
+    );
+    const existsCnt = Number(exists?.[0]?.CNT ?? exists?.[0]?.cnt ?? 0);
+    if (existsCnt < 1) {
+      return res.status(404).json({ error: `Item code ${itemCode} not found.` });
+    }
+
+    let binds;
+    try {
+      binds = buildItemMasterInsertBinds(body, { comp_code, comp_year, user_name, itemCode });
+      await validateItemMasterSaveFields(comp_code, comp_uid, binds);
+    } catch (buildErr) {
+      return res.status(buildErr.status || 400).json({ error: buildErr.message });
+    }
+
+    await deleteItemMasterByCode(comp_code, itemCode, comp_uid);
+    await insertItemMasterRow(binds, comp_uid);
+    res.json(itemMasterSavedJson(binds));
+  } catch (err) {
+    console.error('❌ item-master PUT error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/item-master', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const comp_code = String(body.comp_code ?? req.query.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid ?? req.query.comp_uid;
+    const user_name = String(body.user_name ?? req.query.user_name ?? '').trim();
+    const itemCode = trimItemMasterField(body.item_code ?? body.ITEM_CODE ?? req.query.item_code, 13);
+    if (!comp_code || comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, and user_name are required' });
+    }
+    if (!itemCode) return res.status(400).json({ error: 'item_code is required' });
+
+    const { f5 } = await fetchItemMasterUserF5String(user_name, comp_uid);
+    const perms = itemMasterPermissionsFromF5(f5);
+    if (!perms.canOpen) return res.status(403).json({ error: 'Access Denied' });
+    if (!perms.canDelete) return res.status(403).json({ error: 'You Can Not Delete' });
+
+    const exists = await runQuery(
+      `SELECT COUNT(*) AS CNT FROM ITEMMAST
+       WHERE COMP_CODE = :comp_code AND ITEM_CODE = :item_code AND ROWNUM = 1`,
+      { comp_code, item_code: itemCode },
+      comp_uid
+    );
+    const existsCnt = Number(exists?.[0]?.CNT ?? exists?.[0]?.cnt ?? 0);
+    if (existsCnt < 1) {
+      return res.status(404).json({ error: `Item code ${itemCode} not found.` });
+    }
+
+    const stockCnt = await countItemStockEntries(comp_code, itemCode, comp_uid);
+    if (stockCnt > 0) {
+      return res.status(409).json({ error: 'Entries Already Exist' });
+    }
+
+    await runQuery(
+      `DELETE FROM BARDSTOCK WHERE COMP_CODE = :comp_code AND TRIM(VR_TYPE) = 'OP' AND VR_NO = :vr_no`,
+      { comp_code, vr_no: itemCode },
+      comp_uid,
+      { autoCommit: true, suppressDbErrorLog: true }
+    ).catch(() => {});
+    await deleteItemMasterByCode(comp_code, itemCode, comp_uid);
+    res.json({ ok: true, item_code: itemCode, ITEM_CODE: itemCode });
+  } catch (err) {
+    console.error('❌ item-master DELETE error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

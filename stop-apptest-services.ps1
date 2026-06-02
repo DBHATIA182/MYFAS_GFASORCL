@@ -39,7 +39,8 @@ param(
     [string]$AppRoot = "",
     [switch]$StopScheduledTasks,
     [switch]$StopWindowsServices,
-    [switch]$ReleaseApiPort5001
+    [switch]$ReleaseApiPort5001,
+    [int]$WaitSeconds = 2
 )
 
 Set-StrictMode -Version Latest
@@ -189,7 +190,11 @@ if ($StopWindowsServices) {
     }
 }
 
-Start-Sleep -Seconds 1
+if ($WaitSeconds -gt 0) {
+    Log ""
+    Log ("Waiting {0}s for file handles to release..." -f $WaitSeconds) DarkGray
+    Start-Sleep -Seconds $WaitSeconds
+}
 
 try {
     $still5001 = Get-NetTCPConnection -LocalPort 5001 -State Listen -ErrorAction SilentlyContinue

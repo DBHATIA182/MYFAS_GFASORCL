@@ -1,9 +1,33 @@
+# ========== DEV PC (E:\GFASORCL\APPTEST) — push changes to GitHub ==========
 cd E:\GFASORCL\APPTEST
-.\push-all-to-git.ps1 -CommitMessage "your message here"
+.\push-all-to-git.ps1 -CommitMessage "describe your change here"
 
-on client machine
-cd\gfasorcl\apptest
-1.  Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine -like '*E:\GFASORCL\APPTEST*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-2.  Get-Process node,esbuild,cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force
-3.  .\update-from-git.ps1 -Branch main
-4.  .\start-apptest-services.ps1
+# ========== CLIENT PC — one-time setup (Administrator) ==========
+cd E:\GFASORCL\APPTEST
+
+REM 1) Auto-start GFASORCL when user logs in (API + Vite + tunnel):
+setup-gfasorcl-autostart.cmd
+
+REM 2) Auto git pull + build every day (and after logon/reboot).
+REM    Scheduled task name on every client: git_dal_update
+setup-gfasorcl-git-update.cmd -AtLogon
+
+REM Or custom daily time (24h clock):
+powershell -ExecutionPolicy Bypass -File .\setup-scheduled-task-git-update.ps1 -AtLogon -DailyTime "03:00"
+
+# ========== CLIENT PC — manual update anytime ==========
+cd E:\GFASORCL\APPTEST
+powershell -ExecutionPolicy Bypass -File .\update-from-git.ps1 -Branch main
+
+REM Or step by step:
+REM   .\stop-apptest-services.ps1 -StopScheduledTasks -ReleaseApiPort5001
+REM   .\update-from-git.ps1 -Branch main -SkipProcessStop
+REM   .\start-apptest-services.ps1
+
+# ========== CLIENT PC — test scheduled git update without waiting ==========
+schtasks /Run /TN "git_dal_update"
+type logs\git-auto-update.log
+
+# ========== Logs ==========
+REM logs\git-auto-update.log     — automatic git update
+REM logs\autostart-bootstrap.log — if using run-autostart-stack.cmd

@@ -1,5 +1,6 @@
-import React, { useState, useLayoutEffect } from 'react';
+import React, { useMemo, useState, useLayoutEffect } from 'react';
 import { formatLedgerDateDisplay } from '../utils/dateFormat';
+import WindalInitialFlowCard from '../components/WindalInitialFlowCard';
 
 function parseDateBoundary(value, endOfDay) {
   if (value == null || value === '') return null;
@@ -13,7 +14,6 @@ function parseDateBoundary(value, endOfDay) {
   return d;
 }
 
-/** Prefer FY where today is between start and end; else first row (API: newest comp_year first). */
 function defaultYearUid(yearRows) {
   if (!yearRows?.length) return '';
   const today = new Date();
@@ -32,7 +32,7 @@ function defaultYearUid(yearRows) {
   return uid0 != null && uid0 !== '' ? String(uid0) : '';
 }
 
-export default function Slide2({ years, formData, onPrev, onNext }) {
+export default function Slide2({ years, formData, onPrev, onNext, flowHeaderActions = null }) {
   const [selectedUid, setSelectedUid] = useState('');
 
   useLayoutEffect(() => {
@@ -44,50 +44,99 @@ export default function Slide2({ years, formData, onPrev, onNext }) {
     if (uid) setSelectedUid(uid);
   }, [years]);
 
-  const handleNext = () => {
-    // FIX: Force both to String to ensure the match works regardless of type
-    const yearObj = years.find(y => String(y.COMP_UID) === String(selectedUid));
+  const yearObj = useMemo(
+    () => years.find((y) => String(y.COMP_UID) === String(selectedUid)),
+    [years, selectedUid]
+  );
 
-    if (yearObj) {
-      // We pass the data up to App.jsx
-      onNext(yearObj); 
-    } else {
-      alert("Please select a financial year first.");
+  const handleNext = () => {
+    if (!yearObj) {
+      alert('Please select a financial year first.');
+      return;
     }
+    onNext(yearObj);
   };
 
-  return (
-    <div className="slide">
-      <h2>Step 2: Select Financial Year</h2>
-      {/* Support both UPPER and lower case for the company name display */}
-      <p>Company: <strong>{formData.comp_name || formData.COMP_NAME}</strong></p>
-      
-      <div className="form-group">
-        <label>Select Financial Year:</label>
-        <select 
-          className="form-select"
-          value={selectedUid} 
-          onChange={(e) => setSelectedUid(e.target.value)}
-        >
-          <option value="">-- Select Year --</option>
-          {years.map((y) => (
-            <option key={y.COMP_UID} value={y.COMP_UID}>
-              {y.COMP_YEAR} 
-              {/* Force dd/mm/yyyy regardless of browser/OS locale */}
-              {y.COMP_S_DT
-                ? ` (${formatLedgerDateDisplay(y.COMP_S_DT)} to ${formatLedgerDateDisplay(y.COMP_E_DT)})`
-                : ''}
-            </option>
-          ))}
-        </select>
-      </div>
+  const compName = formData.comp_name ?? formData.COMP_NAME ?? '';
+  const compNo = formData.comp_code ?? formData.COMP_CODE ?? '';
 
-      <div className="button-group">
-        <button className="btn btn-secondary" onClick={onPrev}>← Back</button>
-        <button className="btn btn-primary" onClick={handleNext} disabled={!selectedUid}>
-          Next →
-        </button>
-      </div>
+  return (
+    <div className="slide slide-windal-initial">
+      <WindalInitialFlowCard
+        variant="step"
+        stepTitle="Year Selection"
+        stepIcon="📅"
+        headerRight={<span>{compName || '—'}</span>}
+        settingsSlot={flowHeaderActions}
+      >
+        {(compNo || compName) && (
+          <div className="windal-initial-company-line">
+            Company No: {compNo || '—'}&nbsp;&nbsp;Name: {compName || '—'}
+          </div>
+        )}
+
+        {!years?.length ? (
+          <p className="windal-initial-company-line">No financial years available.</p>
+        ) : (
+          <div className="windal-initial-year-table-wrap">
+            <table className="windal-initial-year-table">
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Company</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {years.map((y) => {
+                  const uid = String(y.COMP_UID ?? y.comp_uid ?? '');
+                  const isSelected = uid === String(selectedUid);
+                  const yearLabel = y.COMP_YEAR ?? y.comp_year ?? '';
+                  const companyLabel = y.COMP_NAME ?? y.comp_name ?? compName;
+                  const sDisp = formatLedgerDateDisplay(y.COMP_S_DT ?? y.comp_s_dt);
+                  const eDisp = formatLedgerDateDisplay(y.COMP_E_DT ?? y.comp_e_dt);
+                  return (
+                    <tr
+                      key={uid || yearLabel}
+                      className={isSelected ? 'is-selected' : ''}
+                      onClick={() => setSelectedUid(uid)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedUid(uid);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-selected={isSelected}
+                    >
+                      <td>{yearLabel}</td>
+                      <td>{companyLabel}</td>
+                      <td>{sDisp}</td>
+                      <td>{eDisp}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="windal-initial-btn-row">
+          <button type="button" className="windal-initial-btn windal-initial-btn--ghost" onClick={onPrev}>
+            ← Back
+          </button>
+          <button
+            type="button"
+            className="windal-initial-btn windal-initial-btn--primary"
+            onClick={handleNext}
+            disabled={!selectedUid}
+          >
+            ✓ Select & Login
+          </button>
+        </div>
+      </WindalInitialFlowCard>
     </div>
   );
 }

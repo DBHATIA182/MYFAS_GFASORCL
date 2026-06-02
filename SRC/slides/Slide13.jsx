@@ -3,6 +3,7 @@ import axios from 'axios';
 import SaleBillPrintModal from '../components/SaleBillPrintModal';
 import { toDisplayDate, toInputDateString, toOracleDate } from '../utils/dateFormat';
 import { formatApiOrigin } from '../utils/apiLabel';
+import ReportHelpButton from '../components/ReportHelpButton';
 
 function highlightMatch(text, q) {
   if (text == null) return null;
@@ -216,6 +217,8 @@ export default function Slide13({ apiBase, formData, onPrev, onReset }) {
         <div className="report-toolbar">
           <h2>Sale Bill Printing</h2>
           <div className="toolbar-actions">
+            <ReportHelpButton reportId="sale-bill-printing" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
+            
             <button type="button" className="btn btn-toolbar-back" onClick={() => setShowReport(false)}>
               ← Back
             </button>

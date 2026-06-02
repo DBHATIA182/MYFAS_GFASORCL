@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { exitApp } from '../utils/exitApp';
+import WindalInitialFlowCard from '../components/WindalInitialFlowCard';
+import { WINDAL_BRAND } from '../utils/windalBrand';
 
 const MAX_LEN = 10;
 
@@ -11,7 +13,7 @@ function toHubUpper(s) {
     .slice(0, MAX_LEN);
 }
 
-export default function LoginSlide({ apiBase, onSuccess, onExit }) {
+export default function LoginSlide({ apiBase, onSuccess, onExit, settingsSlot = null }) {
   const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -35,7 +37,10 @@ export default function LoginSlide({ apiBase, onSuccess, onExit }) {
         { withCredentials: true, timeout: 60000 }
       );
       if (data?.ok) {
-        onSuccess({ userName: data.user_name ?? u });
+        onSuccess({
+          userName: data.user_name ?? u,
+          comp_code: data.comp_code ?? data.COMP_CODE ?? '',
+        });
       } else {
         setError('Login failed.');
       }
@@ -48,77 +53,80 @@ export default function LoginSlide({ apiBase, onSuccess, onExit }) {
   };
 
   return (
-    <div className="slide slide-login">
-      <h2>Sign in</h2>
-      <p className="login-hint">
-        Enter your credentials to continue to company selection. User name and password are sent in uppercase (same as
-        legacy GRAINFAS).
-      </p>
+    <div className="slide slide-login slide-windal-initial">
+      <WindalInitialFlowCard
+        variant="login"
+        stepTitle="USER LOGIN"
+        settingsSlot={settingsSlot}
+        footer={WINDAL_BRAND.footerNote}
+      >
+        <form onSubmit={handleSubmit}>
+          {error ? (
+            <div className="windal-initial-error" role="alert">
+              <strong>Could not sign in.</strong> {error}
+            </div>
+          ) : null}
 
-      <form onSubmit={handleSubmit} className="report-form login-form">
-        {error ? (
-          <div className="form-api-error" role="alert">
-            <strong>Could not sign in.</strong> {error}
+          <label className="windal-initial-label" htmlFor="login-user">
+            User Name
+          </label>
+          <div className="windal-initial-input-wrap">
+            <input
+              id="login-user"
+              name="user_name"
+              type="text"
+              className="windal-initial-input"
+              autoComplete="username"
+              maxLength={MAX_LEN}
+              value={userName}
+              onChange={(e) => setUserName(toHubUpper(e.target.value))}
+              disabled={loading}
+            />
           </div>
-        ) : null}
 
-        <div className="form-group">
-          <label htmlFor="login-user">User name</label>
-          <input
-            id="login-user"
-            name="user_name"
-            type="text"
-            className="form-input"
-            autoComplete="username"
-            maxLength={MAX_LEN}
-            value={userName}
-            onChange={(e) => setUserName(toHubUpper(e.target.value))}
-            disabled={loading}
-          />
-        </div>
+          <label className="windal-initial-label" htmlFor="login-pw">
+            Password
+          </label>
+          <div className="windal-initial-input-wrap">
+            <input
+              id="login-pw"
+              name="pw"
+              type={showPassword ? 'text' : 'password'}
+              className="windal-initial-input windal-initial-input--pw"
+              autoComplete="current-password"
+              spellCheck={false}
+              maxLength={MAX_LEN}
+              value={password}
+              onChange={(e) => setPassword(toHubUpper(e.target.value))}
+              disabled={loading}
+            />
+            <button
+              type="button"
+              className="windal-initial-pw-toggle"
+              onClick={() => setShowPassword((v) => !v)}
+              disabled={loading}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              title={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? '🙈' : '👁'}
+            </button>
+          </div>
 
-        <div className="form-group">
-          <label htmlFor="login-pw">Password</label>
-          <input
-            id="login-pw"
-            name="pw"
-            type={showPassword ? 'text' : 'password'}
-            className="form-input"
-            autoComplete="current-password"
-            spellCheck={false}
-            maxLength={MAX_LEN}
-            value={password}
-            onChange={(e) => setPassword(toHubUpper(e.target.value))}
-            disabled={loading}
-          />
-        </div>
-
-        <div className="form-checkbox-row">
-          <input
-            id="login-show-pw"
-            type="checkbox"
-            checked={showPassword}
-            onChange={(e) => setShowPassword(e.target.checked)}
-            disabled={loading}
-          />
-          <label htmlFor="login-show-pw">Show password</label>
-        </div>
-
-        <div className="button-group button-group--with-exit">
-          <button
-            type="button"
-            className="btn btn-secondary btn-exit"
-            onClick={() => (onExit ? onExit() : exitApp())}
-            disabled={loading}
-            title="Closes the window when allowed; otherwise leaves a blank tab you can close."
-          >
-            Exit
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign in →'}
-          </button>
-        </div>
-      </form>
+          <div className="windal-initial-btn-row">
+            <button
+              type="button"
+              className="windal-initial-btn windal-initial-btn--ghost"
+              onClick={() => (onExit ? onExit() : exitApp())}
+              disabled={loading}
+            >
+              Exit
+            </button>
+            <button type="submit" className="windal-initial-btn windal-initial-btn--primary" disabled={loading}>
+              {loading ? 'Connecting…' : '→ Connect'}
+            </button>
+          </div>
+        </form>
+      </WindalInitialFlowCard>
     </div>
   );
 }

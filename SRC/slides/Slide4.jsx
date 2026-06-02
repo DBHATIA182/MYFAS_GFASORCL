@@ -7,6 +7,8 @@ import { toInputDateString, toOracleDate, toDisplayDate } from '../utils/dateFor
 import { generatePDF, sharePdfWithWhatsApp, buildLedgerStatementPdfMetadata } from '../utils/pdfgenerator';
 import { downloadExcelRows } from '../utils/excelExport';
 import { formatLedgerVoucherApiError } from '../utils/apiLabel';
+import { sortTrialBalanceRows } from '../utils/trialBalanceSort';
+import ReportHelpButton from '../components/ReportHelpButton';
 
 const VIEW = { FORM: 'form', TRIAL: 'trial', LEDGER: 'ledger', VOUCHER: 'voucher' };
 
@@ -91,7 +93,7 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
           comp_uid: compUid,
         },
       });
-      setTrialRows(Array.isArray(data) ? data : []);
+      setTrialRows(sortTrialBalanceRows(Array.isArray(data) ? data : []));
       setViewMode(VIEW.TRIAL);
     } catch (err) {
       alert('Error: ' + (err.response?.data?.error || err.message));
@@ -156,11 +158,15 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
       return;
     }
     const bTypeFromLedger = ledgerLineType != null && String(ledgerLineType).trim() !== '' ? String(ledgerLineType).trim() : ' ';
+    const ptypeNum =
+      typeof vrType === 'number' ? vrType : parseInt(String(vrType ?? '').trim(), 10);
     setBillPrintParams({
       type: saleType,
+      ...(Number.isFinite(ptypeNum) && ptypeNum >= 1 && ptypeNum <= 9 ? { oracleTypeNum: ptypeNum } : {}),
       billNo: String(billNo).trim(),
       bType: bTypeFromLedger,
       oracleDt,
+      compYear: String(formData.comp_year ?? formData.COMP_YEAR ?? '').trim(),
       label: `Sale bill — sale.type=${saleType} · bill_no=${String(billNo)} · b_type=${bTypeFromLedger.trim() || ' '} · ${toDisplayDate(ymd)}`,
     });
     setBillPrintOpen(true);
@@ -255,6 +261,7 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
         <div className="report-toolbar">
           <h2>Voucher entries</h2>
           <div className="toolbar-actions">
+            <ReportHelpButton reportId="trial-balance" viewKey="voucher" />
             <button type="button" className="btn btn-toolbar-back" onClick={() => setViewMode(VIEW.LEDGER)}>
               ← Back to ledger
             </button>
@@ -304,6 +311,7 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
         <div className="report-toolbar">
           <h2>Ledger Account</h2>
           <div className="toolbar-actions">
+            <ReportHelpButton reportId="trial-balance" viewKey="ledger" />
             <button type="button" className="btn btn-toolbar-back" onClick={() => setViewMode(VIEW.TRIAL)}>
               ← Back
             </button>
@@ -387,6 +395,7 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
             <button type="button" className="btn btn-toolbar-back" onClick={() => setViewMode(VIEW.FORM)}>
               ← Back
             </button>
+            <ReportHelpButton reportId="trial-balance" />
             <button
               type="button"
               className="btn btn-export"
@@ -441,6 +450,15 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
   return (
     <div className="slide slide-4">
       <h2>Trial Balance — parameters</h2>
+      <div className="form-top-bar">
+        <button type="button" className="btn btn-secondary" onClick={onPrev}>
+          ← Back
+        </button>
+        <ReportHelpButton reportId="trial-balance" />
+        <button type="button" className="btn btn-primary form-top-bar__run" onClick={runTrialBalance} disabled={loading}>
+          {loading ? 'Loading…' : 'Run'}
+        </button>
+      </div>
       <p className="company-info">
         <strong>{compName}</strong> | FY {compYear}
         <br />
@@ -449,15 +467,6 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
           from a row after the report loads.
         </span>
       </p>
-
-      <div className="button-group button-group--form-top">
-        <button type="button" className="btn btn-secondary" onClick={onPrev}>
-          ← Back
-        </button>
-        <button type="button" className="btn btn-primary" onClick={runTrialBalance} disabled={loading}>
-          {loading ? 'Loading…' : 'Run'}
-        </button>
-      </div>
 
       <div className="form-group">
         <label htmlFor="tb-end-date">Ending date — as-of (comp_e_dt)</label>
@@ -484,15 +493,6 @@ export default function Slide4({ apiBase, formData, onPrev, onReset }) {
           value={schedule}
           onChange={(e) => setSchedule(e.target.value)}
         />
-      </div>
-
-      <div className="button-group">
-        <button type="button" className="btn btn-secondary" onClick={onPrev}>
-          ← Back
-        </button>
-        <button type="button" className="btn btn-primary" onClick={runTrialBalance} disabled={loading}>
-          {loading ? 'Loading…' : 'Run'}
-        </button>
       </div>
     </div>
   );

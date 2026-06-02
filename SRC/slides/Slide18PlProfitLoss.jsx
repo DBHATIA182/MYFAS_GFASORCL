@@ -7,6 +7,7 @@ import SaleBillPrintModal from '../components/SaleBillPrintModal';
 import LedgerReportHeader from '../components/LedgerReportHeader';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { formatLedgerVoucherApiError } from '../utils/apiLabel';
+import ReportHelpButton from '../components/ReportHelpButton';
 
 function num(v) {
   const n = Number(v);
@@ -406,6 +407,8 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
         <div className="report-toolbar">
           <h2>Voucher entries</h2>
           <div className="toolbar-actions">
+            <ReportHelpButton reportId="pl-profit-loss" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
+            
             <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen(SCREEN.LEDGER)}>
               ← Back to ledger
             </button>
@@ -462,6 +465,8 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
         <div className="report-toolbar">
           <h2>Ledger Report</h2>
           <div className="toolbar-actions">
+            <ReportHelpButton reportId="pl-profit-loss" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
+            
             <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen(SCREEN.REPORT)}>
               ← Back to P&L
             </button>
@@ -515,6 +520,8 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
         <div className="report-toolbar">
           <h2>Profit &amp; Loss</h2>
           <div className="toolbar-actions">
+            <ReportHelpButton reportId="pl-profit-loss" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
+            
             <button type="button" className="btn btn-toolbar-back" onClick={() => setPlData(null)}>
               ← Back
             </button>

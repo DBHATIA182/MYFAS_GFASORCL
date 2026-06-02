@@ -6,6 +6,8 @@ import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { downloadExcelRows } from '../utils/excelExport';
 import { toInputDateString, toOracleDate, toDisplayDate } from '../utils/dateFormat';
 import { formatApiOrigin } from '../utils/apiLabel';
+import ReportHelpButton from '../components/ReportHelpButton';
+import '../styles/saleListScreen.css';
 
 function highlightMatch(text, q) {
   if (text == null) return null;
@@ -52,6 +54,7 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
   const [billPrintOpen, setBillPrintOpen] = useState(false);
   const [billPrintParams, setBillPrintParams] = useState(null);
   const lookupRequestSeqRef = useRef(0);
+  const saleChartDrillRanRef = useRef(null);
 
   const compCode = formData.comp_code ?? formData.COMP_CODE;
   const compUid = formData.comp_uid ?? formData.COMP_UID;
@@ -209,6 +212,57 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
     setBillPrintOpen(true);
   };
 
+  useEffect(() => {
+    const d = formData.saleChartDrilldown;
+    if (!d?.autoRun || !d.startDate || !d.endDate) return;
+    const runKey = String(d.at ?? `${d.startDate}-${d.endDate}-${d.itemCode || ''}`);
+    if (saleChartDrillRanRef.current === runKey) return;
+    saleChartDrillRanRef.current = runKey;
+
+    setStartDate(d.startDate);
+    setEndDate(d.endDate);
+    if (d.itemCode) {
+      setSelectedItem(String(d.itemCode).trim());
+      if (d.itemName) setItemSearch(String(d.itemName).trim());
+    }
+
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const params = {
+          comp_code: compCode,
+          comp_uid: compUid,
+          s_date: toOracleDate(d.startDate),
+          e_date: toOracleDate(d.endDate),
+        };
+        if (d.itemCode) params.item_code = String(d.itemCode).trim();
+        const { data } = await axios.get(`${apiBase}/api/sale-list`, {
+          params,
+          withCredentials: true,
+          timeout: 120000,
+        });
+        if (cancelled) return;
+        const rows = Array.isArray(data) ? data : [];
+        if (rows.length === 0) {
+          alert('No rows returned for this chart selection.');
+        } else {
+          setReportData(rows);
+          setSaleSortMode('date');
+          setShowReport(true);
+        }
+      } catch (error) {
+        if (!cancelled) alert('Error: ' + (error.response?.data?.error || error.message));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.saleChartDrilldown, apiBase, compCode, compUid]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!startDate || !endDate) {
@@ -277,7 +331,8 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
     const saleSortLabel =
       saleSortMode === 'party' ? 'Party-wise' : saleSortMode === 'item' ? 'Item-wise' : saleSortMode === 'broker' ? 'Broker-wise' : 'Date-wise';
     return (
-      <div className="slide slide-report">
+      <div className="slide slide-report sale-list-screen sale-list-screen--report">
+        <div className="sale-list-screen__scroll">
         <SaleBillPrintModal
           open={billPrintOpen}
           onClose={() => {
@@ -293,6 +348,7 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
         <div className="report-toolbar">
           <h2>Sale list</h2>
           <div className="toolbar-actions">
+            <ReportHelpButton reportId="sale-list" includeSalesEntry={false} includeStockLot={true} appName="GRAINFAS" />
             <button type="button" className="btn btn-toolbar-back" onClick={() => setShowReport(false)}>
               ← Back
             </button>
@@ -390,12 +446,14 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
             ← Back
           </button>
         </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="slide slide-8">
+    <div className="slide slide-8 sale-list-screen">
+      <div className="sale-list-screen__scroll">
       <h2>Sale list</h2>
       <p className="company-info">
         {compName} | FY {compYear}
@@ -697,6 +755,7 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
           </button>
         </div>
       </form>
+      </div>
     </div>
   );
 }

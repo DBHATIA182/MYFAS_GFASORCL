@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { exitApp } from '../utils/exitApp';
+import WindalInitialFlowCard from '../components/WindalInitialFlowCard';
 
-export default function Slide1({ companies, onNext, onExit }) {
-  // Use a string to match the value from the dropdown
+export default function Slide1({ companies, onNext, onExit, userName = '', flowHeaderActions = null }) {
   const [selected, setSelected] = useState('');
 
   useEffect(() => {
@@ -16,44 +16,79 @@ export default function Slide1({ companies, onNext, onExit }) {
 
   const handleNext = () => {
     if (!selected) {
-      alert("Please select a company first");
+      alert('Please select a company first');
       return;
     }
-    // Pass COMP_CODE exactly as it appears in the Oracle data
+    const selectedComp = companies?.find((c) => String(c.COMP_CODE) === String(selected));
+    if (!selectedComp) {
+      alert('Please select a company first');
+      return;
+    }
     onNext({ COMP_CODE: selected });
   };
 
+  const count = Array.isArray(companies) ? companies.length : 0;
+  const userLabel = String(userName || '').trim() || '—';
+
   return (
-    <div className="slide">
-      <h2>Step 1: Select Company</h2>
-      <div className="form-group">
-        <label>Select Company:</label>
-        <select
-          className="form-select"
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
-        >
-          <option value="">-- Select Company --</option>
-          {companies.map((comp) => (
-            <option key={comp.COMP_CODE} value={comp.COMP_CODE}>
-              {comp.COMP_NAME} ({comp.COMP_CODE})
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="button-group button-group--with-exit">
-        <button
-          type="button"
-          className="btn btn-secondary btn-exit"
-          onClick={() => (onExit ? onExit() : exitApp())}
-          title="Closes the window when allowed; otherwise leaves a blank tab you can close."
-        >
-          Exit
-        </button>
-        <button type="button" className="btn btn-primary" onClick={handleNext}>
-          Next →
-        </button>
-      </div>
+    <div className="slide slide-windal-initial">
+      <WindalInitialFlowCard
+        variant="step"
+        stepTitle="Company Selection"
+        stepIcon="🏢"
+        headerRight={<span>User: {userLabel}</span>}
+        settingsSlot={flowHeaderActions}
+      >
+        <div className="windal-initial-section-label">Select Company</div>
+
+        {count === 0 ? (
+          <p className="windal-initial-company-line">No companies loaded. Check the server connection.</p>
+        ) : (
+          <ul className="windal-initial-list" role="listbox" aria-label="Companies">
+            {companies.map((comp, index) => {
+              const code = String(comp.COMP_CODE);
+              const name = comp.COMP_NAME ?? comp.comp_name ?? code;
+              const isSelected = code === String(selected);
+              return (
+                <li key={code}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    className={`windal-initial-list-item${isSelected ? ' is-selected' : ''}`}
+                    onClick={() => setSelected(code)}
+                  >
+                    <span>
+                      #{index + 1} {name}
+                    </span>
+                    <span className="windal-initial-list-item__check" aria-hidden="true">
+                      ✓
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="windal-initial-btn-row">
+          <button
+            type="button"
+            className="windal-initial-btn windal-initial-btn--ghost"
+            onClick={() => (onExit ? onExit() : exitApp())}
+          >
+            ← Back
+          </button>
+          <button
+            type="button"
+            className="windal-initial-btn windal-initial-btn--primary"
+            onClick={handleNext}
+            disabled={!selected || count === 0}
+          >
+            ✓ Select
+          </button>
+        </div>
+      </WindalInitialFlowCard>
     </div>
   );
 }
