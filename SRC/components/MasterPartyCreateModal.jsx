@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
-import { normalizeMasterPartyCode } from '../utils/masterPartyCode';
+import { isValidMasterPartyCode, normalizeMasterPartyCode } from '../utils/masterPartyCode';
+import { focusNextOnEnter } from '../utils/enterKeyNextField';
 import MasterPartyPickList from './MasterPartyPickList';
 
 const reqOpts = { withCredentials: true, timeout: 120000 };
@@ -50,6 +51,7 @@ export default function MasterPartyCreateModal({
   onUpdated,
 }) {
   const formRef = useRef(null);
+  const codeManuallyEditedRef = useRef(false);
   const [perms, setPerms] = useState(null);
   const [schedules, setSchedules] = useState([]);
   const [states, setStates] = useState([]);
@@ -152,6 +154,7 @@ export default function MasterPartyCreateModal({
     }
     setErr('');
     setSaving(false);
+    codeManuallyEditedRef.current = false;
 
     let cancelled = false;
     (async () => {
@@ -218,7 +221,9 @@ export default function MasterPartyCreateModal({
   useEffect(() => {
     if (!open || loading || !perms?.canOpen) return;
     if (isEdit ? !perms?.canEdit : !perms?.canAdd) return;
-    const t = requestAnimationFrame(() => focusField(lockSchedule || isEdit ? 'name' : 'schedule'));
+    const t = requestAnimationFrame(() =>
+      focusField(isEdit ? 'name' : lockSchedule ? 'code' : 'schedule')
+    );
     return () => cancelAnimationFrame(t);
   }, [open, loading, perms, lockSchedule, isEdit, focusField]);
 
@@ -251,6 +256,14 @@ export default function MasterPartyCreateModal({
       setErr('Local / Central / Import (L_C) is required. Select L, C, or I.');
       focusField('lc');
       return;
+    }
+    if (!isEdit) {
+      const codeKey = normalizeMasterPartyCode(code);
+      if (!isValidMasterPartyCode(codeKey)) {
+        setErr('Account code must be 6 characters: 1 letter + 5 digits (e.g. E00006).');
+        focusField('code');
+        return;
+      }
     }
     setSaving(true);
     setErr('');
@@ -315,7 +328,12 @@ export default function MasterPartyCreateModal({
             ×
           </button>
         </div>
-        <form ref={formRef} className="sale-bill-modal-body master-party-modal__body" onSubmit={handleSave}>
+        <form
+          ref={formRef}
+          className="sale-bill-modal-body master-party-modal__body"
+          onSubmit={handleSave}
+          onKeyDownCapture={(e) => focusNextOnEnter(e, formRef, { submitOnLast: true })}
+        >
           {loading ? <p className="master-party-modal__loading">Loading…</p> : null}
           {err ? <p className="deploy-update-msg deploy-update-msg--err">{err}</p> : null}
           {!loading && !blocked ? (
@@ -338,9 +356,9 @@ export default function MasterPartyCreateModal({
                     getLabel={(s) => schedLabel(s)}
                     onChange={(val) => {
                       setSchedule(val);
-                      if (!isEdit) void loadNextCode(val);
+                      if (!isEdit && !codeManuallyEditedRef.current) void loadNextCode(val);
                     }}
-                    onKeyDown={(e) => onEnterNext(e, 'name')}
+                    onKeyDown={(e) => onEnterNext(e, isEdit ? 'name' : 'code')}
                   />
                 )}
               </label>
@@ -351,10 +369,28 @@ export default function MasterPartyCreateModal({
                     className="form-input master-party-input--code"
                     data-mp-field="code"
                     value={code}
-                    readOnly
-                    tabIndex={-1}
+                    readOnly={isEdit}
+                    tabIndex={isEdit ? -1 : undefined}
                     maxLength={6}
-                    title={code ? `Account code (${code.length}/6)` : 'Auto from schedule range'}
+                    disabled={saving}
+                    title={
+                      isEdit
+                        ? code
+                          ? `Account code (${code.length}/6)`
+                          : 'Account code'
+                        : code
+                          ? `Account code (${code.length}/6) — edit or use auto-suggest from schedule`
+                          : 'Type code or pick schedule for auto-suggest'
+                    }
+                    onChange={
+                      isEdit
+                        ? undefined
+                        : (e) => {
+                            codeManuallyEditedRef.current = true;
+                            setCode(normalizeMasterPartyCode(e.target.value));
+                          }
+                    }
+                    onKeyDown={isEdit ? undefined : (e) => onEnterNext(e, 'name')}
                   />
                 </label>
                 <label className="master-party-cell master-party-cell--grow">

@@ -1,5 +1,8 @@
 /** GFASORCL main menu — original reports only, plus Sale Chart & Overdue Customers. */
 
+import { masterMenuItemsForReportConfig } from './masterModuleConfig';
+import { utilitiesMenuItemsForReportConfig } from './utilitiesModuleConfig';
+
 export const REPORT_MENU = [
   {
     id: 'final-accounts',
@@ -26,6 +29,7 @@ export const REPORT_MENU = [
     tileColor: '#0ca678',
     items: [
       { id: 'ledger', title: 'Ledger Report', shortTitle: 'Ledger', description: 'Account transactions' },
+      { id: 'complete-ledger', title: 'Complete Ledger', shortTitle: 'Complete Ledger', description: 'All accounts in code range' },
       { id: 'ledger-interest', title: 'Ledger With Interest', shortTitle: 'Ledger + Int.', description: 'Interest calculation' },
       { id: 'customer-ledger', title: 'Customer Ledger', shortTitle: 'Customer Ledger', description: 'Customer bills' },
       {
@@ -45,22 +49,36 @@ export const REPORT_MENU = [
     sidebarLabel: 'Stock',
     sidebarIcon: '📦',
     title: 'Stock Reports',
-    subtitle: 'Inventory & HSN',
+    subtitle: 'Inventory movement',
     tileColor: '#e67e22',
     items: [
       { id: 'stock-sum', title: 'Stock Sum', shortTitle: 'Stock Summary', description: 'Item movement totals' },
       { id: 'stock-lot', title: 'Stock Lot Wise', shortTitle: 'Stock Lot', description: 'Lot-wise stock' },
+    ],
+  },
+  {
+    id: 'gst-reports',
+    index: 4,
+    sidebarLabel: 'GST',
+    sidebarIcon: '📋',
+    title: 'GST Reports',
+    subtitle: 'GSTR-1, HSN & state wise',
+    tileColor: '#db2777',
+    items: [
+      { id: 'gstr1', title: 'GSTR-1', shortTitle: 'GSTR-1', description: 'GST return sheets' },
       { id: 'hsn-sales', title: 'HSN Sales', shortTitle: 'HSN Sales', description: 'HSN-wise sales' },
       { id: 'hsn-purchase', title: 'HSN Purchase', shortTitle: 'HSN Purchase', description: 'HSN-wise purchase' },
+      { id: 'state-wise-sales', title: 'State Wise Sales', shortTitle: 'State Sales', description: 'Sales by party state & GST%' },
+      { id: 'state-wise-purchase', title: 'State Wise Purchase', shortTitle: 'State Purchase', description: 'Purchase by party state & GST%' },
     ],
   },
   {
     id: 'sales-module',
-    index: 4,
+    index: 5,
     sidebarLabel: 'Sales',
     sidebarIcon: '🛒',
     title: 'Sales',
-    subtitle: 'Bills, list, GSTR-1',
+    subtitle: 'Bills, list & chart',
     tileColor: '#7c3aed',
     items: [
       { id: 'sale-bill-printing', title: 'Sale Bill Printing', shortTitle: 'Sale Print', description: 'Print sale bills' },
@@ -71,12 +89,11 @@ export const REPORT_MENU = [
         shortTitle: 'Sale Chart',
         description: 'Month-wise weight & amount by item',
       },
-      { id: 'gstr1', title: 'GSTR-1', shortTitle: 'GSTR-1', description: 'GST return sheets' },
     ],
   },
   {
     id: 'purchase-module',
-    index: 5,
+    index: 6,
     sidebarLabel: 'Purchase',
     sidebarIcon: '🧾',
     title: 'Purchase',
@@ -88,7 +105,7 @@ export const REPORT_MENU = [
   },
   {
     id: 'voucher-module',
-    index: 6,
+    index: 7,
     sidebarLabel: 'Vouchers',
     sidebarIcon: '💵',
     title: 'Vouchers',
@@ -100,27 +117,26 @@ export const REPORT_MENU = [
   },
   {
     id: 'master-module',
-    index: 7,
+    index: 8,
     sidebarLabel: 'Master',
-    sidebarIcon: '👤',
+    sidebarIcon: '🗂️',
     title: 'Master Module',
-    subtitle: 'Account maintenance',
+    subtitle: 'Schedules, accounts, items, users, godown & more',
     tileColor: '#2563eb',
     entry: true,
-    items: [
-      {
-        id: 'account-master',
-        title: 'A/c Master',
-        shortTitle: 'A/c Master',
-        description: 'Add, edit, or delete accounts in MASTER (VARCHAR2(6) code)',
-      },
-      {
-        id: 'item-master',
-        title: 'Item Master',
-        shortTitle: 'Item Master',
-        description: 'Add, edit, or delete item records in ITEMMAST',
-      },
-    ],
+    items: masterMenuItemsForReportConfig(),
+  },
+  {
+    id: 'utilities-module',
+    index: 9,
+    sidebarLabel: 'Utilities',
+    sidebarIcon: '🔧',
+    title: 'Utilities',
+    subtitle: 'Year, transfers, installation & system tools',
+    tileColor: '#6b7280',
+    itemsSectionTitle: 'Options',
+    entry: true,
+    items: utilitiesMenuItemsForReportConfig(),
   },
 ];
 

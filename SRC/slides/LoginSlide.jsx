@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { exitApp } from '../utils/exitApp';
 import WindalInitialFlowCard from '../components/WindalInitialFlowCard';
-import { WINDAL_BRAND } from '../utils/windalBrand';
+import { GFAS_BRAND } from '../utils/gfasBrand';
+import { formatLoginError } from '../utils/loginErrorMessage';
+import { apiUrl, formatApiBaseForDisplay } from '../utils/resolveApiBase';
 
 const MAX_LEN = 10;
 
@@ -19,6 +21,22 @@ export default function LoginSlide({ apiBase, onSuccess, onExit, settingsSlot = 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [apiReachable, setApiReachable] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await axios.get(apiUrl(apiBase, '/api/health'), { timeout: 3000 });
+        if (!cancelled) setApiReachable(true);
+      } catch {
+        if (!cancelled) setApiReachable(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,11 +49,7 @@ export default function LoginSlide({ apiBase, onSuccess, onExit, settingsSlot = 
     }
     setLoading(true);
     try {
-      const { data } = await axios.post(
-        `${apiBase}/api/login`,
-        { user_name: u, pw: p },
-        { withCredentials: true, timeout: 60000 }
-      );
+      const { data } = await axios.post(apiUrl(apiBase, '/api/login'), { user_name: u, pw: p }, { withCredentials: true, timeout: 60000 });
       if (data?.ok) {
         onSuccess({
           userName: data.user_name ?? u,
@@ -45,8 +59,9 @@ export default function LoginSlide({ apiBase, onSuccess, onExit, settingsSlot = 
         setError('Login failed.');
       }
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Login failed.';
-      setError(msg);
+      const detail = formatLoginError(err, apiBase);
+      console.error('Login failed:', apiUrl(apiBase, '/api/login'), detail, err?.response?.data);
+      setError(detail);
     } finally {
       setLoading(false);
     }
@@ -58,13 +73,23 @@ export default function LoginSlide({ apiBase, onSuccess, onExit, settingsSlot = 
         variant="login"
         stepTitle="USER LOGIN"
         settingsSlot={settingsSlot}
-        footer={WINDAL_BRAND.footerNote}
+        footer={GFAS_BRAND.footerNote}
       >
         <form onSubmit={handleSubmit}>
           {error ? (
             <div className="windal-initial-error" role="alert">
               <strong>Could not sign in.</strong> {error}
             </div>
+          ) : null}
+          <p className="windal-initial-api-hint">
+            API: {formatApiBaseForDisplay(apiBase)}
+            {apiReachable === true ? ' · reachable' : apiReachable === false ? ' · not reachable' : ''}
+          </p>
+          {apiReachable === false ? (
+            <p className="windal-initial-api-hint windal-initial-api-hint--warn">
+              API not reachable. On this PC run start-api.cmd (port 5002), npm run dev, and cloudflared. On phone open the same
+              link as tunnel (e.g. demo.fasaccountingsoftware.in), not localhost.
+            </p>
           ) : null}
 
           <label className="windal-initial-label" htmlFor="login-user">

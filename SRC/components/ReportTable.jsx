@@ -1264,8 +1264,8 @@ export default function ReportTable({
           </thead>
           <tbody>
             {displayRows.map((item, i) => {
-              if (item.kind === 'broker-section-header') {
-                const hCode = item.BK_CODE || '—';
+              if (item.kind === 'broker-section-header' || item.kind === 'broker-header') {
+                const hCode = item.BK_CODE ?? item.B_CODE ?? '—';
                 const hName = String(item.BK_NAME ?? item.bk_name ?? '').trim();
                 const hLabel = hName ? `Broker ${hCode} — ${hName}` : `Broker ${hCode}`;
                 return (
@@ -1322,7 +1322,7 @@ export default function ReportTable({
                 );
               }
               if (item.kind === 'broker-total') {
-                const bkCode = item.BK_CODE || '—';
+                const bkCode = item.BK_CODE ?? item.B_CODE ?? '—';
                 const bkName = String(item.BK_NAME ?? item.bk_name ?? '').trim();
                 const brokerLabel = bkName ? `${bkCode} — ${bkName}` : bkCode;
                 return (
@@ -1343,6 +1343,7 @@ export default function ReportTable({
                   </tr>
                 );
               }
+              if (item.kind !== 'detail' || !item.row) return null;
               const row = item.row;
               const billDt = row.BILL_DATE ?? row.bill_date;
               const vrDt = row.VR_DATE ?? row.vr_date;

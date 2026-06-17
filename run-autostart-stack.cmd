@@ -9,7 +9,7 @@ set "PATH=%PATH%;%ProgramFiles%\nodejs;%LOCALAPPDATA%\Programs\nodejs;%ProgramFi
 
 echo [%date% %time%] Starting API ^+ Vite ^+ tunnel...>> logs\autostart-stack.log
 
-start "GFAS-API" /MIN cmd /c "node server.cjs >> logs\server.log 2>&1"
+start "GFAS-API" /MIN cmd /c "set PORT=5002 && node server.cjs >> logs\server.log 2>&1"
 timeout /t 2 /nobreak >nul
 start "GFAS-Web" /MIN cmd /c "npm.cmd run dev -- --host 0.0.0.0 --port 5173 >> logs\frontend.log 2>&1"
 timeout /t 2 /nobreak >nul

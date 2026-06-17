@@ -1,9 +1,9 @@
 import React from 'react';
-import { WINDAL_BRAND } from '../utils/windalBrand';
+import { GFAS_BRAND } from '../utils/gfasBrand';
 
 /**
- * Centered card for login / company / year (MFFAS-style).
- * @param {'login'|'step'} variant — login shows (FAS) + WINDAL header; step shows title bar only
+ * Centered card for login / company / year (GFASORCL initial flow).
+ * @param {'login'|'step'} variant — login shows (FAS) + GRAINFAS header; step shows title bar only
  */
 export default function WindalInitialFlowCard({
   variant = 'login',
@@ -23,14 +23,14 @@ export default function WindalInitialFlowCard({
         {variant === 'login' ? (
           <div className="windal-initial-card__brand">
             {loginTools ? <div className="windal-initial-card__brand-tools">{loginTools}</div> : null}
-            <div className="windal-initial-card__fas">{WINDAL_BRAND.fasPrefix}</div>
+            <div className="windal-initial-card__fas">{GFAS_BRAND.fasPrefix}</div>
             <div className="windal-initial-card__brand-row">
               <div className="windal-initial-logo" aria-hidden="true">
-                {WINDAL_BRAND.logoLetter}
+                {GFAS_BRAND.logoLetter}
               </div>
               <div className="windal-initial-card__titles">
-                <div className="windal-initial-product">{WINDAL_BRAND.productName}</div>
-                <div className="windal-initial-tagline">{WINDAL_BRAND.tagline}</div>
+                <div className="windal-initial-product">{GFAS_BRAND.productName}</div>
+                <div className="windal-initial-tagline">{GFAS_BRAND.tagline}</div>
               </div>
             </div>
           </div>

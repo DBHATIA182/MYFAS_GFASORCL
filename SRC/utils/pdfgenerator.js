@@ -1,4 +1,6 @@
 import html2pdf from 'html2pdf.js';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { formatLedgerDateDisplay } from './dateFormat';
 import { buildBrokerOsDisplayRows } from './brokerOsDisplay';
 import { buildSaleListDisplayRows, saleListMeas } from './saleListDisplay';
@@ -609,48 +611,29 @@ function buildTrialBalanceReportHtml(data, metadata) {
   `;
 }
 
-/** Ledger PDF */
-function buildLedgerReportHtml(data, metadata) {
-  const rows = data || [];
+/** Ledger PDF table body (account header + grid + footer) — no outer report-doc shell. */
+function buildLedgerPdfTableSection(rows, metadata, { includeAccountBlock = true } = {}) {
+  const data = rows || [];
   let sumDr = 0;
   let sumCr = 0;
-  rows.forEach((row) => {
+  data.forEach((row) => {
     sumDr += parseFloat(row.DR_AMT ?? row.dr_amt ?? 0) || 0;
     sumCr += parseFloat(row.CR_AMT ?? row.cr_amt ?? 0) || 0;
   });
-  const last = rows[rows.length - 1];
+  const last = data[data.length - 1];
   const closingBal =
     last != null
       ? parseFloat(last.CL_BALANCE ?? last.cl_balance ?? last.RUN_BAL ?? last.run_bal ?? 0) || 0
       : 0;
 
-  const company = escHtml(metadata.companyName);
-  const year = escHtml(metadata.year);
   const accName = escHtml(metadata.accountName);
   const accCode = escHtml(metadata.accountCode);
-  const period = escHtml(metadata.endDate);
-  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
-
-  const cAdd1 = escHtml(String(metadata.companyAdd1 ?? '').trim());
-  const cAdd2 = escHtml(String(metadata.companyAdd2 ?? '').trim());
-  const cGst = escHtml(String(metadata.companyGst ?? '').trim());
   const aAdd1 = escHtml(String(metadata.accountAdd1 ?? '').trim());
   const aAdd2 = escHtml(String(metadata.accountAdd2 ?? '').trim());
   const aCity = escHtml(String(metadata.accountCity ?? '').trim());
   const aGst = escHtml(String(metadata.accountGst ?? '').trim());
   const aPan = escHtml(String(metadata.accountPan ?? '').trim());
   const aTel = escHtml(String(metadata.accountTel ?? '').trim());
-
-  const companyLines = [
-    company ? `<div class="ledger-pdf-company-name">${company}</div>` : '',
-    cAdd1 ? `<div class="ledger-pdf-line">${cAdd1}</div>` : '',
-    cAdd2 ? `<div class="ledger-pdf-line">${cAdd2}</div>` : '',
-    cGst ? `<div class="ledger-pdf-line"><strong>GST:</strong> ${cGst}</div>` : '',
-  ]
-    .filter(Boolean)
-    .join('');
-  const companyBlock =
-    companyLines !== '' ? `<div class="ledger-pdf-company-block">${companyLines}</div>` : '';
 
   const accMetaParts = [
     aCity ? `City: ${aCity}` : '',
@@ -668,7 +651,9 @@ function buildLedgerReportHtml(data, metadata) {
   ]
     .filter(Boolean)
     .join('');
-  const accountBlock = `<div class="ledger-pdf-account-block"><div class="ledger-pdf-block-title">Account</div>${accountLines}</div>`;
+  const accountBlock = includeAccountBlock
+    ? `<div class="ledger-pdf-account-block"><div class="ledger-pdf-block-title">Account</div>${accountLines}</div>`
+    : '';
 
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const amountLen = (n) => formatAmtPdf(n).replace(/\s+/g, '').length;
@@ -676,7 +661,7 @@ function buildLedgerReportHtml(data, metadata) {
     amountLen(sumDr),
     amountLen(sumCr),
     amountLen(closingBal),
-    ...rows.map((r) =>
+    ...data.map((r) =>
       Math.max(
         amountLen(r.DR_AMT ?? r.dr_amt ?? 0),
         amountLen(r.CR_AMT ?? r.cr_amt ?? 0),
@@ -686,7 +671,7 @@ function buildLedgerReportHtml(data, metadata) {
   );
   const maxDetailChars = Math.max(
     12,
-    ...rows.map((r) => String(r.DETAIL ?? r.detail ?? '').replace(/\s+/g, ' ').trim().length)
+    ...data.map((r) => String(r.DETAIL ?? r.detail ?? '').replace(/\s+/g, ' ').trim().length)
   );
   let amountColW = maxAmtChars >= 14 ? 11.5 : maxAmtChars >= 12 ? 11 : 10.5;
   const vrDateW = 7;
@@ -719,7 +704,7 @@ function buildLedgerReportHtml(data, metadata) {
         </colgroup>`;
 
   let bodyRows = '';
-  rows.forEach((row) => {
+  data.forEach((row) => {
     const vrType = row.VR_TYPE ?? row.vr_type ?? '';
     const opClass = vrType === 'OP' ? ' op-row' : '';
     const d = escHtml(formatLedgerDateDisplay(row.VR_DATE ?? row.vr_date));
@@ -746,19 +731,7 @@ function buildLedgerReportHtml(data, metadata) {
   });
 
   return `
-    <div class="report-doc">
-      <style>${PDF_REPORT_STYLES}</style>
-      <div class="report-topbar">
-        <div class="kicker">ACCOUNTING REPORT</div>
-        <h1>LEDGER ACCOUNT STATEMENT</h1>
-        ${companyBlock}
-        ${accountBlock}
-        <table class="report-grid">
-          <tr><td class="lbl">Financial year</td><td class="val">${year}</td><td class="lbl">Account code</td><td class="val">${accCode}</td></tr>
-        </table>
-        <div class="report-period"><strong>Period: ${period}</strong> &nbsp;|&nbsp; <strong>Generated:</strong> ${generated}</div>
-      </div>
-
+      ${accountBlock}
       <table class="table-report table-report-ledger">
         ${ledgerColgroup}
         <thead>
@@ -784,14 +757,423 @@ function buildLedgerReportHtml(data, metadata) {
           </tr>
         </tbody>
       </table>
-
       <div class="report-foot">
         Debit and credit columns are period totals; the balance column is the closing running balance.
-        <br />
-        Computer-generated statement — no signature required.
+      </div>`;
+}
+
+/** Ledger PDF */
+function buildLedgerReportHtml(data, metadata) {
+  const rows = data || [];
+  const company = escHtml(metadata.companyName);
+  const year = escHtml(metadata.year);
+  const accCode = escHtml(metadata.accountCode);
+  const period = escHtml(metadata.endDate);
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+
+  const cAdd1 = escHtml(String(metadata.companyAdd1 ?? '').trim());
+  const cAdd2 = escHtml(String(metadata.companyAdd2 ?? '').trim());
+  const cGst = escHtml(String(metadata.companyGst ?? '').trim());
+  const companyLines = [
+    company ? `<div class="ledger-pdf-company-name">${company}</div>` : '',
+    cAdd1 ? `<div class="ledger-pdf-line">${cAdd1}</div>` : '',
+    cAdd2 ? `<div class="ledger-pdf-line">${cAdd2}</div>` : '',
+    cGst ? `<div class="ledger-pdf-line"><strong>GST:</strong> ${cGst}</div>` : '',
+  ]
+    .filter(Boolean)
+    .join('');
+  const companyBlock =
+    companyLines !== '' ? `<div class="ledger-pdf-company-block">${companyLines}</div>` : '';
+
+  const tableSection = buildLedgerPdfTableSection(rows, metadata);
+
+  return `
+    <div class="report-doc">
+      <style>${PDF_REPORT_STYLES}</style>
+      <div class="report-topbar">
+        <div class="kicker">ACCOUNTING REPORT</div>
+        <h1>LEDGER ACCOUNT STATEMENT</h1>
+        ${companyBlock}
+        <table class="report-grid">
+          <tr><td class="lbl">Financial year</td><td class="val">${year}</td><td class="lbl">Account code</td><td class="val">${accCode}</td></tr>
+        </table>
+        <div class="report-period"><strong>Period: ${period}</strong> &nbsp;|&nbsp; <strong>Generated:</strong> ${generated}</div>
+      </div>
+      ${tableSection}
+    </div>
+  `;
+}
+
+const COMPLETE_LEDGER_PDF_W_PX = 794;
+const COMPLETE_LEDGER_PDF_MARGIN_MM = 6;
+
+function buildLedgerPdfCompanyBlockHtml(metadata) {
+  const company = escHtml(metadata.companyName);
+  const cAdd1 = escHtml(String(metadata.companyAdd1 ?? '').trim());
+  const cAdd2 = escHtml(String(metadata.companyAdd2 ?? '').trim());
+  const cGst = escHtml(String(metadata.companyGst ?? '').trim());
+  const companyLines = [
+    company ? `<div class="ledger-pdf-company-name">${company}</div>` : '',
+    cAdd1 ? `<div class="ledger-pdf-line">${cAdd1}</div>` : '',
+    cAdd2 ? `<div class="ledger-pdf-line">${cAdd2}</div>` : '',
+    cGst ? `<div class="ledger-pdf-line"><strong>GST:</strong> ${cGst}</div>` : '',
+  ]
+    .filter(Boolean)
+    .join('');
+  return companyLines !== '' ? `<div class="ledger-pdf-company-block">${companyLines}</div>` : '';
+}
+
+function buildCompleteLedgerAccountMeta(sec, metadata) {
+  const row0 = Array.isArray(sec?.rows) && sec.rows.length ? sec.rows[0] : null;
+  return buildLedgerStatementPdfMetadata({
+    formData: metadata?.formData,
+    compLedgerHeader: metadata?.compLedgerHeader,
+    account: {
+      CODE: sec?.code,
+      NAME: sec?.name,
+      CITY: sec?.city,
+      ADD1: sec?.add1,
+      ADD2: sec?.add2,
+      GST_NO: sec?.gst_no,
+      PAN: sec?.pan,
+      TEL_NO_O: sec?.tel_no_o,
+      ...(row0 || {}),
+    },
+    year: metadata?.year,
+    endDate: metadata?.endDate,
+  });
+}
+
+function buildCompleteLedgerAccountTableHtml(rows, accountMeta) {
+  const tableSection = buildLedgerPdfTableSection(rows, accountMeta, { includeAccountBlock: false });
+  return `
+    <div class="report-doc complete-ledger-pdf-root">
+      <style>${PDF_REPORT_STYLES}</style>
+      <style>
+        .complete-ledger-pdf-root { width: ${COMPLETE_LEDGER_PDF_W_PX}px; max-width: ${COMPLETE_LEDGER_PDF_W_PX}px; background: #fff; color: #1a202c; }
+      </style>
+      ${tableSection}
+    </div>
+  `;
+}
+
+function pdfHeaderTextLines(pdf, text, maxW) {
+  const t = String(text ?? '').trim();
+  if (!t) return [];
+  return pdf.splitTextToSize(t, maxW);
+}
+
+function drawLedgerPdfPageHeader(pdf, meta, startY = COMPLETE_LEDGER_PDF_MARGIN_MM) {
+  const margin = COMPLETE_LEDGER_PDF_MARGIN_MM;
+  const maxW = pdf.internal.pageSize.getWidth() - margin * 2;
+  let y = startY;
+
+  pdf.setTextColor(15, 23, 42);
+
+  const company = String(meta.companyName || '').trim();
+  if (company) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.text(company, margin, y);
+    y += 5.2;
+  }
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8.5);
+  for (const line of [meta.companyAdd1, meta.companyAdd2].map((s) => String(s || '').trim()).filter(Boolean)) {
+    for (const chunk of pdfHeaderTextLines(pdf, line, maxW)) {
+      pdf.text(chunk, margin, y);
+      y += 3.8;
+    }
+  }
+  const cGst = String(meta.companyGst || '').trim();
+  if (cGst) {
+    pdf.text(`GST: ${cGst}`, margin, y);
+    y += 3.8;
+  }
+
+  const accName = String(meta.accountName || '').trim();
+  const accCode = String(meta.accountCode || '').trim();
+  if (accName || accCode) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.text(`Account: ${accName}${accCode ? ` (${accCode})` : ''}`, margin, y);
+    y += 4.5;
+  }
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8.5);
+  for (const line of [meta.accountAdd1, meta.accountAdd2].map((s) => String(s || '').trim()).filter(Boolean)) {
+    for (const chunk of pdfHeaderTextLines(pdf, line, maxW)) {
+      pdf.text(chunk, margin, y);
+      y += 3.8;
+    }
+  }
+  const accMeta = [
+    meta.accountCity ? `City: ${meta.accountCity}` : '',
+    meta.accountGst ? `GST: ${meta.accountGst}` : '',
+    meta.accountPan ? `PAN: ${meta.accountPan}` : '',
+    meta.accountTel ? `Tel: ${meta.accountTel}` : '',
+  ]
+    .filter(Boolean)
+    .join('  |  ');
+  if (accMeta) {
+    for (const chunk of pdfHeaderTextLines(pdf, accMeta, maxW)) {
+      pdf.text(chunk, margin, y);
+      y += 3.8;
+    }
+  }
+
+  const period = String(meta.endDate || '').trim();
+  const year = String(meta.year || '').trim();
+  if (period) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8.5);
+    pdf.text(`Period: ${period}${year ? `  |  FY ${year}` : ''}`, margin, y);
+    y += 5;
+  }
+
+  pdf.setDrawColor(148, 163, 184);
+  pdf.line(margin, y, pdf.internal.pageSize.getWidth() - margin, y);
+  return y + 2;
+}
+
+function buildCompleteLedgerFilterBits(metadata) {
+  return [
+    metadata?.scheduleNo ? `Schedule ${escHtml(metadata.scheduleNo)}${metadata.scheduleLabel ? ` (${escHtml(metadata.scheduleLabel)})` : ''}` : '',
+    metadata?.startCode != null && metadata?.endCode != null ? `Codes ${escHtml(metadata.startCode)}–${escHtml(metadata.endCode)}` : '',
+    metadata?.accountCount != null ? `${escHtml(metadata.accountCount)} account(s)` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function buildCompleteLedgerSectionsHtml(sections, metadata) {
+  return sections
+    .map((sec, idx) => {
+      const accountMeta = buildCompleteLedgerAccountMeta(sec, metadata);
+      const breakCls = idx > 0 ? ' complete-ledger-pdf-section--break' : '';
+      const inner = buildLedgerPdfTableSection(sec.rows, accountMeta);
+      return `<div class="complete-ledger-pdf-section${breakCls}">${inner}</div>`;
+    })
+    .join('');
+}
+
+function buildCompleteLedgerCoverHtml(metadata, sectionCount) {
+  const coverMeta = buildLedgerStatementPdfMetadata({
+    formData: metadata?.formData,
+    compLedgerHeader: metadata?.compLedgerHeader,
+    account: {},
+    year: metadata?.year,
+    endDate: metadata?.endDate,
+    accountNameOverride: '',
+    accountCodeOverride: '',
+  });
+  const companyBlock = buildLedgerPdfCompanyBlockHtml({
+    ...coverMeta,
+    companyName: coverMeta.companyName || metadata?.companyName || metadata?.formData?.comp_name || metadata?.formData?.COMP_NAME || '',
+  });
+  const year = escHtml(metadata?.year || '');
+  const period = escHtml(metadata?.endDate || '');
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+  const filterBits = buildCompleteLedgerFilterBits(metadata);
+
+  return `
+    <div class="report-doc complete-ledger-pdf-root">
+      <style>${PDF_REPORT_STYLES}</style>
+      <style>
+        .complete-ledger-pdf-root { width: ${COMPLETE_LEDGER_PDF_W_PX}px; max-width: ${COMPLETE_LEDGER_PDF_W_PX}px; background: #fff; color: #1a202c; }
+      </style>
+      <div class="complete-ledger-pdf-cover">
+        <div class="report-topbar">
+          <div class="kicker">ACCOUNTING REPORT</div>
+          <h1>COMPLETE LEDGER</h1>
+          ${companyBlock}
+          <table class="report-grid">
+            <tr><td class="lbl">Financial year</td><td class="val">${year}</td><td class="lbl">Accounts</td><td class="val">${escHtml(sectionCount)}</td></tr>
+          </table>
+          <div class="report-period"><strong>Period: ${period}</strong>${filterBits ? ` &nbsp;|&nbsp; ${filterBits}` : ''}</div>
+          <div class="report-period"><strong>Generated:</strong> ${generated}</div>
+        </div>
       </div>
     </div>
   `;
+}
+
+function buildCompleteLedgerBodyHtml(sections, metadata) {
+  const body = buildCompleteLedgerSectionsHtml(sections, metadata);
+  return `
+    <div class="report-doc complete-ledger-pdf-root">
+      <style>${PDF_REPORT_STYLES}</style>
+      <style>
+        .complete-ledger-pdf-root { width: ${COMPLETE_LEDGER_PDF_W_PX}px; max-width: ${COMPLETE_LEDGER_PDF_W_PX}px; background: #fff; color: #1a202c; }
+        .complete-ledger-pdf-section { margin-bottom: 12px; }
+      </style>
+      ${body}
+    </div>
+  `;
+}
+
+function buildCompleteLedgerReportHtml(data, metadata) {
+  const sections = Array.isArray(data?.sections) ? data.sections : [];
+  const company = escHtml(metadata?.companyName || metadata?.formData?.comp_name || metadata?.formData?.COMP_NAME || '');
+  const year = escHtml(metadata?.year || '');
+  const period = escHtml(metadata?.endDate || '');
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+  const filterBits = buildCompleteLedgerFilterBits(metadata);
+  const body = buildCompleteLedgerSectionsHtml(sections, metadata);
+
+  return `
+    <div class="report-doc complete-ledger-pdf-root">
+      <style>${PDF_REPORT_STYLES}</style>
+      <style>
+        .complete-ledger-pdf-root { width: ${COMPLETE_LEDGER_PDF_W_PX}px; max-width: ${COMPLETE_LEDGER_PDF_W_PX}px; background: #fff; color: #1a202c; }
+        .complete-ledger-pdf-section { margin-bottom: 12px; }
+        .complete-ledger-pdf-section--break { page-break-before: always; break-before: page; margin-top: 16px; }
+        .complete-ledger-pdf-cover { page-break-after: always; break-after: page; margin-bottom: 12px; }
+      </style>
+      <div class="complete-ledger-pdf-cover">
+        <div class="report-topbar">
+          <div class="kicker">ACCOUNTING REPORT</div>
+          <h1>COMPLETE LEDGER</h1>
+          ${company ? `<div class="ledger-pdf-company-name">${company}</div>` : ''}
+          <table class="report-grid">
+            <tr><td class="lbl">Financial year</td><td class="val">${year}</td><td class="lbl">Accounts</td><td class="val">${escHtml(sections.length)}</td></tr>
+          </table>
+          <div class="report-period"><strong>Period: ${period}</strong>${filterBits ? ` &nbsp;|&nbsp; ${filterBits}` : ''}</div>
+          <div class="report-period"><strong>Generated:</strong> ${generated}</div>
+        </div>
+      </div>
+      ${body}
+    </div>
+  `;
+}
+
+function chunkCompleteLedgerSections(sections, maxRows = 180, maxAccounts = 10) {
+  const chunks = [];
+  let cur = [];
+  let rows = 0;
+  for (const sec of sections) {
+    const n = Array.isArray(sec.rows) ? sec.rows.length : 0;
+    if (cur.length && (rows + n > maxRows || cur.length >= maxAccounts)) {
+      chunks.push(cur);
+      cur = [];
+      rows = 0;
+    }
+    cur.push(sec);
+    rows += n;
+  }
+  if (cur.length) chunks.push(cur);
+  return chunks.length ? chunks : [[]];
+}
+
+function mountCompleteLedgerPdfHost(html) {
+  const host = document.createElement('div');
+  host.setAttribute('data-pdf-host', 'complete-ledger');
+  host.style.cssText = [
+    'position:fixed',
+    'left:0',
+    'top:0',
+    `width:${COMPLETE_LEDGER_PDF_W_PX}px`,
+    'background:#fff',
+    'color:#1a202c',
+    'opacity:0.01',
+    'pointer-events:none',
+    'z-index:2147483646',
+    'overflow:visible',
+  ].join(';');
+  host.innerHTML = html;
+  document.body.appendChild(host);
+  return host;
+}
+
+async function waitForPdfPaint() {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+}
+
+async function captureCompleteLedgerPdfCanvas(host) {
+  const target = host.querySelector('.report-doc') || host.firstElementChild || host;
+  const canvas = await html2canvas(target, {
+    scale: 1,
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff',
+    width: COMPLETE_LEDGER_PDF_W_PX,
+    windowWidth: COMPLETE_LEDGER_PDF_W_PX,
+    scrollX: 0,
+    scrollY: 0,
+  });
+  if (!canvas?.width || !canvas?.height) {
+    throw new Error('PDF render produced empty canvas');
+  }
+  return canvas;
+}
+
+function appendCanvasSlicesToPdf(pdf, canvas, { newSection = true, pageHeader = null, headerEveryPage = false } = {}) {
+  const imgData = canvas.toDataURL('image/jpeg', 0.92);
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const imgW = pageW;
+  const imgH = (canvas.height * imgW) / canvas.width;
+  const hadPages = pdf.internal.getNumberOfPages() > 0;
+  const bottomMargin = COMPLETE_LEDGER_PDF_MARGIN_MM;
+
+  let rendered = 0;
+  while (rendered < imgH) {
+    if (rendered > 0 || (hadPages && newSection)) {
+      pdf.addPage();
+    }
+
+    let contentTop = 0;
+    let sliceHeight = pageH - bottomMargin;
+    if (pageHeader && headerEveryPage) {
+      contentTop = drawLedgerPdfPageHeader(pdf, pageHeader, COMPLETE_LEDGER_PDF_MARGIN_MM);
+      sliceHeight = pageH - contentTop - bottomMargin;
+    }
+
+    pdf.addImage(imgData, 'JPEG', 0, contentTop - rendered, imgW, imgH);
+    rendered += sliceHeight > 0 ? sliceHeight : pageH - bottomMargin;
+  }
+}
+
+async function getCompleteLedgerPdfBlob(data, metadata) {
+  const sections = Array.isArray(data?.sections) ? data.sections : [];
+  if (!sections.length) {
+    throw new Error('Complete ledger has no account sections to export.');
+  }
+
+  const options = getPdfOptions(metadata, 'complete-ledger');
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const renderHtmlChunk = async (html, { isNewSection, pageHeader, headerEveryPage } = {}) => {
+    const host = mountCompleteLedgerPdfHost(html);
+    try {
+      await waitForPdfPaint();
+      const canvas = await captureCompleteLedgerPdfCanvas(host);
+      appendCanvasSlicesToPdf(pdf, canvas, {
+        newSection: isNewSection !== false,
+        pageHeader,
+        headerEveryPage: !!headerEveryPage,
+      });
+    } finally {
+      document.body.removeChild(host);
+    }
+  };
+
+  await renderHtmlChunk(buildCompleteLedgerCoverHtml(metadata, sections.length), { isNewSection: false });
+
+  for (const sec of sections) {
+    const accountMeta = buildCompleteLedgerAccountMeta(sec, metadata);
+    const html = buildCompleteLedgerAccountTableHtml(sec.rows, accountMeta);
+    await renderHtmlChunk(html, {
+      isNewSection: true,
+      pageHeader: accountMeta,
+      headerEveryPage: true,
+    });
+  }
+
+  return { blob: pdf.output('blob'), filename: options.filename };
 }
 
 /** Trading Ledger PDF (Entry/Date/Month wise). */
@@ -1095,8 +1477,8 @@ function buildBrokerOsReportHtml(data, metadata) {
 
   let bodyRows = '';
   displayRows.forEach((item) => {
-    if (item.kind === 'broker-section-header') {
-      const hc = escHtml(item.BK_CODE ?? '');
+    if (item.kind === 'broker-section-header' || item.kind === 'broker-header') {
+      const hc = escHtml(item.BK_CODE ?? item.B_CODE ?? '');
       const hn = escHtml(String(item.BK_NAME ?? item.bk_name ?? '').trim());
       const headLine = hn ? `Broker ${hc} — ${hn}` : `Broker ${hc}`;
       bodyRows += `
@@ -1133,7 +1515,7 @@ function buildBrokerOsReportHtml(data, metadata) {
       return;
     }
     if (item.kind === 'broker-total') {
-      const bk = escHtml(item.BK_CODE ?? '');
+      const bk = escHtml(item.BK_CODE ?? item.B_CODE ?? '');
       const bkNm = String(item.BK_NAME ?? item.bk_name ?? '').trim();
       const brokerPdfLabel = bkNm ? `${bk} — ${escHtml(bkNm)}` : bk;
       bodyRows += `
@@ -1146,6 +1528,7 @@ function buildBrokerOsReportHtml(data, metadata) {
             </tr>`;
       return;
     }
+    if (item.kind !== 'detail' || !item.row) return;
     const row = item.row;
     const billDt = escHtml(formatLedgerDateDisplay(row.BILL_DATE ?? row.bill_date));
     const vrDt = escHtml(formatLedgerDateDisplay(row.VR_DATE ?? row.vr_date));
@@ -2570,6 +2953,53 @@ function buildHsnSalesReportHtml(payload, metadata) {
   `;
 }
 
+function buildStateWiseSalesReportHtml(payload, metadata) {
+  const data = payload && typeof payload === 'object' ? payload : {};
+  const rows = Array.isArray(data.rows) ? data.rows : [];
+  const columns =
+    rows.length > 0
+      ? Object.keys(rows[0])
+      : ['State Code', 'State', 'Gst%', 'Qty.', 'Weight', 'Taxable', 'Cgst Amt.', 'Sgst Amt.', 'Igst Amt.'];
+  const company = escHtml(metadata?.companyName || '');
+  const fy = escHtml(metadata?.year || '');
+  const period = escHtml(metadata?.period || '');
+  const stateFilter = escHtml(metadata?.stateFilter || 'All states');
+  const title = escHtml(metadata?.reportTitle || 'State Wise Sales');
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+  const thead = columns.map((c) => `<th>${escHtml(c)}</th>`).join('');
+  const tbody = rows
+    .map((r) => {
+      const tds = columns
+        .map((c) => {
+          const v = r[c];
+          const isNum = typeof v === 'number';
+          return `<td class="${isNum ? 'amount' : ''}">${escHtml(v == null ? '' : String(v))}</td>`;
+        })
+        .join('');
+      return `<tr>${tds}</tr>`;
+    })
+    .join('');
+  return `
+    <div class="report-doc">
+      <style>${PDF_REPORT_STYLES}</style>
+      <div class="report-topbar">
+        <div class="kicker">${escHtml(String(metadata?.reportTitle || 'State Wise Sales').toUpperCase())}</div>
+        <h1>${title}</h1>
+        <div class="company">${company}</div>
+        <table class="report-grid">
+          <tr><td class="lbl">FY</td><td class="val">${fy}</td><td class="lbl">Period</td><td class="val">${period}</td></tr>
+          <tr><td class="lbl">State</td><td class="val" colspan="3">${stateFilter} (${rows.length} rows)</td></tr>
+        </table>
+        <div class="report-period">Generated: ${generated}</div>
+      </div>
+      <table class="table-report">
+        <thead><tr>${thead}</tr></thead>
+        <tbody>${tbody || '<tr><td>(No rows)</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function buildBalanceSheetReportHtml(data, metadata) {
   const rows = Array.isArray(data?.rows) ? data.rows : Array.isArray(data) ? data : [];
   const company = escHtml(metadata.companyName || 'Company');
@@ -2834,6 +3264,822 @@ function buildProfitLossReportHtml(data, metadata) {
   `;
 }
 
+function buildItemMasterReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Item Master List');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r?.ITEM_CODE ?? r?.item_code ?? '')}</td>
+        <td>${escHtml(r?.ITEM_NAME ?? r?.item_name ?? '')}</td>
+        <td>${escHtml(r?.CAT ?? r?.cat ?? '')}</td>
+        <td>${escHtml(r?.CAT_CODE ?? r?.cat_code ?? '')}</td>
+        <td>${escHtml(r?.HSN_CODE ?? r?.hsn_code ?? '')}</td>
+        <td>${escHtml(r?.TAX_PER ?? r?.tax_per ?? '')}</td>
+        <td>${escHtml(r?.S_CODE ?? r?.s_code ?? '')}</td>
+        <td>${escHtml(r?.P_CODE ?? r?.p_code ?? '')}</td>
+        <td>${escHtml(r?.AMT_CAL ?? r?.amt_cal ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .imm-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .imm-pdf .imm-header { text-align: center; margin-bottom: 10px; }
+        .imm-pdf .imm-company { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .imm-pdf .imm-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .imm-pdf .imm-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .imm-pdf .table-report { width: 100%; table-layout: fixed; font-size: 9px; border-collapse: collapse; }
+        .imm-pdf .table-report th, .imm-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; line-height: 1.15; vertical-align: top; word-break: break-word; }
+        .imm-pdf .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+      </style>
+      <div class="imm-pdf report-doc">
+        <div class="imm-header">
+          <div class="imm-company">${company}</div>
+          <div class="imm-title">${title}</div>
+          <div class="imm-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Item code</th>
+              <th>Item name</th>
+              <th>Cat</th>
+              <th>Cat code</th>
+              <th>HSN</th>
+              <th>GST %</th>
+              <th>S code</th>
+              <th>P code</th>
+              <th>AmtCal</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="9">(No rows)</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildScheduleMasterReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Schedule Master');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+  const view = metadata.scheduleView || 'all';
+  const isAll = view === 'all' || view === 'complete';
+  const isSub = !isAll && view === 'sub';
+
+  const body = isAll
+    ? rows
+        .map(
+          (r) => `<tr class="${String(r?.TYPE ?? r?.type ?? '').toLowerCase() === 'main' ? 'schm-main' : 'schm-sub'}">
+        <td>${escHtml(r?.SCHEDULE_NO ?? r?.schedule_no ?? r?.SUB_GROUP ?? '')}</td>
+        <td>${escHtml(r?.TYPE ?? r?.type ?? '')}</td>
+        <td>${escHtml(r?.NAME ?? r?.name ?? '')}</td>
+        <td>${escHtml(r?.RANGE ?? r?.range ?? '')}</td>
+        <td>${escHtml(r?.NORM_BAL ?? r?.norm_bal ?? '')}</td>
+        <td>${escHtml(r?.CORR_NO ?? r?.corr_no ?? '')}</td>
+      </tr>`
+        )
+        .join('')
+    : isSub
+      ? rows
+          .map(
+            (r) => `<tr>
+        <td>${escHtml(r?.SUB_GROUP ?? r?.sub_group ?? '')}</td>
+        <td>${escHtml(r?.NAME ?? r?.name ?? '')}</td>
+        <td>${escHtml(r?.RANGE ?? r?.range ?? '')}</td>
+        <td>${escHtml(r?.NORM_BAL ?? r?.norm_bal ?? '')}</td>
+        <td>${escHtml(r?.CORR_NO ?? r?.corr_no ?? '')}</td>
+      </tr>`
+          )
+          .join('')
+      : rows
+          .map(
+            (r) => `<tr>
+        <td>${escHtml(r?.SCHEDULE_NO ?? r?.schedule_no ?? '')}</td>
+        <td>${escHtml(r?.NAME ?? r?.name ?? '')}</td>
+      </tr>`
+          )
+          .join('');
+
+  const head = isAll
+    ? '<tr><th>Schedule</th><th>Type</th><th>Name</th><th>Range</th><th>Nor.Bal</th><th>Corr.N</th></tr>'
+    : isSub
+      ? '<tr><th>Sub group</th><th>Name</th><th>Range</th><th>Nor.Bal</th><th>Corr.N</th></tr>'
+      : '<tr><th>Schedule</th><th>Name</th></tr>';
+  const colSpan = isAll ? 6 : isSub ? 5 : 2;
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .schm-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .schm-pdf .schm-header { text-align: center; margin-bottom: 10px; }
+        .schm-pdf .schm-company { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .schm-pdf .schm-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .schm-pdf .schm-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .schm-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .schm-pdf .table-report th, .schm-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; line-height: 1.15; vertical-align: top; }
+        .schm-pdf .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+        .schm-pdf .table-report tr.schm-main td { background: #e8eef5; font-weight: 700; }
+        .schm-pdf .table-report tr.schm-sub td:first-child { padding-left: 10px; }
+      </style>
+      <div class="schm-pdf report-doc">
+        <div class="schm-header">
+          <div class="schm-company">${company}</div>
+          <div class="schm-title">${title}</div>
+          <div class="schm-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>${head}</thead>
+          <tbody>${body || `<tr><td colspan="${colSpan}">(No rows)</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildItemGrpReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Item Group Master');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r?.GRP_CODE ?? r?.grp_code ?? r?.GROUP ?? '')}</td>
+        <td>${escHtml(r?.GRP_NAME ?? r?.grp_name ?? r?.NAME ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .igrp-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .igrp-pdf .igrp-header { text-align: center; margin-bottom: 10px; }
+        .igrp-pdf .igrp-company { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .igrp-pdf .igrp-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .igrp-pdf .igrp-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .igrp-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .igrp-pdf .table-report th, .igrp-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; line-height: 1.15; vertical-align: top; }
+        .igrp-pdf .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+      </style>
+      <div class="igrp-pdf report-doc">
+        <div class="igrp-header">
+          <div class="igrp-company">${company}</div>
+          <div class="igrp-title">${title}</div>
+          <div class="igrp-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Name</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="2">(No rows)</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function opdetPartyTotals(partyLines) {
+  let bill = 0;
+  let pmt = 0;
+  for (const r of partyLines || []) {
+    const trn = Number(r?.TRN_NO ?? r?.trn_no ?? 0) || 0;
+    const billAmt = Number(r?.BILL_AMT ?? r?.bill_amt ?? 0) || 0;
+    const pmtAmt = Number(r?.PMT_AMT ?? r?.pmt_amt ?? 0) || 0;
+    if (trn === 1) bill += billAmt;
+    pmt += pmtAmt;
+  }
+  return { bill, pmt, balance: bill - pmt };
+}
+
+function buildOpdetReportHtml(data, metadata = {}) {
+  const lines = Array.isArray(data?.lines) ? data.lines : Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'OP.BILLS DETAIL');
+  const fy = escHtml(metadata.year || '—');
+  const fyStart = escHtml(formatLedgerDateDisplay(metadata.fyStart) || '—');
+  const fyEnd = escHtml(formatLedgerDateDisplay(metadata.fyEnd) || '—');
+  const period = escHtml(metadata.period || `Financial Year ${fyStart} TO ${fyEnd}`);
+
+  const groups = [];
+  const groupMap = new Map();
+  for (const r of lines) {
+    const code = String(r?.CODE ?? r?.code ?? '').trim();
+    if (!groupMap.has(code)) {
+      const g = { code, name: String(r?.AC_NAME ?? r?.ac_name ?? '').trim(), lines: [] };
+      groupMap.set(code, g);
+      groups.push(g);
+    }
+    groupMap.get(code).lines.push(r);
+  }
+
+  let grandBill = 0;
+  let grandPmt = 0;
+  const sections = groups
+    .map((g) => {
+      const totals = opdetPartyTotals(g.lines);
+      grandBill += totals.bill;
+      grandPmt += totals.pmt;
+      const detailRows = g.lines
+        .map((r) => {
+          const bCode = String(r?.B_CODE ?? r?.b_code ?? '').trim();
+          const bName = String(r?.BROKER_NAME ?? r?.broker_name ?? '').trim();
+          const broker = bCode ? `${escHtml(bCode)}<br/>${escHtml(bName)}` : escHtml(bName);
+          return `<tr>
+            <td>${escHtml(formatLedgerDateDisplay(r?.BILL_DATE ?? r?.bill_date))}</td>
+            <td class="num">${escHtml(r?.BILL_NO ?? r?.bill_no ?? '')}</td>
+            <td>${escHtml(formatLedgerDateDisplay(r?.V_DATE ?? r?.v_date))}</td>
+            <td class="num">${escHtml(r?.DAYS ?? r?.days ?? '')}</td>
+            <td class="num">${formatAmtPdf(r?.BILL_AMT ?? r?.bill_amt)}</td>
+            <td>${escHtml(formatLedgerDateDisplay(r?.PMT_DATE ?? r?.pmt_date))}</td>
+            <td class="num">${formatAmtPdf(r?.PMT_AMT ?? r?.pmt_amt)}</td>
+            <td>${broker}</td>
+            <td class="num">${escHtml(r?.OP_NO ?? r?.op_no ?? '')}</td>
+          </tr>`;
+        })
+        .join('');
+      return `
+        <tr class="opdet-party-head"><td colspan="9"><strong>${escHtml(g.code)}</strong> &nbsp; ${escHtml(g.name)}</td></tr>
+        ${detailRows}
+        <tr class="opdet-party-total">
+          <td colspan="4" class="num"><strong>TOTAL</strong></td>
+          <td class="num"><strong>${formatAmtPdf(totals.bill)}</strong></td>
+          <td></td>
+          <td class="num"><strong>${formatAmtPdf(totals.pmt)}</strong></td>
+          <td class="num"><strong>${formatAmtPdf(totals.balance)}</strong></td>
+          <td></td>
+        </tr>`;
+    })
+    .join('');
+
+  const grandBalance = grandBill - grandPmt;
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .opdet-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .opdet-pdf .opdet-header { text-align: center; margin-bottom: 10px; }
+        .opdet-pdf .opdet-company { font-size: 16px; font-weight: 700; text-transform: uppercase; }
+        .opdet-pdf .opdet-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .opdet-pdf .opdet-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .opdet-pdf .table-report { width: 100%; table-layout: fixed; font-size: 9px; border-collapse: collapse; }
+        .opdet-pdf .table-report th, .opdet-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; vertical-align: top; }
+        .opdet-pdf .table-report thead th { background: #f4f4f4; text-align: center; }
+        .opdet-pdf .table-report td.num, .opdet-pdf .table-report th.num { text-align: right; }
+        .opdet-pdf .opdet-party-head td { background: #eef2ff; font-weight: 600; padding: 5px 6px; }
+        .opdet-pdf .opdet-party-total td { background: #f8fafc; font-weight: 600; }
+        .opdet-pdf .opdet-grand-total td { background: #e5e7eb; font-weight: 700; border-top: 2px solid #9ca3af; }
+      </style>
+      <div class="opdet-pdf report-doc">
+        <div class="opdet-header">
+          <div class="opdet-company">${company}</div>
+          <div class="opdet-title">${title}</div>
+          <div class="opdet-period">Financial Year ${fyStart} TO ${fyEnd} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>B.Date</th>
+              <th class="num">B.No.</th>
+              <th>V.Date</th>
+              <th class="num">Dys</th>
+              <th class="num">Bill.Amt.</th>
+              <th>Pmt.Date</th>
+              <th class="num">Pmt.Amt.</th>
+              <th>Broker</th>
+              <th class="num">Sr.No.</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sections || '<tr><td colspan="9">No records</td></tr>'}
+            <tr class="opdet-grand-total">
+              <td colspan="4" class="num">G.TOTAL</td>
+              <td class="num">${formatAmtPdf(grandBill)}</td>
+              <td></td>
+              <td class="num">${formatAmtPdf(grandPmt)}</td>
+              <td class="num">${formatAmtPdf(grandBalance)}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildDetailMastMasterReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Detail Master');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td class="num">${escHtml(r?.S_NO ?? r?.s_no ?? '')}</td>
+        <td>${escHtml(r?.CODE ?? r?.code ?? '')}</td>
+        <td>${escHtml(r?.AC_NAME ?? r?.ac_name ?? '')}</td>
+        <td>${escHtml(r?.DETAIL ?? r?.detail ?? r?.DETAIL_PREVIEW ?? '')}</td>
+        <td class="num">${escHtml(r?.LINES ?? r?.LINE_CNT ?? r?.line_cnt ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .detailmast-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .detailmast-pdf .detailmast-header { text-align: center; margin-bottom: 10px; }
+        .detailmast-pdf .detailmast-company { font-size: 16px; font-weight: 700; text-transform: uppercase; }
+        .detailmast-pdf .detailmast-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .detailmast-pdf .detailmast-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .detailmast-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .detailmast-pdf .table-report th, .detailmast-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; vertical-align: top; }
+        .detailmast-pdf .table-report thead th { background: #f4f4f4; text-align: left; }
+        .detailmast-pdf .table-report td.num, .detailmast-pdf .table-report th.num { text-align: right; }
+      </style>
+      <div class="detailmast-pdf report-doc">
+        <div class="detailmast-header">
+          <div class="detailmast-company">${company}</div>
+          <div class="detailmast-title">${title}</div>
+          <div class="detailmast-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th class="num">S_No</th>
+              <th>A/c</th>
+              <th>Name</th>
+              <th>Detail</th>
+              <th class="num">Lines</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="5">No records</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildGstStateMasterReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'GST State Master');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r?.['STATE CODE'] ?? r?.STATE_CODE ?? r?.state_code ?? '')}</td>
+        <td>${escHtml(r?.STATE ?? r?.state ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .gststate-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .gststate-pdf .gststate-header { text-align: center; margin-bottom: 10px; }
+        .gststate-pdf .gststate-company { font-size: 16px; font-weight: 700; text-transform: uppercase; }
+        .gststate-pdf .gststate-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .gststate-pdf .gststate-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .gststate-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .gststate-pdf .table-report th, .gststate-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; }
+        .gststate-pdf .table-report thead th { background: #f4f4f4; text-align: left; }
+      </style>
+      <div class="gststate-pdf report-doc">
+        <div class="gststate-header">
+          <div class="gststate-company">${company}</div>
+          <div class="gststate-title">${title}</div>
+          <div class="gststate-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>State_Code</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="2">No rows</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildLocBtypeMasterReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Location Wise BType');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r?.['B TYPE'] ?? r?.B_TYPE ?? r?.b_type ?? '')}</td>
+        <td>${escHtml(r?.['BILL INIT'] ?? r?.BILL_INIT ?? r?.bill_init ?? '')}</td>
+        <td>${escHtml(r?.['FIN YEAR'] ?? r?.FIN_YEAR ?? r?.fin_year ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .locbtype-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .locbtype-pdf .locbtype-header { text-align: center; margin-bottom: 10px; }
+        .locbtype-pdf .locbtype-company { font-size: 16px; font-weight: 700; text-transform: uppercase; }
+        .locbtype-pdf .locbtype-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .locbtype-pdf .locbtype-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .locbtype-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .locbtype-pdf .table-report th, .locbtype-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; }
+        .locbtype-pdf .table-report thead th { background: #f4f4f4; text-align: left; }
+      </style>
+      <div class="locbtype-pdf report-doc">
+        <div class="locbtype-header">
+          <div class="locbtype-company">${company}</div>
+          <div class="locbtype-title">${title}</div>
+          <div class="locbtype-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>B_Type</th>
+              <th>Bill_Init</th>
+              <th>Fin_Year</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="3">No rows</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildSaleCondMasterReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Sale Bill Condition');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td class="num">${escHtml(r?.NO ?? r?.no ?? '')}</td>
+        <td>${escHtml(r?.COND ?? r?.cond ?? r?.Condition ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .salecond-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .salecond-pdf .salecond-header { text-align: center; margin-bottom: 10px; }
+        .salecond-pdf .salecond-company { font-size: 16px; font-weight: 700; text-transform: uppercase; }
+        .salecond-pdf .salecond-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .salecond-pdf .salecond-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .salecond-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .salecond-pdf .table-report th, .salecond-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; vertical-align: top; }
+        .salecond-pdf .table-report thead th { background: #f4f4f4; text-align: left; }
+        .salecond-pdf .table-report td.num, .salecond-pdf .table-report th.num { text-align: center; width: 36px; }
+        .salecond-pdf .table-report td:last-child { word-break: break-word; }
+      </style>
+      <div class="salecond-pdf report-doc">
+        <div class="salecond-header">
+          <div class="salecond-company">${company}</div>
+          <div class="salecond-title">${title}</div>
+          <div class="salecond-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th class="num">#</th>
+              <th>Cond</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="2">No conditions</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildPurExpMasterReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Purchase Exp Master');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r?.EXP_NAME ?? r?.exp_name ?? '')}</td>
+        <td class="num">${escHtml(r?.EXP_RATE ?? r?.exp_rate ?? '')}</td>
+        <td>${escHtml(r?.CAL ?? r?.cal ?? '')}</td>
+        <td>${escHtml(r?.CODE ?? r?.code ?? '')}</td>
+        <td>${escHtml(r?.AC_NAME ?? r?.ac_name ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .purexp-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .purexp-pdf .purexp-header { text-align: center; margin-bottom: 10px; }
+        .purexp-pdf .purexp-company { font-size: 16px; font-weight: 700; text-transform: uppercase; }
+        .purexp-pdf .purexp-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .purexp-pdf .purexp-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .purexp-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .purexp-pdf .table-report th, .purexp-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; }
+        .purexp-pdf .table-report thead th { background: #f4f4f4; text-align: left; }
+        .purexp-pdf .table-report td.num, .purexp-pdf .table-report th.num { text-align: right; }
+      </style>
+      <div class="purexp-pdf report-doc">
+        <div class="purexp-header">
+          <div class="purexp-company">${company}</div>
+          <div class="purexp-title">${title}</div>
+          <div class="purexp-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Exp_name</th>
+              <th class="num">Exp_rate</th>
+              <th>CAL</th>
+              <th>Code</th>
+              <th>A/c name</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="5">(No rows)</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildMarkaMasterReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Marka Master');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r?.MARKA ?? r?.marka ?? '')}</td>
+        <td class="num">${escHtml(r?.MIN_RATE ?? r?.min_rate ?? '')}</td>
+        <td class="num">${escHtml(r?.MAX_RATE ?? r?.max_rate ?? '')}</td>
+        <td class="num">${escHtml(r?.LAB_RATE ?? r?.lab_rate ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .marka-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .marka-pdf .marka-header { text-align: center; margin-bottom: 10px; }
+        .marka-pdf .marka-company { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .marka-pdf .marka-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .marka-pdf .marka-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .marka-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .marka-pdf .table-report th, .marka-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; line-height: 1.15; vertical-align: top; }
+        .marka-pdf .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+        .marka-pdf .table-report td.num, .marka-pdf .table-report th.num { text-align: right; }
+      </style>
+      <div class="marka-pdf report-doc">
+        <div class="marka-header">
+          <div class="marka-company">${company}</div>
+          <div class="marka-title">${title}</div>
+          <div class="marka-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Marka</th>
+              <th class="num">Min.Rate</th>
+              <th class="num">Max.Rate</th>
+              <th class="num">Lab.Rate</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="4">(No rows)</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+const GODOWN_MASTER_PDF_COLUMNS = [
+  ['GOD_CODE', 'God.Code'],
+  ['GOD_NAME', 'God.Name'],
+  ['GOD_NAME1', 'Company'],
+  ['GOD_ADD1', 'Address 1'],
+  ['GOD_ADD2', 'Address 2'],
+  ['GOD_LOCATION', 'Location'],
+  ['GOD_PIN_CODE', 'Pin'],
+  ['GOD_STATE_CODE', 'St.Code'],
+  ['GOD_STATE', 'State Name'],
+  ['GOD_GST_NO', 'GST No.'],
+  ['GOD_TEL_NO_1', 'Tel 1'],
+  ['GOD_TEL_NO_2', 'Tel 2'],
+  ['GOD_FSSAI_NO', 'FSSAI'],
+  ['GOD_B_TYPE', 'Bill Type'],
+  ['GOD_CODE_MAIN', 'Main God.'],
+];
+
+function godownMasterPdfCell(r, key) {
+  const aliases =
+    key === 'GOD_STATE' ? ['STATE', 'state'] : key === 'GOD_STATE_CODE' ? ['STATE_CODE', 'state_code'] : [];
+  const keys = [key, key.toLowerCase(), ...aliases];
+  for (const k of keys) {
+    const v = r?.[k];
+    if (v != null && String(v).trim() !== '') return escHtml(v);
+  }
+  return '';
+}
+
+function buildGodownMasterReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Godown Master');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+  const colCount = GODOWN_MASTER_PDF_COLUMNS.length;
+
+  const headCells = GODOWN_MASTER_PDF_COLUMNS.map(([, label]) => `<th>${escHtml(label)}</th>`).join('');
+  const body = rows
+    .map(
+      (r) =>
+        `<tr>${GODOWN_MASTER_PDF_COLUMNS.map(([key]) => `<td>${godownMasterPdfCell(r, key)}</td>`).join('')}</tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .godm-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .godm-pdf .godm-header { text-align: center; margin-bottom: 10px; }
+        .godm-pdf .godm-company { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .godm-pdf .godm-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .godm-pdf .godm-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .godm-pdf .table-report { width: 100%; table-layout: fixed; font-size: 7px; border-collapse: collapse; }
+        .godm-pdf .table-report th, .godm-pdf .table-report td { border: 1px solid #ddd; padding: 2px 3px; line-height: 1.1; vertical-align: top; word-break: break-word; }
+        .godm-pdf .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+      </style>
+      <div class="godm-pdf report-doc">
+        <div class="godm-header">
+          <div class="godm-company">${company}</div>
+          <div class="godm-title">${title}</div>
+          <div class="godm-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>${headCells}</tr>
+          </thead>
+          <tbody>${body || `<tr><td colspan="${colCount}">(No rows)</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildCostMastReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Cost Centre Master');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r?.COST_CODE ?? r?.cost_code ?? '')}</td>
+        <td>${escHtml(r?.COST_NAME ?? r?.cost_name ?? '')}</td>
+        <td>${escHtml(r?.CODE ?? r?.code ?? '')}</td>
+        <td>${escHtml(r?.AC_NAME ?? r?.ac_name ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .costm-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .costm-pdf .costm-header { text-align: center; margin-bottom: 10px; }
+        .costm-pdf .costm-company { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .costm-pdf .costm-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .costm-pdf .costm-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .costm-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .costm-pdf .table-report th, .costm-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; line-height: 1.15; vertical-align: top; }
+        .costm-pdf .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+      </style>
+      <div class="costm-pdf report-doc">
+        <div class="costm-header">
+          <div class="costm-company">${company}</div>
+          <div class="costm-title">${title}</div>
+          <div class="costm-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Cost code</th>
+              <th>Name</th>
+              <th>A/c code</th>
+              <th>A/c name</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="4">(No rows)</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildCatMastReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Item Category Master');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r?.CAT_CODE ?? r?.cat_code ?? r?.CATEGORY ?? '')}</td>
+        <td>${escHtml(r?.CAT_NAME ?? r?.cat_name ?? r?.NAME ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .catm-pdf.report-doc { border: 1px solid #c8c8c8; padding: 12px 14px; }
+        .catm-pdf .catm-header { text-align: center; margin-bottom: 10px; }
+        .catm-pdf .catm-company { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .catm-pdf .catm-title { font-size: 18px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .catm-pdf .catm-period { font-size: 11px; margin-top: 4px; color: #444; }
+        .catm-pdf .table-report { width: 100%; table-layout: fixed; font-size: 10px; border-collapse: collapse; }
+        .catm-pdf .table-report th, .catm-pdf .table-report td { border: 1px solid #ddd; padding: 3px 4px; line-height: 1.15; vertical-align: top; }
+        .catm-pdf .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+      </style>
+      <div class="catm-pdf report-doc">
+        <div class="catm-header">
+          <div class="catm-company">${company}</div>
+          <div class="catm-title">${title}</div>
+          <div class="catm-period">Financial year ${fy} &nbsp; | &nbsp; ${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Name</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="2">(No rows)</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 function buildAccountMasterReportHtml(data, metadata = {}) {
   const rows = Array.isArray(data) ? data : [];
   const company = escHtml(metadata.companyName || 'Company');
@@ -2926,6 +4172,7 @@ function buildAccountMasterReportHtml(data, metadata = {}) {
 
 export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'ledger') return buildLedgerReportHtml(data, metadata);
+  if (reportType === 'complete-ledger') return buildCompleteLedgerReportHtml(data, metadata);
   if (reportType === 'trading-ledger') return buildTradingLedgerReportHtml(data, metadata);
   if (reportType === 'bill-ledger') return buildBillLedgerReportHtml(data, metadata);
   if (reportType === 'broker-os') return buildBrokerOsReportHtml(data, metadata);
@@ -2940,10 +4187,24 @@ export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'gstr1') return buildGstr1ReportHtml(data, metadata);
   if (reportType === 'hsn-sales') return buildHsnSalesReportHtml(data, metadata);
   if (reportType === 'hsn-purchase') return buildHsnSalesReportHtml(data, metadata);
+  if (reportType === 'state-wise-sales' || reportType === 'state-wise-purchase') return buildStateWiseSalesReportHtml(data, metadata);
   if (reportType === 'balance-sheet') return buildBalanceSheetReportHtml(data, metadata);
   if (reportType === 'trading-account') return buildTradingAccountReportHtml(data, metadata);
   if (reportType === 'profit-loss') return buildProfitLossReportHtml(data, metadata);
   if (reportType === 'account-master') return buildAccountMasterReportHtml(data, metadata);
+  if (reportType === 'item-master') return buildItemMasterReportHtml(data, metadata);
+  if (reportType === 'schedule-master') return buildScheduleMasterReportHtml(data, metadata);
+  if (reportType === 'cat-mast') return buildCatMastReportHtml(data, metadata);
+  if (reportType === 'cost-mast') return buildCostMastReportHtml(data, metadata);
+  if (reportType === 'item-grp') return buildItemGrpReportHtml(data, metadata);
+  if (reportType === 'marka-master') return buildMarkaMasterReportHtml(data, metadata);
+  if (reportType === 'pur-exp-master') return buildPurExpMasterReportHtml(data, metadata);
+  if (reportType === 'sale-cond-master') return buildSaleCondMasterReportHtml(data, metadata);
+  if (reportType === 'loc-btype-master') return buildLocBtypeMasterReportHtml(data, metadata);
+  if (reportType === 'detail-mast-master') return buildDetailMastMasterReportHtml(data, metadata);
+  if (reportType === 'opdet-report') return buildOpdetReportHtml(data, metadata);
+  if (reportType === 'gst-state-master') return buildGstStateMasterReportHtml(data, metadata);
+  if (reportType === 'godown-master') return buildGodownMasterReportHtml(data, metadata);
   return buildTrialBalanceReportHtml(data, metadata);
 }
 
@@ -2978,13 +4239,53 @@ function getPdfOptions(metadata, reportType) {
             scrollX: 0,
             scrollY: 0,
           }
-        : reportType === 'account-master'
+        : reportType === 'state-wise-sales' || reportType === 'state-wise-purchase'
           ? {
-              // Large master lists can produce blank PDF pages at high canvas scales.
               scale: 1,
               useCORS: true,
               logging: false,
               windowWidth: 1800,
+              scrollX: 0,
+              scrollY: 0,
+            }
+        : reportType === 'godown-master'
+          ? {
+              scale: 1,
+              useCORS: true,
+              logging: false,
+              windowWidth: 3600,
+              scrollX: 0,
+              scrollY: 0,
+            }
+          : reportType === 'account-master' ||
+              reportType === 'item-master' ||
+              reportType === 'schedule-master' ||
+              reportType === 'cat-mast' ||
+              reportType === 'cost-mast' ||
+              reportType === 'item-grp' ||
+              reportType === 'marka-master' ||
+              reportType === 'pur-exp-master' ||
+              reportType === 'sale-cond-master' ||
+              reportType === 'loc-btype-master' ||
+              reportType === 'detail-mast-master' ||
+              reportType === 'opdet-report' ||
+              reportType === 'gst-state-master'
+            ? {
+                // Large master lists can produce blank PDF pages at high canvas scales.
+                scale: 1,
+                useCORS: true,
+                logging: false,
+                windowWidth:
+                  reportType === 'item-master' ? 2000 : reportType === 'opdet-report' ? 2200 : 1800,
+                scrollX: 0,
+                scrollY: 0,
+              }
+        : reportType === 'complete-ledger'
+          ? {
+              scale: 1,
+              useCORS: true,
+              logging: false,
+              windowWidth: 794,
               scrollX: 0,
               scrollY: 0,
             }
@@ -3000,14 +4301,40 @@ function getPdfOptions(metadata, reportType) {
       : { scale: 2, useCORS: true };
 
   return {
-    margin: reportType === 'sale-bill' || reportType === 'purchase-bill' ? 8 : reportType === 'balance-sheet' ? 6 : 10,
+    margin:
+      reportType === 'sale-bill' || reportType === 'purchase-bill'
+        ? 8
+        : reportType === 'balance-sheet' || reportType === 'complete-ledger'
+          ? 6
+          : 10,
     filename,
-    image: { type: 'jpeg', quality: 0.98 },
+    image: { type: 'jpeg', quality: reportType === 'complete-ledger' ? 0.92 : 0.98 },
     html2canvas,
+    pagebreak:
+      reportType === 'complete-ledger'
+        ? { mode: ['css', 'legacy'], before: '.complete-ledger-pdf-section--break' }
+        : undefined,
     jsPDF: {
       orientation:
-        reportType === 'sale-bill' || reportType === 'purchase-bill' || reportType === 'account-master'
+        reportType === 'complete-ledger' ||
+        reportType === 'ledger' ||
+        reportType === 'sale-bill' ||
+          reportType === 'purchase-bill' ||
+          reportType === 'account-master' ||
+          reportType === 'item-master' ||
+          reportType === 'schedule-master' ||
+          reportType === 'cat-mast' ||
+          reportType === 'cost-mast' ||
+          reportType === 'item-grp' ||
+          reportType === 'marka-master' ||
+          reportType === 'pur-exp-master' ||
+          reportType === 'sale-cond-master' ||
+          reportType === 'loc-btype-master' ||
+          reportType === 'detail-mast-master' ||
+          reportType === 'gst-state-master'
           ? 'portrait'
+          : reportType === 'opdet-report'
+            ? 'landscape'
           : 'landscape',
       unit: 'mm',
       format: 'a4',
@@ -3021,6 +4348,11 @@ function getPdfOptions(metadata, reportType) {
 export async function getPdfBlob(reportType, data, metadata) {
   const htmlContent = buildReportHtml(reportType, data, metadata);
   const options = getPdfOptions(metadata, reportType);
+
+  if (reportType === 'complete-ledger') {
+    return getCompleteLedgerPdfBlob(data, metadata);
+  }
+
   const blob = await html2pdf().set(options).from(htmlContent).outputPdf('blob');
   return { blob, filename: options.filename };
 }
@@ -3133,6 +4465,30 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
           ? 'Broker outstanding'
           : reportType === 'account-master'
             ? 'A/c Master List'
+            : reportType === 'item-master'
+              ? 'Item Master List'
+              : reportType === 'schedule-master'
+                ? 'Schedule Master'
+                : reportType === 'cat-mast'
+                  ? 'Item Category Master'
+                  : reportType === 'cost-mast'
+                    ? 'Cost Centre Master'
+                  : reportType === 'item-grp'
+                    ? 'Item Group Master'
+                    : reportType === 'marka-master'
+                      ? 'Marka Master'
+                    : reportType === 'pur-exp-master'
+                      ? 'Purchase Exp Master'
+                    : reportType === 'sale-cond-master'
+                      ? 'Sale Bill Condition'
+                    : reportType === 'loc-btype-master'
+                      ? 'Location Wise BType'
+                    : reportType === 'detail-mast-master'
+                      ? 'Detail Master'
+                    : reportType === 'gst-state-master'
+                      ? 'GST State Master'
+                    : reportType === 'godown-master'
+                      ? 'Godown Master'
           : reportType === 'sale-list'
             ? 'Sale list'
             : reportType === 'sale-bill'
@@ -3151,6 +4507,12 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
                           ? 'GSTR-1'
                           : reportType === 'hsn-sales'
                             ? 'HSN Sales'
+                            : reportType === 'state-wise-sales'
+                              ? 'State Wise Sales'
+                              : reportType === 'state-wise-purchase'
+                                ? 'State Wise Purchase'
+                              : reportType === 'complete-ledger'
+                                ? 'Complete Ledger'
                         : 'Ledger';
   const text =
     shareText || `${metadata.companyName}\n${reportLabel}\n${metadata.endDate || ''}`;

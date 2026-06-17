@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import MasterPartyCreateModal from '../components/MasterPartyCreateModal';
 import MasterPartyPickList from '../components/MasterPartyPickList';
 import SessionInfoLine from '../components/SessionInfoLine';
 import { downloadExcelRows } from '../utils/excelExport';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
+import { useDebouncedMasterSearch } from '../utils/useDebouncedMasterSearch';
+import { MasterScreenToolbar } from '../components/GfasToolbar';
 
 const reqOpts = { withCredentials: true, timeout: 120000 };
 
@@ -57,26 +59,42 @@ export default function Slide26AccountMaster({ apiBase, formData, userName, onPr
   const [addOpen, setAddOpen] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const accountDrillRanRef = useRef('');
 
-  const loadList = useCallback(async () => {
-    if (!compCode || compUid == null) return;
-    setListLoading(true);
-    setErr('');
-    try {
-      const params = { comp_code: compCode, comp_uid: compUid };
-      const sch = scheduleNum(scheduleFilter);
-      if (sch) params.schedule = sch;
-      const q = String(searchQ).trim();
-      if (q) params.q = q;
-      const { data } = await axios.get(`${apiBase}/api/master-accounts`, { params, ...reqOpts });
-      setRows(Array.isArray(data) ? data.map(mapAccountRow) : []);
-    } catch (e) {
-      setErr(e?.response?.data?.error || e.message || 'Load failed');
-      setRows([]);
-    } finally {
-      setListLoading(false);
-    }
-  }, [apiBase, compCode, compUid, scheduleFilter, searchQ]);
+  const onSearch = useCallback(
+    async (q, { isStale }) => {
+      if (!compCode || compUid == null) return;
+      setListLoading(true);
+      setErr('');
+      try {
+        const params = { comp_code: compCode, comp_uid: compUid };
+        const sch = scheduleNum(scheduleFilter);
+        if (sch) params.schedule = sch;
+        const trimmed = String(q ?? '').trim();
+        if (trimmed) params.q = trimmed;
+        const { data } = await axios.get(`${apiBase}/api/master-accounts`, { params, ...reqOpts });
+        if (isStale()) return;
+        setRows(Array.isArray(data) ? data.map(mapAccountRow) : []);
+      } catch (e) {
+        if (isStale()) return;
+        setErr(e?.response?.data?.error || e.message || 'Load failed');
+        setRows([]);
+      } finally {
+        if (!isStale()) setListLoading(false);
+      }
+    },
+    [apiBase, compCode, compUid, scheduleFilter]
+  );
+
+  const { executeSearch, refreshList } = useDebouncedMasterSearch({
+    enabled: !loading && !!perms?.canOpen,
+    onSearch,
+  });
+
+  useEffect(() => {
+    if (loading || !perms?.canOpen) return;
+    executeSearch(searchQ, { immediate: true });
+  }, [scheduleFilter, loading, perms?.canOpen, searchQ, executeSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,9 +129,44 @@ export default function Slide26AccountMaster({ apiBase, formData, userName, onPr
   }, [apiBase, compCode, compUid, userName]);
 
   useEffect(() => {
-    if (loading || !perms?.canOpen) return;
-    void loadList();
-  }, [loading, perms?.canOpen, loadList]);
+    const d = formData.accountMasterDrilldown;
+    if (!d?.code || loading || !perms?.canOpen) return;
+    const runKey = String(d.at ?? d.code);
+    if (accountDrillRanRef.current === runKey) return;
+
+    const code = String(d.code).trim().toUpperCase();
+    if (!code) return;
+    accountDrillRanRef.current = runKey;
+
+    setSearchQ(code);
+    let cancelled = false;
+    (async () => {
+      setListLoading(true);
+      try {
+        const { data } = await axios.get(`${apiBase}/api/master-accounts`, {
+          params: { comp_code: compCode, comp_uid: compUid, q: code },
+          ...reqOpts,
+        });
+        if (cancelled) return;
+        const mapped = Array.isArray(data) ? data.map(mapAccountRow) : [];
+        setRows(mapped);
+        const hit = mapped.find((r) => String(r.CODE).trim().toUpperCase() === code);
+        if (hit) {
+          setSelectedCode(String(hit.CODE));
+          if (d.autoEdit !== false && perms?.canEdit) setEditRow(hit);
+        } else {
+          alert(`Account [${code}] not found in master list.`);
+        }
+      } catch (e) {
+        if (!cancelled) alert(e?.response?.data?.error || e.message || 'Could not load account');
+      } finally {
+        if (!cancelled) setListLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.accountMasterDrilldown, loading, perms?.canOpen, perms?.canEdit, apiBase, compCode, compUid]);
 
   const selectedRow = useMemo(
     () => rows.find((r) => String(r.CODE) === String(selectedCode)) || null,
@@ -154,7 +207,7 @@ export default function Slide26AccountMaster({ apiBase, formData, userName, onPr
         ...reqOpts,
       });
       setSelectedCode('');
-      await loadList();
+      refreshList();
     } catch (e) {
       const msg = e?.response?.data?.error || e.message || 'Delete failed';
       setErr(msg);
@@ -164,7 +217,7 @@ export default function Slide26AccountMaster({ apiBase, formData, userName, onPr
     }
   };
 
-  const handleRefresh = () => void loadList();
+  const handleRefresh = () => refreshList();
 
   const handleListBySchedule = async () => {
     const typed = window.prompt(
@@ -309,62 +362,35 @@ export default function Slide26AccountMaster({ apiBase, formData, userName, onPr
 
   return (
     <div className="slide slide-26-account-master account-master-screen">
+      <div className="account-master-screen__chrome">
       <div className="account-master-screen__head">
         <div className="account-master-screen__title-row">
           <h2 className="sale-bill-page__title">A/c Master</h2>
         </div>
         <SessionInfoLine formData={formData} userName={userName} helpReportId="account-master" />
-        <div className="account-master-screen__toolbar">
-          <button type="button" className="btn btn-secondary" onClick={onPrev}>
-            ← Back
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={onReset}>
-            Home
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={handleRefresh} disabled={listLoading}>
-            {listLoading ? 'Loading…' : 'Refresh'}
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={() => void handleListBySchedule()} disabled={listLoading}>
-            List
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={handleExcel} disabled={!rows.length || listLoading}>
-            Excel
-          </button>
-          <button type="button" className="btn btn-export" onClick={handlePdf} disabled={!rows.length || listLoading}>
-            Pdf
-          </button>
-          <button type="button" className="btn btn-whatsapp" onClick={handleWhatsApp} disabled={!rows.length || listLoading}>
-            WhatsApp
-          </button>
-          {perms?.canAdd ? (
-            <button type="button" className="btn btn-primary" onClick={() => setAddOpen(true)}>
-              Add
-            </button>
-          ) : null}
-          {perms?.canEdit ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!selectedRow}
-              onClick={() => setEditRow(selectedRow)}
-            >
-              Edit
-            </button>
-          ) : null}
-          {perms?.canDelete ? (
-            <button
-              type="button"
-              className="btn btn-danger"
-              disabled={!selectedRow || deleting}
-              onClick={() => void handleDelete()}
-            >
-              {deleting ? 'Deleting…' : 'Delete'}
-            </button>
-          ) : null}
-        </div>
+        <MasterScreenToolbar
+          onPrev={onPrev}
+          onReset={onReset}
+          onRefresh={handleRefresh}
+          onList={() => void handleListBySchedule()}
+          onExcel={handleExcel}
+          onPdf={handlePdf}
+          onWhatsApp={handleWhatsApp}
+          perms={perms}
+          onAdd={() => setAddOpen(true)}
+          onEdit={() => setEditRow(selectedRow)}
+          onDelete={() => void handleDelete()}
+          listLoading={listLoading}
+          hasRows={rows.length > 0}
+          selectedRow={selectedRow}
+          deleting={deleting}
+          listDisabled={listLoading}
+        />
       </div>
 
-      {err ? <p className="deploy-update-msg deploy-update-msg--err">{err}</p> : null}
+      </div>
+
+      {err ? <p className="deploy-update-msg deploy-update-msg--err account-master-screen__err">{err}</p> : null}
 
       <div className="account-master-screen__filters">
         <label className="sale-bill-field account-master-filter">
@@ -388,19 +414,31 @@ export default function Slide26AccountMaster({ apiBase, formData, userName, onPr
         <label className="sale-bill-field account-master-filter account-master-filter--search">
           <span className="sale-bill-field__label">Search</span>
           <input
-            className="form-input"
+            className="form-input account-master-search-input"
+            type="search"
             value={searchQ}
-            placeholder="Code, name, or city…"
-            onChange={(e) => setSearchQ(e.target.value)}
+            placeholder="Code, name, or city (e.g. DAL ARHAR)…"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            onChange={(e) => {
+              const v = String(e.target.value ?? '').toUpperCase();
+              setSearchQ(v);
+              executeSearch(v);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                void loadList();
+                executeSearch(searchQ, { immediate: true });
               }
             }}
           />
         </label>
-        <button type="button" className="btn btn-secondary account-master-filter-btn" onClick={() => void loadList()}>
+        <button
+          type="button"
+          className="btn btn-secondary account-master-filter-btn"
+          onClick={() => executeSearch(searchQ, { immediate: true })}
+        >
           Find
         </button>
       </div>
@@ -473,7 +511,7 @@ export default function Slide26AccountMaster({ apiBase, formData, userName, onPr
         lockSchedule={Boolean(defaultScheduleForAdd)}
         onCreated={() => {
           setAddOpen(false);
-          void loadList();
+          refreshList();
         }}
       />
 
@@ -488,7 +526,7 @@ export default function Slide26AccountMaster({ apiBase, formData, userName, onPr
         editRow={editRow}
         onUpdated={() => {
           setEditRow(null);
-          void loadList();
+          refreshList();
         }}
       />
     </div>

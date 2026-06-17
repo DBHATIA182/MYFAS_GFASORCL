@@ -11,11 +11,41 @@ import {
   categoryForReport,
   findReportItem,
 } from '../data/reportMenuConfig';
+import {
+  findUtilitiesModuleItem,
+  isUtilityDesktopOnlyBlocked,
+  isUtilityMobileOnlyBlocked,
+  utilityDesktopOnlyMessage,
+  utilityMobileOnlyMessage,
+} from '../data/utilitiesModuleConfig';
+import { isDesktopOnlyFrozen } from '../utils/appViewMode';
 
-function ReportTile({ item, color, icon, onOpen }) {
+function ReportTile({ item, color, icon, onOpen, frozenDesktopOnly = false, frozenMobileOnly = false }) {
   const label = item.shortTitle || item.title;
+  const frozen = frozenDesktopOnly || frozenMobileOnly;
+  const title = frozenDesktopOnly
+    ? `${item.description || label} · Desktop only (not available on mobile)`
+    : frozenMobileOnly
+      ? `${item.description || label} · Mobile only (not available on desktop)`
+      : item.description;
   return (
-    <button type="button" className="windal-dash__tile" onClick={() => onOpen(item.id)} title={item.description}>
+    <button
+      type="button"
+      className={`windal-dash__tile${frozen ? ' windal-dash__tile--frozen' : ''}`}
+      onClick={() => {
+        if (frozenDesktopOnly) {
+          alert(utilityDesktopOnlyMessage(findUtilitiesModuleItem(item.id) || item));
+          return;
+        }
+        if (frozenMobileOnly) {
+          alert(utilityMobileOnlyMessage(findUtilitiesModuleItem(item.id) || item));
+          return;
+        }
+        onOpen(item.id);
+      }}
+      title={title}
+      aria-disabled={frozen || undefined}
+    >
       <span className="windal-dash__tile-icon" style={{ background: `${color}18`, color }} aria-hidden="true">
         {icon || '▣'}
       </span>
@@ -42,8 +72,15 @@ export default function WindalDashboardMenu({ formData, onPrev, onNext, onExit }
     return REPORT_MENU.find((m) => m.id === activeModuleId) || REPORT_MENU[0];
   }, [activeModuleId]);
 
+  const mobileFrozen = isDesktopOnlyFrozen();
+
   const openReport = useCallback(
     (id) => {
+      const util = findUtilitiesModuleItem(id);
+      if (isUtilityDesktopOnlyBlocked(util)) {
+        alert(utilityDesktopOnlyMessage(util));
+        return;
+      }
       setReportType(id);
       setSidebarOpen(false);
       onNext({ reportType: id });
@@ -122,9 +159,11 @@ export default function WindalDashboardMenu({ formData, onPrev, onNext, onExit }
         color={activeModule.tileColor}
         icon={activeModule.sidebarIcon}
         onOpen={openReport}
+        frozenDesktopOnly={Boolean(item.desktopOnly && mobileFrozen)}
+        frozenMobileOnly={Boolean(item.mobileOnly && !mobileFrozen)}
       />
     ));
-  }, [activeModule, openReport]);
+  }, [activeModule, openReport, mobileFrozen]);
 
   const moduleStrip = (
     <nav className="windal-dash__module-strip" aria-label="Choose module">
@@ -282,7 +321,7 @@ export default function WindalDashboardMenu({ formData, onPrev, onNext, onExit }
           {activeModuleId !== HOME_MODULE_ID && activeModule ? (
             <section className="windal-dash__module-block" aria-labelledby="windal-module-reports-heading">
               <h2 id="windal-module-reports-heading" className="windal-dash__section-title">
-                {activeModule.sidebarLabel} — Reports
+                {activeModule.sidebarLabel} — {activeModule.itemsSectionTitle || 'Reports'}
               </h2>
               <div className="windal-dash__grid windal-dash__grid--module" role="list">
                 {moduleTiles}

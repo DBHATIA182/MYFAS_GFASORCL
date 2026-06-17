@@ -71,7 +71,8 @@ body {
   margin: 0;
 }
 
-/* Vite dev only ‚?? proves this bundle is WINDAL\APPTEST (see App.jsx renderHeaderBrand). */
+/* Vite dev only ‚Äî proves this bundle is GFASORCL\APPTEST */
+.gfasorcl-dev-strip,
 .windal-dev-strip {
   font-size: 0.65rem;
   font-weight: 700;
@@ -140,7 +141,7 @@ body {
   box-sizing: border-box;
 }
 
-/* WINDAL dashboard menu: full viewport (not centered 920px card) */
+/* GFAS dashboard menu: full viewport (not centered 920px card) */
 .slide.slide-windal-dashboard,
 .app--windal-dashboard .slide.slide-3.slide-windal-dashboard {
   max-width: none !important;
@@ -435,6 +436,261 @@ body {
   font-weight: 700;
 }
 
+.slide-21-state-wise .report-table--grand-total,
+.slide-22-state-wise-purchase .report-table--grand-total {
+  width: 100%;
+  table-layout: fixed;
+  margin-top: 0;
+}
+
+.slide-21-state-wise .state-wise-sales-grand-summary,
+.slide-22-state-wise-purchase .state-wise-sales-grand-summary {
+  margin-top: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.slide-21-state-wise .state-wise-sales-report .table-responsive,
+.slide-22-state-wise-purchase .state-wise-sales-report .table-responsive {
+  margin-bottom: 0;
+}
+
+.slide-21-state-wise .report-table--state-wise-sales thead th.text-right,
+.slide-21-state-wise .report-table--state-wise-sales td.text-right,
+.slide-22-state-wise-purchase .report-table--state-wise-sales thead th.text-right,
+.slide-22-state-wise-purchase .report-table--state-wise-sales td.text-right {
+  text-align: right !important;
+}
+
+.slide-21-state-wise.slide-report--mobile-toolbar-row .toolbar-actions,
+.slide-22-state-wise-purchase.slide-report--mobile-toolbar-row .toolbar-actions {
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 720px) {
+  .slide-21-state-wise.slide-report--mobile-toolbar-row .toolbar-actions,
+  .slide-22-state-wise-purchase.slide-report--mobile-toolbar-row .toolbar-actions {
+    flex-wrap: wrap;
+  }
+}
+
+.complete-ledger-report-meta {
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  color: #334155;
+  line-height: 1.45;
+}
+
+.complete-ledger-section {
+  margin-bottom: 2rem;
+}
+
+.complete-ledger-section--break {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 2px solid #cbd5e1;
+}
+
+.slide-40-complete-ledger.complete-ledger-entry,
+.slide-56-complete-ledger.complete-ledger-entry,
+.slide-40-complete-ledger.complete-ledger-report,
+.slide-56-complete-ledger.complete-ledger-report {
+  max-width: min(920px, 100%);
+  max-height: calc(100dvh - 4.25rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.slide-40-complete-ledger.complete-ledger-report,
+.slide-56-complete-ledger.complete-ledger-report {
+  max-width: min(1200px, 100%);
+}
+
+.slide-40-complete-ledger.complete-ledger-entry > .report-toolbar--ledger-form,
+.slide-56-complete-ledger.complete-ledger-entry > .report-toolbar--ledger-form,
+.slide-40-complete-ledger.complete-ledger-entry > .session-info-line,
+.slide-56-complete-ledger.complete-ledger-entry > .session-info-line,
+.slide-40-complete-ledger.complete-ledger-entry > .form-actions--complete-ledger,
+.slide-56-complete-ledger.complete-ledger-entry > .form-actions--complete-ledger,
+.slide-40-complete-ledger.complete-ledger-report > .session-info-line,
+.slide-56-complete-ledger.complete-ledger-report > .session-info-line,
+.slide-40-complete-ledger.complete-ledger-report > .report-toolbar,
+.slide-56-complete-ledger.complete-ledger-report > .report-toolbar,
+.slide-40-complete-ledger.complete-ledger-report > .complete-ledger-report-meta,
+.slide-56-complete-ledger.complete-ledger-report > .complete-ledger-report-meta,
+.slide-40-complete-ledger.complete-ledger-report > .complete-ledger-report-actions,
+.slide-56-complete-ledger.complete-ledger-report > .complete-ledger-report-actions {
+  flex-shrink: 0;
+}
+
+.complete-ledger-report-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding-right: 0.15rem;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+.complete-ledger-report .complete-ledger-section .report-display {
+  overflow: visible;
+  flex: none;
+  min-height: auto;
+}
+
+.slide-40-complete-ledger.complete-ledger-entry .report-toolbar--ledger-form,
+.slide-56-complete-ledger.complete-ledger-entry .report-toolbar--ledger-form {
+  flex-shrink: 0;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.slide-40-complete-ledger.complete-ledger-entry .report-toolbar--ledger-form h2,
+.slide-56-complete-ledger.complete-ledger-entry .report-toolbar--ledger-form h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: #1e3a5f;
+}
+
+.slide-40-complete-ledger.complete-ledger-entry .session-info-line,
+.slide-56-complete-ledger.complete-ledger-entry .session-info-line {
+  flex-shrink: 0;
+  margin-bottom: 0.75rem;
+}
+
+.slide-40-complete-ledger.complete-ledger-entry .compdet-date-hint,
+.slide-56-complete-ledger.complete-ledger-entry .compdet-date-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.86rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.app-main:has(> .slide-40-complete-ledger),
+.app-main:has(> .slide-56-complete-ledger) {
+  align-items: stretch;
+}
+
+.app-main:has(> .slide-40-complete-ledger) > .slide-40-complete-ledger,
+.app-main:has(> .slide-56-complete-ledger) > .slide-56-complete-ledger {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-self: stretch;
+}
+
+.report-form--complete-ledger {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 1.1rem 1.15rem 1.25rem;
+  border: 1px solid #dbe4ff;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 8px 22px rgba(30, 58, 95, 0.06);
+}
+
+.complete-ledger-form-section {
+  margin-bottom: 1.15rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.complete-ledger-form-section--last {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.complete-ledger-form-section__title {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.complete-ledger-form-dates,
+.complete-ledger-form-codes {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+
+.report-form--complete-ledger .form-group {
+  margin-bottom: 0;
+}
+
+.complete-ledger-form-vwt {
+  max-width: 22rem;
+}
+
+.complete-ledger-field-note,
+.complete-ledger-schedule-pick {
+  margin: 0.45rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+.complete-ledger-schedule-pick {
+  color: #1e40af;
+}
+
+.form-actions--complete-ledger {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.25rem;
+}
+
+@media (max-width: 720px) {
+  .complete-ledger-form-dates,
+  .complete-ledger-form-codes {
+    grid-template-columns: 1fr;
+  }
+
+  .complete-ledger-form-vwt {
+    max-width: none;
+  }
+
+  .slide-40-complete-ledger.complete-ledger-entry .report-toolbar--ledger-form,
+  .slide-56-complete-ledger.complete-ledger-entry .report-toolbar--ledger-form {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .app-main:has(> .slide-40-complete-ledger),
+  .app-main:has(> .slide-56-complete-ledger) {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  .app-main:has(> .slide-40-complete-ledger) > .slide-40-complete-ledger,
+  .app-main:has(> .slide-56-complete-ledger) > .slide-56-complete-ledger {
+    max-height: none;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 100%;
+  }
+}
+
 .hsn-mobile-filter-wrap {
   display: none;
   margin-bottom: 0.65rem;
@@ -525,6 +781,45 @@ body {
   margin-bottom: 0.55rem;
   font-size: 0.82rem;
   line-height: 1.25;
+}
+
+.session-info-line--with-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.session-info-line--with-actions .session-info-line__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.session-info-line--with-actions .session-info-line__main .company-info {
+  margin-bottom: 0;
+}
+
+.session-info-line__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem 0.5rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.session-info-line__actions .view-settings-wrap {
+  position: relative;
+}
+
+.session-info-line__actions .btn,
+.session-info-line__actions .voice-command-btn {
+  font-size: 0.72rem;
+  padding: 0.28rem 0.55rem;
+  min-height: 1.75rem;
 }
 
 .compdet-date-hint {
@@ -1106,7 +1401,7 @@ body {
   background-color: #f1f5f9 !important;
 }
 
-/* ‚??‚?? Trial balance: full-width header, grid, horizontal scroll on phone ‚??‚?? */
+/* ?????? Trial balance: full-width header, grid, horizontal scroll on phone ?????? */
 .table-responsive--trial {
   border: 2px solid #1e293b;
   border-radius: 10px;
@@ -1208,7 +1503,7 @@ body {
   color: #fff !important;
 }
 
-/* Ageing Cur. Bal: schedule 8.10 negative, or other schedules positive ‚?? show flipped / negative in red */
+/* Ageing Cur. Bal: schedule 8.10 negative, or other schedules positive ??? show flipped / negative in red */
 .report-table--trial td.ageing-cur-bal-alert,
 .report-table--trial td.ageing-cur-bal-alert strong {
   color: #c53030 !important;
@@ -1232,7 +1527,7 @@ body {
   color: #4a5568;
 }
 
-/* ‚??‚?? Ledger + bill-wise ledger on-screen ‚??‚?? */
+/* ?????? Ledger + bill-wise ledger on-screen ?????? */
 .table-responsive--ledger,
 .table-responsive--bill-ledger,
 .table-responsive--broker-os {
@@ -1277,7 +1572,7 @@ body {
   min-width: 0;
 }
 
-/** Sale Bill Printing list ‚?? overrides bill-ledger fixed/100% squeeze (globally enforced) */
+/** Sale Bill Printing list ??? overrides bill-ledger fixed/100% squeeze (globally enforced) */
 .slide-13-report .report-display {
   max-width: 100%;
   min-width: 0;
@@ -1320,7 +1615,7 @@ body {
   width: 100%;
 }
 
-/* Voucher lines (CV/BV/JV drill-down): main ledger uses fixed layout; voucher is wide ‚?? scroll, don‚??t squeeze */
+/* Voucher lines (CV/BV/JV drill-down): main ledger uses fixed layout; voucher is wide ??? scroll, don???t squeeze */
 .table-responsive--ledger-voucher {
   margin: 0.75rem 0;
 }
@@ -1447,7 +1742,7 @@ body {
   font-size: 0.74rem;
 }
 
-/* Bill-ledger: fixed layout = no stretched ‚??dead‚?ù columns; tight widths + larger type */
+/* Bill-ledger: fixed layout = no stretched ???dead??? columns; tight widths + larger type */
 .report-table--bill-ledger {
   table-layout: fixed;
   width: 100%;
@@ -1494,7 +1789,7 @@ body {
   }
 }
 
-/* Column widths come from <colgroup>; cells only set alignment, padding, type ‚?? avoids stretched dead space */
+/* Column widths come from <colgroup>; cells only set alignment, padding, type ??? avoids stretched dead space */
 .report-table--bill-ledger thead th.col-bill-ledger-bt,
 .report-table--bill-ledger thead th.col-bill-ledger-vt,
 .report-table--bill-ledger thead th.col-bill-ledger-date,
@@ -1702,7 +1997,7 @@ body {
   color: #fff !important;
 }
 
-/* Ageing ‚?? pending ledger / pending bills: scroll wide grid on phone; row highlight uses .ledger-row-selected */
+/* Ageing ??? pending ledger / pending bills: scroll wide grid on phone; row highlight uses .ledger-row-selected */
 .table-responsive--ageing-drill {
   -webkit-overflow-scrolling: touch;
 }
@@ -1948,6 +2243,46 @@ body {
     white-space: nowrap;
   }
 
+  .report-toolbar-back-short {
+    display: none;
+  }
+
+  /* Bill ledger / Broker OS: Back + Pdf + Excel + WhatsApp on one row */
+  .slide-report--mobile-toolbar-row .toolbar-actions {
+    display: grid;
+    grid-template-columns: minmax(2.35rem, 0.42fr) repeat(3, minmax(0, 1fr));
+    gap: 0.28rem;
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .slide-report--mobile-toolbar-row .report-toolbar-back-full {
+    display: none;
+  }
+
+  .slide-report--mobile-toolbar-row .report-toolbar-back-short {
+    display: inline;
+  }
+
+  .slide-report--mobile-toolbar-row .toolbar-actions .btn-report-help,
+  .slide-report--mobile-toolbar-row .toolbar-actions .btn-toolbar-back {
+    flex: none;
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    padding: 0.34rem 0.2rem !important;
+    font-size: 0.62rem !important;
+  }
+
+  .slide-report--mobile-toolbar-row .toolbar-actions .btn {
+    min-width: 0 !important;
+    width: 100%;
+    max-width: none;
+    padding: 0.34rem 0.16rem !important;
+    font-size: 0.62rem !important;
+    line-height: 1.1;
+  }
+
   .report-help-dialog {
     width: 100%;
     max-height: min(88vh, 640px);
@@ -1993,6 +2328,17 @@ body {
 
 .form-input:focus {
   border-color: #4c51bf;
+}
+
+.account-search-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.45rem;
+}
+
+.account-search-input-row__field {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .account-search-group .account-selected-hint {
@@ -2135,7 +2481,7 @@ body {
   background: #eef2ff;
 }
 
-/* Narrow screens: avoid squeezing NAME into ellipsis ‚?? stack row so full name wraps */
+/* Narrow screens: avoid squeezing NAME into ellipsis ??? stack row so full name wraps */
 @media (max-width: 640px) {
   .account-search-header {
     display: none;
@@ -2280,6 +2626,731 @@ body {
   gap: 1rem;
 }
 
+.form-row-broker--dates {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.slide-7-broker-os {
+  max-width: min(920px, 100%);
+  max-height: calc(100dvh - 4.25rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.broker-os-form-chrome {
+  flex-shrink: 0;
+  margin-bottom: 0.4rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.broker-os-form-chrome .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.5rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.42rem 0.55rem;
+  background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  margin-bottom: 0;
+  box-sizing: border-box;
+}
+
+.broker-os-form-chrome .session-info-line__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.broker-os-form-chrome .session-info-line__main .company-info {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.broker-os-form-chrome .session-info-line__main .app-session-line__text {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.broker-os-form-chrome .session-info-line__actions {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.28rem 0.35rem;
+  flex-shrink: 0;
+}
+
+.broker-os-form-chrome .session-info-line__actions .btn-report-help,
+.broker-os-form-chrome .session-info-line__actions .toolbar-icon-btn,
+.broker-os-form-chrome .session-info-line__actions .voice-command-btn {
+  flex-shrink: 0;
+}
+
+.broker-os-form-chrome .session-info-line__actions .btn-toolbar-back,
+.broker-os-form-chrome .session-info-line__actions .btn-toolbar-run {
+  font-size: 0.72rem;
+  padding: 0.28rem 0.5rem;
+  min-height: 1.75rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Prepare New Year Books (VFP DO FORM prepare) */
+.slide-50-new-year-books {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 0.5rem 0.75rem 1rem;
+}
+
+.new-year-books-form {
+  flex: 1;
+}
+
+.new-year-books-card {
+  background: linear-gradient(165deg, #fff9e6 0%, #ffe9a8 100%);
+  border: 1px solid #e6c200;
+  border-radius: 12px;
+  padding: 1.25rem 1.35rem 1rem;
+  box-shadow: 0 4px 18px rgba(120, 90, 0, 0.12);
+}
+
+.new-year-books-card__title {
+  margin: 0 0 1rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #3d2e00;
+  letter-spacing: 0.02em;
+}
+
+.new-year-books-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  justify-content: space-between;
+}
+
+.new-year-books-card__actions .btn-primary {
+  margin-right: auto;
+}
+
+.new-year-books-denied {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+
+.new-year-books-denied--mobile {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.new-year-books-progress {
+  margin: 0.75rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+}
+
+.new-year-books-progress__title {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  color: #1e40af;
+}
+
+.new-year-books-progress__msg {
+  margin: 0 0 0.25rem;
+  color: #1e3a8a;
+}
+
+.new-year-books-progress__elapsed {
+  margin: 0 0 0.35rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #3730a3;
+}
+
+/* Primary Key utility (Slide 51) ‚Äî VFP DO primary_key */
+.slide-51-primary-key.primary-key-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem 0.65rem;
+  min-height: 0;
+}
+
+.primary-key-screen__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.primary-key-screen__head-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.primary-key-screen__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.primary-key-screen__hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.primary-key-screen__actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.primary-key-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 8rem;
+  max-height: min(52vh, 22rem);
+  overflow: auto;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.primary-key-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.primary-key-grid th,
+.primary-key-grid td {
+  border: 1px solid #e2e8f0;
+  padding: 0.28rem 0.4rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.primary-key-grid thead th {
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.primary-key-grid__ok {
+  color: #166534;
+}
+
+.primary-key-grid__skip {
+  color: #b45309;
+  font-size: 0.72rem;
+}
+
+.primary-key-screen__summary {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.primary-key-screen__footer {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.primary-key-denied {
+  padding: 0.75rem 1rem;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+}
+
+.primary-key-denied__badge {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.primary-key-denied--mobile {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.primary-key-denied--mobile .primary-key-denied__badge {
+  color: #92400e;
+}
+
+.primary-key-progress {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.primary-key-progress__title {
+  margin: 0 0 0.2rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.primary-key-progress__current {
+  margin: 0 0 0.2rem;
+  font-size: 0.82rem;
+  color: #1e40af;
+}
+
+.primary-key-progress__counts {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.primary-key-progress__track {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  overflow: hidden;
+}
+
+.primary-key-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  transition: width 0.25s ease;
+}
+
+.primary-key-grid__row.is-current td {
+  background: #fef9c3;
+}
+
+.primary-key-grid__row.is-done td {
+  background: #f8fafc;
+}
+
+.primary-key-grid__working {
+  color: #a16207;
+  font-weight: 600;
+}
+
+.primary-key-grid td.num {
+  text-align: right;
+  width: 2.2rem;
+}
+
+/* Set Function utility (Slide 52) ‚Äî VFP DO setFUNC */
+.slide-52-set-function.set-function-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem 0.65rem;
+  min-height: 0;
+}
+
+.set-function-screen__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.set-function-screen__head-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.set-function-screen__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.set-function-screen__hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.set-function-screen__actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.set-function-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 8rem;
+  max-height: min(52vh, 22rem);
+  overflow: auto;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.set-function-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.set-function-grid th,
+.set-function-grid td {
+  border: 1px solid #e2e8f0;
+  padding: 0.28rem 0.4rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.set-function-grid thead th {
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.set-function-grid td.num {
+  text-align: right;
+  width: 2.2rem;
+}
+
+.set-function-grid__row.is-current td {
+  background: #fef9c3;
+}
+
+.set-function-grid__working {
+  color: #a16207;
+  font-weight: 600;
+}
+
+.set-function-grid__ok {
+  color: #166534;
+}
+
+.set-function-grid__skip {
+  color: #b45309;
+  font-size: 0.72rem;
+}
+
+.set-function-screen__summary {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.set-function-screen__footer {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.set-function-denied {
+  padding: 0.75rem 1rem;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+}
+
+.set-function-denied__badge {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.set-function-denied--mobile {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.set-function-denied--mobile .set-function-denied__badge {
+  color: #92400e;
+}
+
+.set-function-progress {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.set-function-progress__title {
+  margin: 0 0 0.2rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.set-function-progress__current {
+  margin: 0 0 0.2rem;
+  font-size: 0.82rem;
+  color: #1e40af;
+}
+
+.set-function-progress__counts {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.set-function-progress__track {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  overflow: hidden;
+}
+
+.set-function-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  transition: width 0.25s ease;
+}
+
+/* Takaja Query utility (Slide 53) ‚Äî VFP DO TAKAJA_QUERY */
+.slide-53-takaja-query.takaja-query-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem 0.65rem;
+  min-height: 0;
+}
+
+.takaja-query-screen__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.takaja-query-screen__head-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.takaja-query-screen__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.takaja-query-screen__hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.takaja-query-screen__actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.takaja-query-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 6rem;
+  max-height: min(40vh, 14rem);
+  overflow: auto;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.takaja-query-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.takaja-query-grid th,
+.takaja-query-grid td {
+  border: 1px solid #e2e8f0;
+  padding: 0.28rem 0.4rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.takaja-query-grid thead th {
+  background: #f8fafc;
+}
+
+.takaja-query-grid td.num {
+  text-align: right;
+  width: 2.2rem;
+}
+
+.takaja-query-grid__row.is-current td {
+  background: #fef9c3;
+}
+
+.takaja-query-grid__working {
+  color: #a16207;
+  font-weight: 600;
+}
+
+.takaja-query-grid__ok {
+  color: #166534;
+}
+
+.takaja-query-grid__skip {
+  color: #b45309;
+  font-size: 0.72rem;
+}
+
+.takaja-query-screen__summary {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.takaja-query-screen__footer {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.takaja-query-denied {
+  padding: 0.75rem 1rem;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+}
+
+.takaja-query-denied__badge {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.takaja-query-denied--mobile {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.takaja-query-denied--mobile .takaja-query-denied__badge {
+  color: #92400e;
+}
+
+.takaja-query-progress {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.takaja-query-progress__title {
+  margin: 0 0 0.2rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.takaja-query-progress__current {
+  margin: 0 0 0.2rem;
+  font-size: 0.82rem;
+  color: #1e40af;
+}
+
+.takaja-query-progress__counts {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.takaja-query-progress__track {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  overflow: hidden;
+}
+
+.takaja-query-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  transition: width 0.25s ease;
+}
+
+.new-year-books-denied__badge {
+  display: inline-block;
+  margin: 0 0 0.65rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.slide-7-broker-os .session-info-line {
+  flex-shrink: 0;
+}
+
+.slide-7-broker-os .form-api-error {
+  flex-shrink: 0;
+}
+
+.slide-7-broker-os .report-form--broker-os {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-right: 0.15rem;
+}
+
+.slide-6-ledger-form {
+  max-width: min(920px, 100%);
+  max-height: calc(100dvh - 5.5rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.slide-6-ledger-form .report-toolbar--ledger-form {
+  flex-shrink: 0;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.slide-6-ledger-form .session-info-line {
+  flex-shrink: 0;
+}
+
+.slide-6-ledger-form .report-form--ledger {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-right: 0.15rem;
+}
+
 .form-row-ageing-meta {
   margin-bottom: 0.5rem;
 }
@@ -2335,6 +3406,12 @@ body {
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 4px 12px rgba(76, 81, 191, 0.06);
+}
+
+@media (max-width: 720px) {
+  .form-row-broker--dates {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
@@ -2589,7 +3666,7 @@ mark.search-highlight {
   margin-bottom: 0.35rem;
 }
 
-/* Profit & Loss ‚?? plain two-column document (notepad / classic printout) */
+/* Profit & Loss ??? plain two-column document (notepad / classic printout) */
 .pl-profit-loss .pl-statement.pl-doc {
   max-width: 920px;
   margin: 0 auto 1.5rem;
@@ -2903,7 +3980,7 @@ mark.search-highlight {
 }
 
 .bs-table--plain .bs-drillable::before {
-  content: "‚?∏ ";
+  content: "??? ";
   color: #2563eb;
   font-weight: 700;
 }
@@ -3143,7 +4220,7 @@ mark.search-highlight {
 
 /*
  * Lead column widths: <colgroup> + inline width + --sl-col-* on <table> (ReportTable.jsx).
- * Do not set width: max-content !important here ‚?? it overrides the inline sum width and
+ * Do not set width: max-content !important here ??? it overrides the inline sum width and
  * lets the browser redistribute columns, recreating huge gaps after Tp / InvNo / Bt / Party.
  */
 .report-table.report-table--sale-list {
@@ -3191,7 +4268,7 @@ mark.search-highlight {
   overflow: visible !important;
 }
 
-/* Trn / Item / Item name: clamp header paint so narrow cols don‚??t stack on each other */
+/* Trn / Item / Item name: clamp header paint so narrow cols don???t stack on each other */
 .report-table--sale-list thead th:nth-child(11),
 .report-table--sale-list thead th:nth-child(12),
 .report-table--sale-list thead th:nth-child(13) {
@@ -3199,12 +4276,12 @@ mark.search-highlight {
   text-overflow: ellipsis;
 }
 
-/* .report-table th { text-align: left } beats .text-right ‚?? keep measure headers on the right */
+/* .report-table th { text-align: left } beats .text-right ??? keep measure headers on the right */
 .report-table--sale-list thead th.text-right {
   text-align: right !important;
 }
 
-/* No InvDate column ‚?? widths: <colgroup> + table inline width + vars --sl-col-1‚?¶5 on <table> */
+/* No InvDate column ??? widths: <colgroup> + table inline width + vars --sl-col-1???5 on <table> */
 .report-table--sale-list thead th:nth-child(1),
 .report-table--sale-list tr.sale-list-line td:nth-child(1) {
   width: var(--sl-col-1, 18px) !important;
@@ -3215,7 +4292,7 @@ mark.search-highlight {
   padding-right: 0 !important;
 }
 
-/* Left-align short lead cols ‚?? enforce width so colspan / nowrap rows cannot stretch Tp‚??Party */
+/* Left-align short lead cols ??? enforce width so colspan / nowrap rows cannot stretch Tp???Party */
 .report-table--sale-list thead th:nth-child(2),
 .report-table--sale-list tr.sale-list-line td:nth-child(2) {
   width: var(--sl-col-2, 32px) !important;
@@ -3302,7 +4379,7 @@ mark.search-highlight {
   line-height: 1.05;
 }
 
-/* Bk: was right-aligned in a 28px col ‚?? code sat on the edge and met Bk name (looked like "26001SELF") */
+/* Bk: was right-aligned in a 28px col ??? code sat on the edge and met Bk name (looked like "26001SELF") */
 .report-table--sale-list thead th:nth-child(9),
 .report-table--sale-list tr.sale-list-line td:nth-child(9) {
   text-align: left !important;
@@ -3355,7 +4432,7 @@ mark.search-highlight {
   text-overflow: ellipsis;
 }
 
-/* Qty ‚?¶ Bill amt (no Lot column) ‚?? wide enough for Indian-format totals; padding avoids digit run-on */
+/* Qty ??? Bill amt (no Lot column) ??? wide enough for Indian-format totals; padding avoids digit run-on */
 .report-table--sale-list thead th:nth-child(n+15),
 .report-table--sale-list tr.sale-list-line td:nth-child(n+15),
 .report-table--sale-list tr.sale-list-day-total td:nth-child(n+2),
@@ -3370,7 +4447,7 @@ mark.search-highlight {
 
 @media (max-width: 900px) {
   /*
-   * Sale list on phone/tablet: match desktop layout ‚?? same <colgroup> px widths + inline table width.
+   * Sale list on phone/tablet: match desktop layout ??? same <colgroup> px widths + inline table width.
    * Do not hide the top scroll bar (JS toggles it); do not override width with max-content or add
    * grouped-only min/max column rules (those made Party/Item/Broker differ from Date-wise and PC).
    */
@@ -3468,7 +4545,7 @@ tr.sale-list-row-clickable:focus {
   }
 }
 
-/* Credit note (TYPE = CN) ‚?? distinct from SL/SE sale lines */
+/* Credit note (TYPE = CN) ??? distinct from SL/SE sale lines */
 tr.sale-list-row-cn td {
   background: #fff7ed;
   color: #7c2d12;
@@ -3527,7 +4604,7 @@ tr.sale-list-bill-total td {
   border-bottom: 2px solid #64748b;
 }
 
-/* Subtotal row: keep label short in the colspan=14 cell ‚?? long captions used to force lead cols to huge min width */
+/* Subtotal row: keep label short in the colspan=14 cell ??? long captions used to force lead cols to huge min width */
 .report-table--sale-list td.sale-list-subtotal-label {
   white-space: nowrap;
 }
@@ -3588,8 +4665,8 @@ tr.sale-list-item-summary-head th {
 }
 
 /*
- * Item-wise summary: Code+Name share one cell spanning Tp‚?¶BKH (cols 1‚??14).
- * Qty / Wt / Amount use the same physical cols as detail rows (15‚??17).
+ * Item-wise summary: Code+Name share one cell spanning Tp???BKH (cols 1???14).
+ * Qty / Wt / Amount use the same physical cols as detail rows (15???17).
  */
 .report-table--sale-list tr.sale-list-item-summary-head th.sale-list-item-summary-lead,
 .report-table--sale-list tr.sale-list-item-summary-row td.sale-list-item-summary-lead {
@@ -4231,7 +5308,8 @@ td.sale-list-total-pad {
   position: absolute;
   top: calc(100% + 0.45rem);
   right: 0;
-  min-width: 12rem;
+  min-width: 14rem;
+  max-width: min(18rem, 92vw);
   background: #fff;
   border: 1px solid #cbd5e1;
   border-radius: 12px;
@@ -4239,6 +5317,38 @@ td.sale-list-total-pad {
   padding: 0.35rem;
   z-index: 110;
   backdrop-filter: saturate(120%) blur(2px);
+}
+
+.view-settings-menu__hint {
+  margin: 0.25rem 0.35rem 0.5rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.35;
+  word-break: break-all;
+}
+
+.view-settings-menu__label {
+  display: block;
+  margin: 0 0.35rem 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.view-settings-menu__input {
+  width: calc(100% - 0.7rem);
+  margin: 0 0.35rem 0.4rem;
+  padding: 0.4rem 0.45rem;
+  font-size: 0.78rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.view-settings-menu__apply {
+  margin-bottom: 0.25rem;
+  font-weight: 700;
+  color: #1d4ed8;
 }
 
 .view-settings-option {
@@ -4715,7 +5825,7 @@ td.sale-list-total-pad {
 }
 
 /*
-  Stock detail header: close must be a direct grid child ‚?? when it lived inside Pdf/Excel/WA flex row,
+  Stock detail header: close must be a direct grid child ??? when it lived inside Pdf/Excel/WA flex row,
   small screens clipped it. Title row + full-width toolbar.
 */
 .stock-sum-detail-modal .sale-bill-modal-head.stock-sum-detail-modal-head {
@@ -4794,7 +5904,7 @@ td.sale-list-total-pad {
   text-align: right !important;
 }
 
-/* Stock sum (slide 9): full-screen ledger / detail panels ‚?? long titles wrap cleanly */
+/* Stock sum (slide 9): full-screen ledger / detail panels ??? long titles wrap cleanly */
 .slide-9.slide-report .report-toolbar h2.stock-panel-title {
   flex: 1 1 200px;
   min-width: 0;
@@ -4995,7 +6105,7 @@ td.sale-list-total-pad {
 
   /*
    * Totals: desktop uses grid justify-end + fixed column widths.
-   * On narrow screens `width: 100%` on the block defeats grid justify-self ‚?? use flex + align-self.
+   * On narrow screens `width: 100%` on the block defeats grid justify-self ??? use flex + align-self.
    */
   .sale-bill-print-sum-section {
     display: flex;
@@ -5208,7 +6318,7 @@ td.sale-list-total-pad {
     vertical-align: top;
   }
 
-  /* Main schedule heads vs detail lines ‚?? extra air on phones */
+  /* Main schedule heads vs detail lines ??? extra air on phones */
   .slide-19 .bs-table--plain tbody tr.pl-pl-sch-header td {
     padding-top: 0.55rem;
     padding-bottom: 0.48rem;
@@ -5553,7 +6663,7 @@ body.force-desktop-view .app--desktop {
   flex-direction: column;
 }
 
-/* ‚??‚?? Sale bill entry (slide 21) ‚??‚?? */
+/* ?????? Sale bill entry (slide 21) ?????? */
 .slide.slide-21-sale-bill {
   max-width: min(1080px, calc(100vw - 2rem));
   padding: 1.35rem 1.5rem 1.5rem;
@@ -6329,7 +7439,7 @@ body.force-desktop-view .app--desktop {
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
 }
 
-/* ‚??‚?? Sale bill: layout polish (mobile + desktop) ‚??‚?? */
+/* ?????? Sale bill: layout polish (mobile + desktop) ?????? */
 .slide-21-sale-bill--loading {
   display: flex;
   align-items: center;
@@ -6755,7 +7865,7 @@ body.force-desktop-view .app--desktop {
   max-width: 22rem;
 }
 
-/* Line grid ‚?? compact numeric cols; wider name / marka / status */
+/* Line grid ??? compact numeric cols; wider name / marka / status */
 .slide-22-dispatch-challan .dc-lines-section {
   border-left: 4px solid #0ea5e9;
 }
@@ -7086,7 +8196,7 @@ body.force-desktop-view .app--desktop {
 }
 
 
-/* Dispatch challan ‚?? highlighted action bars (top + bottom) */
+/* Dispatch challan ??? highlighted action bars (top + bottom) */
 .dc-action-bar {
   margin: 0.65rem 0;
   padding: 0.65rem 0.85rem;
@@ -7560,7 +8670,7 @@ body.force-desktop-view .app--desktop {
   justify-content: flex-end;
   width: 100%;
 }
-/* ?? A/c Master (from WINDAL) ?? */
+/* A/c Master */
 .btn-master-party-add {
   flex-shrink: 0;
   min-width: 2rem;
@@ -7982,6 +9092,75 @@ body.force-desktop-view .app--desktop {
   font-size: 0.92em;
 }
 
+/* VFP Name Search style ‚Äî name, city, gst_no, pan, tel_no_o, code */
+.master-party-pick__panel--accountHelp.master-party-pick__panel--dropdown {
+  min-width: 45rem;
+  max-width: min(56rem, 98vw);
+}
+
+.master-party-pick__panel--accountHelp .master-party-pick__list {
+  max-height: min(22rem, 62vh);
+}
+
+.master-party-pick__cols-head--account-help,
+.master-party-pick__opt.master-party-pick__opt--account-help {
+  display: grid;
+  grid-template-columns:
+    minmax(8rem, 1.4fr)
+    minmax(5rem, 0.9fr)
+    minmax(7.5rem, 1.1fr)
+    minmax(5.5rem, 0.85fr)
+    minmax(5rem, 0.75fr)
+    4.5rem;
+  gap: 0.35rem 0.5rem;
+  align-items: start;
+}
+
+.master-party-pick__cols-head--account-help {
+  padding: 0.35rem 0.65rem;
+  border-bottom: 1px solid #cbd5e1;
+  background: #f1f5f9;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.master-party-pick__opt.master-party-pick__opt--account-help {
+  height: auto;
+  min-height: 2rem;
+  padding: 0.4rem 0.65rem;
+  text-align: left;
+}
+
+.master-party-pick__opt--account-help .master-party-pick__opt-name {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.master-party-pick__opt--account-help .master-party-pick__opt-city,
+.master-party-pick__opt--account-help .master-party-pick__opt-gst,
+.master-party-pick__opt--account-help .master-party-pick__opt-pan,
+.master-party-pick__opt--account-help .master-party-pick__opt-tel {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
+  color: #64748b;
+  font-size: 0.92em;
+}
+
+.master-party-pick__opt--account-help .master-party-pick__opt-code {
+  white-space: nowrap;
+  text-align: right;
+  font-weight: 700;
+  color: #334155;
+}
+
 .master-party-pick__panel--stateName.master-party-pick__panel--dropdown {
   min-width: 20rem;
 }
@@ -8148,7 +9327,7 @@ body.force-desktop-view .app--desktop {
   flex-shrink: 0;
 }
 
-/* ‚??‚?? Purchase bill entry (all viewports) ‚??‚?? */
+/* ?????? Purchase bill entry (all viewports) ?????? */
 .app--mobile .app-main:has(.slide-25-purchase-bill.pb-layout--mobile) {
   overflow-x: hidden;
   overflow-y: auto;
@@ -8540,12 +9719,111 @@ body.force-desktop-view .app--desktop {
   }
 }
 
-/* ‚??‚?? A/c Master (Slide 26) ‚??‚?? */
-.slide-26-account-master.account-master-screen {
+/* ?? A/c Master (Slide 26) + Item Master (Slide 27) ?? */
+.slide-26-account-master.account-master-screen,
+.slide-27-item-master.item-master-screen,
+.slide-30-cat-mast.cat-mast-screen,
+.slide-39-cost-mast.cost-mast-screen,
+.slide-40-cust-int.cust-int-screen,
+.slide-41-holiday.holiday-screen,
+.slide-42-dane.dane-screen,
+.slide-43-marka.marka-screen,
+.slide-44-pur-exp.pur-exp-screen,
+.slide-45-sale-cond.sale-cond-screen,
+.slide-46-loc-btype.loc-btype-screen,
+.slide-47-detail-mast.detail-mast-screen,
+.slide-48-gst-state.gst-state-screen,
+.slide-54-opdet.opdet-screen,
+.slide-55-inttrf.inttrf-screen,
+.slide-57-square.square-screen,
+.slide-58-trldif.trldif-screen,
+.slide-59-amerge.amerge-screen,
+.slide-60-bnotrf.bnotrf-screen,
+.slide-61-bnotrf-lot.bnotrf-lot-screen,
+.slide-62-shortage.shortage-screen,
+.slide-31-item-grp.item-grp-screen,
+.slide-32-user-master.user-master-screen,
+.slide-36-bikri-exp.bikri-exp-screen,
+.slide-37-godown-rent.godown-rent-screen,
+.slide-38-godown.godown-master-screen,
+.slide-35-user-password.user-password-screen,
+.slide-29-schedule-master.schedule-master-screen {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-width: 100%;
+  max-width: min(1200px, 100%);
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  align-self: stretch;
+  height: calc(100dvh - 5.5rem);
+  max-height: calc(100dvh - 5.5rem);
+  overflow: hidden;
+}
+
+.app--mobile .app-main:has(.account-master-screen) {
+  overflow: hidden;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.app--no-header .slide-26-account-master.account-master-screen,
+.app--no-header .slide-27-item-master.item-master-screen,
+.app--no-header .slide-30-cat-mast.cat-mast-screen,
+.app--no-header .slide-39-cost-mast.cost-mast-screen,
+.app--no-header .slide-40-cust-int.cust-int-screen,
+.app--no-header .slide-41-holiday.holiday-screen,
+.app--no-header .slide-42-dane.dane-screen,
+.app--no-header .slide-43-marka.marka-screen,
+.app--no-header .slide-44-pur-exp.pur-exp-screen,
+.app--no-header .slide-45-sale-cond.sale-cond-screen,
+.app--no-header .slide-46-loc-btype.loc-btype-screen,
+.app--no-header .slide-47-detail-mast.detail-mast-screen,
+.app--no-header .slide-48-gst-state.gst-state-screen,
+.app--no-header .slide-54-opdet.opdet-screen,
+.app--no-header .slide-55-inttrf.inttrf-screen,
+.app--no-header .slide-69-stktrf.inttrf-screen,
+.app--no-header .slide-70-saletrf.inttrf-screen,
+.app--no-header .slide-71-voutrf.inttrf-screen,
+.app--no-header .slide-72-purtrf.inttrf-screen,
+.app--no-header .slide-73-usinv.inttrf-screen,
+.app--no-header .slide-74-panpgst.inttrf-screen,
+.app--no-header .slide-75-usrrpt.inttrf-screen,
+.app--no-header .slide-76-audtrf.inttrf-screen,
+.app--no-header .slide-77-compdet.compdet-screen,
+.app--no-header .slide-78-gstprof.gstprof-screen,
+.app--no-header .slide-79-updt.updt-screen,
+.slide-57-square.square-screen,
+.slide-58-trldif.trldif-screen,
+.slide-59-amerge.amerge-screen,
+.slide-60-bnotrf.bnotrf-screen,
+.slide-61-bnotrf-lot.bnotrf-lot-screen,
+.slide-62-shortage.shortage-screen,
+.app--no-header .slide-31-item-grp.item-grp-screen,
+.app--no-header .slide-32-user-master.user-master-screen,
+.app--no-header .slide-36-bikri-exp.bikri-exp-screen,
+.app--no-header .slide-37-godown-rent.godown-rent-screen,
+.app--no-header .slide-38-godown.godown-master-screen,
+.app--no-header .slide-35-user-password.user-password-screen,
+.app--no-header .slide-29-schedule-master.schedule-master-screen {
+  height: calc(100dvh - 2rem);
+  max-height: calc(100dvh - 2rem);
+}
+
+.account-master-screen__chrome {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.account-master-screen__head,
+.account-master-screen__filters,
+.account-master-screen__hint,
+.item-master-screen__hint {
+  flex-shrink: 0;
 }
 
 .account-master-screen__head {
@@ -8560,11 +9838,13 @@ body.force-desktop-view .app--desktop {
   gap: 0.5rem;
 }
 
+/* Toolbar layout: see styles/gfasToolbar.css (28px single line) */
 .account-master-screen__toolbar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
+  flex-wrap: nowrap;
+  gap: 0.2rem;
   align-items: center;
+  max-height: 28px;
 }
 
 .account-master-screen__filters {
@@ -8585,21 +9865,38 @@ body.force-desktop-view .app--desktop {
   max-width: 28rem;
 }
 
+/* A/c & Item Master list search ‚Äî uppercase on desktop and mobile */
+.account-master-search-input,
+.account-master-filter--search .account-master-search-input {
+  text-transform: uppercase;
+}
+
+.app--mobile .account-master-filter--search .account-master-search-input {
+  text-transform: uppercase;
+  -webkit-text-transform: uppercase;
+}
+
 .account-master-filter-btn {
   flex: 0 0 auto;
   margin-bottom: 0.1rem;
 }
 
-.account-master-screen__list-wrap {
+.account-master-screen__list-wrap,
+.item-master-screen__list-wrap {
+  flex: 1 1 0%;
+  min-height: 12rem;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   border: 1px solid var(--border-color, #c8d0dc);
   border-radius: 6px;
   background: #fff;
-  max-height: min(70vh, 640px);
+  max-height: none;
 }
 
 .account-master-table {
   width: 100%;
+  min-width: 36rem;
   border-collapse: collapse;
   font-size: 0.88rem;
 }
@@ -8644,20 +9941,5526 @@ body.force-desktop-view .app--desktop {
   margin: 0;
 }
 
-@media (max-width: 640px) {
-  .account-master-screen__toolbar .btn {
-    flex: 1 1 auto;
-    min-width: 5.5rem;
+/* Mobile: filters always visible; list scrolls vertically inside its box */
+.app--mobile .slide-26-account-master.account-master-screen,
+.app--mobile .slide-27-item-master.item-master-screen,
+.app--mobile .slide-30-cat-mast.cat-mast-screen,
+.app--mobile .slide-39-cost-mast.cost-mast-screen,
+.app--mobile .slide-40-cust-int.cust-int-screen,
+.app--mobile .slide-41-holiday.holiday-screen,
+.app--mobile .slide-42-dane.dane-screen,
+.app--mobile .slide-43-marka.marka-screen,
+.app--mobile .slide-44-pur-exp.pur-exp-screen,
+.app--mobile .slide-45-sale-cond.sale-cond-screen,
+.app--mobile .slide-46-loc-btype.loc-btype-screen,
+.app--mobile .slide-47-detail-mast.detail-mast-screen,
+.app--mobile .slide-48-gst-state.gst-state-screen,
+.app--mobile .slide-54-opdet.opdet-screen,
+.app--mobile .slide-55-inttrf.inttrf-screen,
+.app--mobile .slide-69-stktrf.inttrf-screen,
+.app--mobile .slide-70-saletrf.inttrf-screen,
+.app--mobile .slide-71-voutrf.inttrf-screen,
+.app--mobile .slide-72-purtrf.inttrf-screen,
+.slide-57-square.square-screen,
+.slide-58-trldif.trldif-screen,
+.slide-59-amerge.amerge-screen,
+.slide-60-bnotrf.bnotrf-screen,
+.slide-61-bnotrf-lot.bnotrf-lot-screen,
+.slide-62-shortage.shortage-screen,
+.app--mobile .slide-30-cat-mast.item-master-screen,
+.app--mobile .slide-39-cost-mast.item-master-screen,
+.app--mobile .slide-40-cust-int.item-master-screen,
+.app--mobile .slide-41-holiday.holiday-screen,
+.app--mobile .slide-41-holiday.item-master-screen,
+.app--mobile .slide-42-dane.item-master-screen,
+.app--mobile .slide-43-marka.item-master-screen,
+.app--mobile .slide-44-pur-exp.item-master-screen,
+.app--mobile .slide-45-sale-cond.item-master-screen,
+.app--mobile .slide-46-loc-btype.item-master-screen,
+.app--mobile .slide-47-detail-mast.item-master-screen,
+.app--mobile .slide-48-gst-state.item-master-screen,
+.app--mobile .slide-54-opdet.item-master-screen,
+.app--mobile .slide-55-inttrf.item-master-screen,
+.app--mobile .slide-69-stktrf.item-master-screen,
+.app--mobile .slide-70-saletrf.item-master-screen,
+.app--mobile .slide-71-voutrf.item-master-screen,
+.app--mobile .slide-72-purtrf.item-master-screen,
+.app--mobile .slide-31-item-grp.item-grp-screen,
+.app--mobile .slide-31-item-grp.item-master-screen,
+.app--mobile .slide-32-user-master.user-master-screen,
+.app--mobile .slide-32-user-master.item-master-screen,
+.app--mobile .slide-36-bikri-exp.bikri-exp-screen,
+.app--mobile .slide-37-godown-rent.godown-rent-screen,
+.app--mobile .slide-38-godown.godown-master-screen,
+.app--mobile .slide-35-user-password.user-password-screen,
+.slide-29-schedule-master.schedule-master-screen {
+  padding: 0.45rem 0.5rem 0.5rem;
+  gap: 0.4rem;
+  overflow-x: hidden;
+  max-width: 100%;
+  min-height: 40dvh;
+}
+
+.app--fas-flow.app--mobile .app-main .slide.slide-30-cat-mast.cat-mast-screen,
+.app--fas-flow.app--mobile .app-main .slide.slide-39-cost-mast.cost-mast-screen,
+.app--fas-flow.app--mobile .app-main .slide.slide-40-cust-int.cust-int-screen,
+.app--fas-flow.app--mobile .app-main .slide.slide-31-item-grp.item-grp-screen {
+  flex: 1 1 auto;
+  min-height: 40dvh;
+  height: calc(100dvh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* User Master on phone: scroll whole screen (fixed height was hiding the user list) */
+.app--fas-flow.app--mobile .app-main .slide.slide-32-user-master.user-master-screen {
+  flex: 1 1 auto;
+  min-height: calc(100dvh - 1.5rem);
+  height: auto;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+
+/* User Master form ‚Äî VFP split; sticky footer; password always visible */
+.user-master-modal-backdrop {
+  align-items: center;
+  padding: 0.35rem;
+  overflow: hidden;
+}
+
+.user-master-form-modal--vfp-layout {
+  width: min(1120px, 100%);
+  max-height: calc(100dvh - 0.75rem);
+  overflow: hidden;
+}
+
+.user-master-form-modal--vfp-layout .sale-bill-modal-head {
+  flex-shrink: 0;
+}
+
+.user-master-form-modal {
+  display: flex;
+  flex-direction: column;
+  margin: auto;
+  overflow: hidden;
+}
+
+.user-master-form-modal__form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.user-master-form-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0.45rem 0.65rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Left: modules ¬∑ Right: scrollable settings + fixed password box */
+.user-master-form-modal__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 0.55rem;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.user-master-form-modal__rights-panel {
+  border: 1px solid #c8d0dc;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 0.35rem 0.4rem;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.user-master-form-modal__details-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.user-master-form-modal__details-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.user-master-form-modal__bottom {
+  flex-shrink: 0;
+  border-top: 1px solid #cbd5e1;
+  background: #fff;
+}
+
+.user-master-form-modal__password-box {
+  flex-shrink: 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0;
+  border: none;
+  border-top: 3px solid #93c5fd;
+  background: #eff6ff;
+}
+
+.user-master-login-input,
+.user-master-form-modal .account-master-search-input.user-master-login-input {
+  text-transform: uppercase;
+}
+
+.user-master-form-modal__grid--settings .user-master-pw-field {
+  max-width: 12rem;
+}
+
+.user-master-form-modal__grid--settings .user-master-pw-field .form-input {
+  width: 11ch;
+  max-width: 100%;
+  min-width: 9ch;
+  box-sizing: border-box;
+}
+
+.user-master-password-input {
+  min-height: 2rem;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.88rem;
+}
+
+.user-master-reset-pw {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0.35rem;
+  cursor: pointer;
+}
+
+.user-master-reset-pw input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.user-master-module-access {
+  overflow: visible;
+}
+
+.user-master-form-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem 0.55rem;
+}
+
+.user-master-form-modal__grid--identity {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.user-master-form-modal__grid--settings {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.user-master-form-modal__details-scroll .item-master-field .sale-bill-field__label {
+  font-size: 0.72rem;
+}
+
+.user-master-form-modal__details-scroll .form-input {
+  padding: 0.28rem 0.4rem;
+  font-size: 0.82rem;
+}
+
+.user-master-form-modal__section-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.user-master-form-modal__rights-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.user-master-form-modal__rights-head .user-master-form-modal__section-title {
+  margin: 0;
+}
+
+.user-master-select-all-btn {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.user-rights-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.user-rights-table--compact {
+  font-size: 0.76rem;
+  line-height: 1.1;
+}
+
+.user-rights-table--compact th,
+.user-rights-table--compact td {
+  padding: 0.12rem 0.2rem;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+
+.user-rights-table--compact thead th {
+  background: #e8eef4;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-align: center;
+  color: #1e293b;
+}
+
+.user-rights-table__module-col {
+  width: 42%;
+  text-align: left !important;
+}
+
+.user-rights-table__bit-col {
+  width: 14.5%;
+}
+
+.user-rights-table__module {
+  font-weight: 500;
+  text-align: left;
+  font-size: 0.74rem;
+  line-height: 1.15;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.user-rights-table__bit {
+  text-align: center;
+}
+
+.user-rights-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin: 0;
+}
+
+.user-rights-check--compact input[type='checkbox'] {
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0;
+  cursor: pointer;
+}
+
+.user-rights-table__row:last-child td,
+.user-rights-table__row:last-child th {
+  border-bottom: none;
+}
+
+.user-master-form-modal__settings {
+  border-top: 1px solid #e8ecf0;
+  padding-top: 0.35rem;
+}
+
+.user-master-reset-pw {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  margin-bottom: 0.35rem;
+}
+
+.user-master-form-modal__foot {
+  flex-shrink: 0;
+  border-top: 1px solid #e2e8f0;
+  padding: 0.5rem 0.65rem;
+  margin: 0;
+  background: #fff;
+  box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.08);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  z-index: 2;
+}
+
+.user-master-screen__badge {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #0f766e;
+  font-weight: 600;
+  font-style: normal;
+}
+
+.user-master-admin-gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  padding: 1rem;
+}
+
+.user-master-admin-gate__card {
+  width: 100%;
+  max-width: 22rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+}
+
+.user-master-admin-gate__lead {
+  margin: 0.35rem 0 1rem;
+  font-size: 0.88rem;
+  color: #475569;
+}
+
+.user-master-admin-gate__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.user-master-admin-gate__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Compact header ‚Äî less empty space above list / module access */
+.slide-32-user-master.user-master-screen {
+  gap: 0.35rem;
+}
+
+.user-master-screen .account-master-screen__chrome {
+  gap: 0.2rem;
+}
+
+.slide-32-user-master.user-master-screen.item-master-screen .account-master-screen__head {
+  padding: 0.4rem 0.55rem;
+  gap: 0.28rem;
+}
+
+.slide-32-user-master.user-master-screen.item-master-screen .sale-bill-page__title {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.user-master-screen .company-info {
+  margin-bottom: 0;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.user-master-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.45rem;
+}
+
+.user-master-screen .session-info-line__main {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.user-master-screen .session-info-line__actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.slide-32-user-master.user-master-screen.item-master-screen .account-master-screen__toolbar {
+  margin-top: 0.15rem;
+  padding-top: 0.2rem;
+}
+
+/* Screen 1 ‚Äî mock layout: tabs + Users (left) + Module access (right, beige) */
+.user-master-screen__shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0%;
+  min-height: 0;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.user-master-screen__view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.user-master-screen__view-tab {
+  display: inline-block;
+  padding: 0.22rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+}
+
+.user-master-screen__view-tab.is-active {
+  color: #1e3a5f;
+  background: #fff;
+  border-color: #94a3b8;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.user-master-screen__main-panels {
+  display: flex;
+  flex-direction: row;
+  gap: 0.55rem;
+  flex: 1 1 0%;
+  min-height: 0;
+  width: 100%;
+  align-items: stretch;
+}
+
+.user-master-panel {
+  border: 1px solid #b8c4d4;
+  border-radius: 6px;
+  padding: 0.45rem 0.5rem 0.4rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.user-master-panel--users {
+  flex: 1 1 0%;
+  background: #fff;
+}
+
+.user-master-panel--access {
+  flex: 0 0 clamp(16rem, 40%, 28rem);
+  width: clamp(16rem, 40%, 28rem);
+  max-width: 28rem;
+  background: #f3efe6;
+  overflow: hidden;
+}
+
+.user-master-panel__head {
+  flex-shrink: 0;
+  margin-bottom: 0.25rem;
+}
+
+.user-master-panel__title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.user-master-panel__summary {
+  margin: 0.15rem 0 0;
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.user-master-panel__search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: flex-end;
+  flex-shrink: 0;
+  margin-bottom: 0.35rem;
+}
+
+.user-master-panel__search .account-master-filter--search {
+  flex: 1 1 10rem;
+  min-width: 0;
+  max-width: none;
+}
+
+.user-master-panel__foot-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.76rem;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.user-master-screen__list-wrap {
+  flex: 1 1 0%;
+  min-height: 8rem;
+  width: 100%;
+}
+
+.user-master-screen .account-master-table.user-master-table {
+  width: 100%;
+  min-width: 0;
+}
+
+.user-master-screen__access-matrix {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.user-master-screen__access-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+  flex-shrink: 0;
+}
+
+.user-master-screen__access-badge {
+  margin: 0 0 0.25rem;
+  padding: 0.22rem 0.5rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #1e40af;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.user-master-screen__access-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.user-master-screen__edit-btn {
+  margin-top: 0.25rem;
+  align-self: flex-start;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.5rem;
+}
+
+/* ‚Äî‚Äî User Master: mobile + narrow screens ‚Äî‚Äî */
+.app--mobile .slide-32-user-master.user-master-screen,
+.app--mobile .slide-32-user-master.item-master-screen {
+  height: auto;
+  max-height: none;
+  min-height: calc(100dvh - 1.5rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app--mobile .user-master-screen__view-tabs {
+  display: none;
+}
+
+.app--mobile .user-master-screen__shell {
+  flex: none;
+  min-height: 0;
+  overflow: visible;
+}
+
+.app--mobile .user-master-screen__main-panels {
+  flex-direction: column;
+  flex: none;
+  min-height: 0;
+  overflow: visible;
+  width: 100%;
+}
+
+.app--mobile .user-master-panel--users {
+  flex: 0 0 auto;
+  max-height: none;
+  min-height: 0;
+  width: 100%;
+}
+
+.app--mobile .user-master-screen__list-wrap {
+  flex: 0 1 auto;
+  min-height: 10rem;
+  max-height: min(48dvh, 420px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app--mobile .user-master-panel--access {
+  flex: 0 0 auto;
+  min-height: 12rem;
+  width: 100%;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-top: 0.35rem;
+}
+
+.app--mobile .user-master-screen__access-matrix {
+  flex: 1 1 auto;
+  min-height: 8rem;
+  max-height: min(42dvh, 360px);
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app--mobile .user-master-screen__access-matrix .user-rights-table--compact {
+  min-width: 17.5rem;
+}
+
+.app--mobile .user-master-screen__edit-btn {
+  width: 100%;
+  text-align: center;
+  padding: 0.45rem 0.65rem;
+  margin-top: 0.35rem;
+}
+
+.user-master-screen .item-master-screen__tip:not(.user-master-screen__badge) {
+  display: none;
+}
+
+.user-master-screen__mobile-hint {
+  display: none;
+  margin: 0;
+  font-size: 0.78rem;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.app--mobile .user-master-screen__mobile-hint {
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .user-master-screen__mobile-hint {
+    display: block;
+  }
+}
+
+/* Edit dialog ‚Äî full-height sheet, modules then settings, sticky buttons */
+.app--mobile .user-master-modal-backdrop {
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+.app--mobile .user-master-form-modal--vfp-layout {
+  width: 100%;
+  max-width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  border-radius: 0;
+}
+
+.app--mobile .user-master-form-modal__form {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.app--mobile .user-master-form-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.4rem 0.5rem 0;
+}
+
+.app--mobile .user-master-form-modal__layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  overflow: visible;
+  flex: none;
+}
+
+.app--mobile .user-master-form-modal__rights-panel {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.35rem;
+  overflow: visible;
+}
+
+.app--mobile .user-master-form-modal__details-panel {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.app--mobile .user-master-form-modal__details-scroll {
+  overflow: visible;
+  flex: none;
+}
+
+.app--mobile .user-master-form-modal__bottom {
+  flex-shrink: 0;
+}
+
+.app--mobile .user-master-form-modal__password-box {
+  padding: 0.5rem 0.55rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.app--mobile .user-rights-table--compact {
+  font-size: 0.72rem;
+}
+
+.app--mobile .user-rights-table__module {
+  font-size: 0.68rem;
+}
+
+.app--mobile .user-master-form-modal__grid,
+.app--mobile .user-master-form-modal__grid--identity {
+  grid-template-columns: 1fr;
+}
+
+.app--mobile .user-master-form-modal__grid--settings {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app--mobile .user-master-form-modal__foot {
+  flex-shrink: 0;
+  padding: 0.55rem 0.5rem calc(0.55rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Phones in landscape / narrow width even if app--desktop */
+@media (max-width: 900px) {
+  .slide-32-user-master.user-master-screen {
+    height: auto;
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .account-master-screen__filters {
+  .user-master-screen__view-tabs {
+    display: none;
+  }
+
+  .user-master-screen__main-panels {
     flex-direction: column;
-    align-items: stretch;
   }
 
-  .account-master-filter,
-  .account-master-filter--search {
+  .user-master-panel--users {
+    flex: 0 0 auto;
+    max-height: none;
+  }
+
+  .user-master-screen__list-wrap {
+    min-height: 10rem;
+    max-height: min(48dvh, 420px);
+  }
+
+  .user-master-panel--access {
+    flex: 0 0 auto;
+    min-height: 12rem;
+    width: 100%;
     max-width: none;
+  }
+
+  .user-master-screen__access-matrix {
+    max-height: min(42dvh, 360px);
+    overflow-y: auto;
+  }
+
+  .user-master-modal-backdrop {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .user-master-form-modal--vfp-layout {
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .user-master-form-modal__layout {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.master-slide-error {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 12rem;
+  background: var(--bg-color, #f8fafc);
+}
+
+.app--mobile .account-master-screen__chrome {
+  flex-shrink: 0;
+  max-height: none;
+  overflow: visible;
+  gap: 0.35rem;
+}
+
+.app--mobile .account-master-screen__filters {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  background: var(--bg-color, #f8fafc);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+}
+
+.app--mobile .account-master-screen__err {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.app--mobile .account-master-screen__list-wrap,
+.app--mobile .item-master-screen__list-wrap {
+  flex: 1 1 auto;
+  min-height: 8rem;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.app--mobile .account-master-table {
+  min-width: 28rem;
+}
+
+.app--mobile .item-master-table {
+  min-width: 32rem;
+}
+
+.app--mobile .account-master-screen__hint,
+.app--mobile .item-master-screen__hint {
+  flex-shrink: 0;
+}
+
+/* Mobile master toolbar: gfasToolbar.css */
+
+.app--mobile .account-master-screen__filters {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  padding: 0.5rem 0.55rem;
+}
+
+.app--mobile .account-master-filter,
+.app--mobile .account-master-filter--search {
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  width: 100%;
+}
+
+.app--mobile .account-master-filter .form-input,
+.app--mobile .account-master-filter .master-party-pick__trigger {
+  min-height: 2.35rem;
+}
+
+.app--mobile .account-master-filter-btn {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.app--mobile .item-master-screen .account-master-screen__head {
+  padding: 0.55rem 0.65rem;
+}
+
+.app--mobile .item-master-screen .account-master-screen__filters {
+  padding: 0.45rem 0.55rem;
+}
+
+.app--mobile .item-master-screen__hint {
+  margin-left: 0;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.app--mobile .item-master-screen__tip {
+  margin-left: 0;
+  width: 100%;
+}
+
+/* Master placeholder (Slide 28) ? pending VFP ports */
+.slide-28-master-placeholder.master-placeholder-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: min(640px, 100%);
+  width: 100%;
+}
+
+.master-placeholder-screen__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.master-placeholder-screen__card {
+  padding: 1rem 1.15rem;
+  border: 1px solid #dbe4ef;
+  border-radius: 10px;
+  background: linear-gradient(165deg, #f8fafc 0%, #fff 100%);
+}
+
+.master-placeholder-screen__badge {
+  display: inline-block;
+  margin: 0 0 0.65rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1e40af;
+  background: #dbeafe;
+  border-radius: 4px;
+}
+
+.master-placeholder-screen__lead {
+  margin: 0 0 1rem;
+  color: #334155;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.master-placeholder-screen__meta {
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.master-placeholder-screen__meta dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.master-placeholder-screen__meta dd {
+  margin: 0.2rem 0 0;
+  color: #0f172a;
+}
+
+.master-placeholder-screen__files {
+  margin: 0.25rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.master-placeholder-screen__files code {
+  font-size: 0.88rem;
+}
+
+.master-placeholder-screen__hint {
+  margin: 1rem 0 0;
+  font-size: 0.88rem;
+  color: #64748b;
+}
+
+.master-placeholder-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.schedule-master-screen__breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+  font-size: 0.88rem;
+  color: #334155;
+}
+
+.schedule-master-screen__breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.schedule-master-screen__breadcrumb-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.schedule-master-screen__breadcrumb-hint--main {
+  padding: 0 0.15rem;
+}
+
+.schedule-master-table--all .schedule-master-table__row--main td {
+  font-weight: 600;
+  background: #e8eef5;
+}
+
+.schedule-master-table--all .schedule-master-table__row--main:hover td {
+  background: #dde4ed;
+}
+
+.schedule-master-table--all .schedule-master-table__row--main.is-selected td {
+  background: linear-gradient(90deg, #c7daf5 0%, #e0ecff 100%);
+}
+
+.schedule-master-table--all .schedule-master-table__row--sub .schedule-master-table__no {
+  padding-left: 1rem;
+  color: #475569;
+}
+
+.cat-mast-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 22rem;
+}
+
+.cat-mast-table {
+  min-width: 20rem;
+}
+
+.schedule-master-modal__parent {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+/* User Password (Slide 35) ‚Äî VFP DO FORM PASSWORD */
+.slide-35-user-password.user-password-screen {
+  gap: 0.25rem;
+}
+
+.user-password-screen .account-master-screen__chrome {
+  gap: 0.15rem;
+}
+
+.slide-35-user-password.user-password-screen.item-master-screen .account-master-screen__head {
+  padding: 0.35rem 0.5rem;
+  gap: 0.22rem;
+}
+
+.slide-35-user-password.user-password-screen.item-master-screen .sale-bill-page__title {
+  font-size: 1.1rem;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.user-password-screen .company-info {
+  margin-bottom: 0;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.user-password-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+}
+
+.user-password-screen .session-info-line__main {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.user-password-screen .session-info-line__actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.slide-35-user-password.user-password-screen.item-master-screen .account-master-screen__toolbar {
+  margin-top: 0.1rem;
+  padding-top: 0.15rem;
+}
+
+.slide-35-user-password .account-master-screen__err {
+  margin: 0;
+  padding: 0.2rem 0.45rem;
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.user-password-screen__tip {
+  display: none;
+}
+
+.user-password-screen__body {
+  display: flex;
+  flex-direction: row;
+  gap: 0.55rem;
+  flex: 1 1 0%;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.user-password-screen__users,
+.user-password-screen__form-panel {
+  border: 1px solid #b8c4d4;
+  border-radius: 6px;
+  padding: 0.45rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.user-password-screen__users {
+  flex: 1 1 0%;
+  background: #fff;
+}
+
+.user-password-screen__form-panel {
+  flex: 0 0 min(22rem, 42%);
+  max-width: 22rem;
+  background: #f8fafc;
+}
+
+.user-password-screen__section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.user-password-screen__search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: flex-end;
+  margin-bottom: 0.35rem;
+}
+
+.user-password-screen__list-wrap {
+  flex: 1 1 0%;
+  min-height: 10rem;
+  overflow: auto;
+}
+
+.user-password-screen__selected {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  color: #1e40af;
+}
+
+.user-password-screen__hint,
+.user-password-screen__note {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.user-password-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.user-password-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.app--mobile .slide-35-user-password.user-password-screen.item-master-screen .account-master-screen__head {
+  padding: 0.3rem 0.45rem;
+  gap: 0.18rem;
+}
+
+.app--mobile .user-password-screen__body {
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.app--mobile .user-password-screen__form-panel {
+  flex: 0 0 auto;
+  max-width: none;
+  width: 100%;
+}
+
+.app--mobile .user-password-screen__list-wrap {
+  max-height: min(36dvh, 240px);
+  min-height: 6rem;
+}
+
+.app--fas-flow.app--mobile .app-main .slide.slide-35-user-password.user-password-screen {
+  flex: 1 1 auto;
+  min-height: calc(100dvh - 1.5rem);
+  height: auto;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bikri Exp (Slide 36) ‚Äî VFP DO FORM BIKEXP */
+.slide-36-bikri-exp.bikri-exp-screen {
+  gap: 0.2rem;
+}
+
+.bikri-exp-screen .account-master-screen__chrome {
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+
+.slide-36-bikri-exp.bikri-exp-screen.item-master-screen .account-master-screen__head {
+  padding: 0.3rem 0.45rem;
+  gap: 0.15rem;
+}
+
+.slide-36-bikri-exp.bikri-exp-screen.item-master-screen .sale-bill-page__title {
+  font-size: 1.1rem;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.bikri-exp-screen .company-info {
+  margin-bottom: 0;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.78rem;
+}
+
+.bikri-exp-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.35rem;
+}
+
+.bikri-exp-screen .session-info-line__main {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.bikri-exp-screen .session-info-line__actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.bikri-exp-screen__toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.35rem;
+}
+
+.bikri-exp-screen__toolbar-row .account-master-screen__toolbar {
+  margin: 0;
+  padding: 0;
+  border-top: none;
+}
+
+.bikri-exp-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  margin-left: auto;
+}
+
+.bikri-exp-screen__actions .btn {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+  min-height: 1.75rem;
+}
+
+.bikri-exp-screen__filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: flex-end;
+  margin-top: 0;
+}
+
+.bikri-exp-screen__filter .account-master-filter {
+  min-width: 8rem;
+  max-width: 12rem;
+}
+
+.bikri-exp-screen__badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #0f766e;
+}
+
+.slide-36-bikri-exp .account-master-screen__err {
+  margin: 0;
+  padding: 0.15rem 0.4rem;
+  flex-shrink: 0;
+}
+
+.bikri-exp-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #b8c4d4;
+  border-radius: 6px;
+  background: #fff;
+  margin-top: 0;
+}
+
+.bikri-exp-grid {
+  width: 100%;
+  min-width: 52rem;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.bikri-exp-grid th,
+.bikri-exp-grid td {
+  padding: 0.2rem 0.35rem;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+
+.bikri-exp-grid thead th {
+  background: #f1f5f9;
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.bikri-exp-grid th.bikri-exp-grid__num-col,
+.bikri-exp-grid td.bikri-exp-grid__num-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.bikri-exp-grid__label-col {
+  min-width: 7.5rem;
+  text-align: left;
+}
+
+.bikri-exp-grid tbody th[scope='row'] {
+  font-weight: 600;
+  color: #334155;
+  background: #fafbfc;
+}
+
+.bikri-exp-grid__num {
+  width: 4.5rem;
+  min-width: 3.5rem;
+  max-width: 100%;
+  padding: 0.2rem 0.3rem;
+  font-size: 0.78rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.bikri-exp-grid__sub-amt .bikri-exp-grid__num {
+  margin-left: auto;
+}
+
+.bikri-exp-grid__code-col {
+  min-width: 9rem;
+}
+
+.bikri-exp-grid__name-col {
+  min-width: 8rem;
+}
+
+.bikri-exp-grid__code-cell .master-party-pick {
+  max-width: 9rem;
+}
+
+.bikri-exp-grid__code-cell .master-party-pick__trigger {
+  min-height: 1.85rem;
+  font-size: 0.76rem;
+}
+
+.bikri-exp-grid__ac-name {
+  display: none;
+}
+
+.bikri-exp-grid__sub-amt {
+  margin-top: 0.2rem;
+}
+
+.bikri-exp-grid__sub-amt .sale-bill-field__label {
+  font-size: 0.68rem;
+}
+
+/* Godown Rent (Slide 37) ‚Äî VFP DO GODRENT */
+.slide-37-godown-rent.godown-rent-screen {
+  gap: 0.2rem;
+}
+
+.godown-rent-screen .account-master-screen__chrome {
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+
+.slide-37-godown-rent.godown-rent-screen.item-master-screen .account-master-screen__head {
+  padding: 0.3rem 0.45rem;
+  gap: 0.15rem;
+}
+
+.slide-37-godown-rent.godown-rent-screen.item-master-screen .sale-bill-page__title {
+  font-size: 1.1rem;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.godown-rent-screen__toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.35rem;
+}
+
+.godown-rent-screen__toolbar-row .account-master-screen__toolbar {
+  margin: 0;
+  padding: 0;
+  border-top: none;
+}
+
+.godown-rent-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  margin-left: auto;
+}
+
+.godown-rent-screen__actions .btn {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+  min-height: 1.75rem;
+}
+
+.godown-rent-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #b8c4d4;
+  border-radius: 6px;
+  background: #fff;
+  margin-top: 0.15rem;
+}
+
+.godown-rent-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.godown-rent-grid th,
+.godown-rent-grid td {
+  border: 1px solid #d8e0ea;
+  padding: 0.2rem 0.35rem;
+}
+
+.godown-rent-grid thead th {
+  background: #e8eef5;
+  font-weight: 600;
+  text-align: center;
+}
+
+.godown-rent-grid__num-cell {
+  text-align: right;
+}
+
+.godown-rent-grid__input {
+  width: 100%;
+  min-width: 4rem;
+  text-align: right;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.82rem;
+}
+
+.godown-rent-grid__act-col,
+.godown-rent-grid__act-cell {
+  width: 2.5rem;
+  text-align: center;
+}
+
+.godown-rent-grid__del {
+  padding: 0.1rem 0.4rem;
+  min-height: 1.5rem;
+}
+
+/* Holiday Master (Slide 41) ‚Äî VFP DO HOLIDAY */
+.slide-41-holiday.holiday-screen {
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.holiday-screen .account-master-screen__chrome {
+  gap: 0.15rem;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 52rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.slide-41-holiday.holiday-screen.item-master-screen .account-master-screen__head {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+}
+
+.slide-41-holiday.holiday-screen.item-master-screen .sale-bill-page__title {
+  font-size: 1.1rem;
+  line-height: 1.2;
+  margin: 0;
+  text-align: center;
+  width: 100%;
+}
+
+.holiday-screen__head-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.holiday-screen__head-bar .sale-bill-page__title {
+  flex: 0 0 auto;
+}
+
+.holiday-screen__head-bar .account-master-screen__toolbar {
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  border-top: none;
+  max-height: none;
+}
+
+.holiday-screen .holiday-screen__session-line.company-info,
+.holiday-screen .session-info-line .company-info {
+  margin: 0;
+  padding: 0.22rem 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  border-radius: 4px;
+}
+
+.holiday-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.holiday-screen .session-info-line__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.holiday-screen .session-info-line__actions {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.holiday-screen .session-info-line__actions .btn-report-help,
+.holiday-screen .session-info-line__actions .toolbar-icon-btn,
+.holiday-screen .session-info-line__actions .voice-command-btn {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.holiday-screen .session-info-line__actions .btn-report-help__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.holiday-screen__body {
+  width: 100%;
+  max-width: 26rem;
+  margin-left: auto;
+  margin-right: auto;
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.holiday-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  text-align: center;
+}
+
+.holiday-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 12rem;
+  max-height: min(60vh, 28rem);
+  overflow: auto;
+  border: 1px solid #b8c4d4;
+  border-radius: 8px;
+  background: #fff;
+  width: 100%;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.holiday-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.holiday-grid th,
+.holiday-grid td {
+  border: 1px solid #d8e0ea;
+  padding: 0.25rem 0.4rem;
+}
+
+.holiday-grid thead th {
+  background: #e8eef5;
+  font-weight: 600;
+  text-align: left;
+}
+
+.holiday-grid__date-cell {
+  width: 100%;
+}
+
+.holiday-grid__input {
+  width: 100%;
+  min-width: 10rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.82rem;
+}
+
+.holiday-grid__act-col,
+.holiday-grid__act-cell {
+  width: 2.5rem;
+  text-align: center;
+}
+
+.holiday-grid__del {
+  padding: 0.1rem 0.4rem;
+  min-height: 1.5rem;
+  line-height: 1;
+}
+
+.app--mobile .holiday-screen .account-master-screen__chrome,
+.app--mobile .holiday-screen__body {
+  max-width: 100%;
+}
+
+.app--mobile .holiday-screen__head-bar .account-master-screen__toolbar {
+  justify-content: flex-start;
+}
+
+/* Dane Master (Slide 42) ‚Äî VFP DO DANE */
+.slide-42-dane.dane-screen {
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.dane-screen .account-master-screen__chrome {
+  gap: 0.15rem;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.slide-42-dane.dane-screen.item-master-screen .account-master-screen__head {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+}
+
+.slide-42-dane.dane-screen.item-master-screen .sale-bill-page__title {
+  font-size: 1.1rem;
+  line-height: 1.2;
+  margin: 0;
+  text-align: center;
+  width: 100%;
+}
+
+.dane-screen__head-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.dane-screen__head-bar .account-master-screen__toolbar {
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  border-top: none;
+  max-height: none;
+}
+
+.dane-screen .dane-screen__session-line.company-info,
+.dane-screen .session-info-line .company-info {
+  margin: 0;
+  padding: 0.22rem 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  border-radius: 4px;
+}
+
+.dane-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.dane-screen .session-info-line__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dane-screen .session-info-line__actions {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.dane-screen .session-info-line__actions .btn-report-help,
+.dane-screen .session-info-line__actions .toolbar-icon-btn,
+.dane-screen .session-info-line__actions .voice-command-btn {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.dane-screen .session-info-line__actions .btn-report-help__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.dane-screen__body {
+  width: 100%;
+  max-width: 40rem;
+  margin-left: auto;
+  margin-right: auto;
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dane-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  text-align: center;
+}
+
+.dane-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 12rem;
+  max-height: min(60vh, 28rem);
+  overflow: auto;
+  border: 1px solid #b8c4d4;
+  border-radius: 8px;
+  background: #fff;
+  width: 100%;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.dane-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.dane-grid th,
+.dane-grid td {
+  border: 1px solid #d8e0ea;
+  padding: 0.2rem 0.3rem;
+}
+
+.dane-grid thead th {
+  background: #e8eef5;
+  font-weight: 600;
+  text-align: center;
+  font-size: 0.78rem;
+}
+
+.dane-grid__code-cell {
+  width: 3rem;
+  text-align: center;
+}
+
+.dane-grid__num-cell {
+  text-align: right;
+}
+
+.dane-grid__input {
+  width: 100%;
+  min-width: 3.5rem;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.82rem;
+}
+
+.dane-grid__input--code {
+  min-width: 2rem;
+  max-width: 2.5rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.dane-grid__act-col,
+.dane-grid__act-cell {
+  width: 2.5rem;
+  text-align: center;
+}
+
+.dane-grid__del {
+  padding: 0.1rem 0.4rem;
+  min-height: 1.5rem;
+  line-height: 1;
+}
+
+.app--mobile .dane-screen .account-master-screen__chrome,
+.app--mobile .dane-screen__body {
+  max-width: 100%;
+}
+
+.app--mobile .dane-screen__head-bar .account-master-screen__toolbar {
+  justify-content: flex-start;
+}
+
+/* Marka Master (Slide 43) ‚Äî VFP DO FORM MARKA; layout like Cost Centre */
+.slide-43-marka.marka-screen.cost-mast-screen {
+  padding: 0.35rem 0.5rem 0.45rem;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.slide-43-marka.marka-screen .account-master-screen__chrome {
+  gap: 0.28rem;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+}
+
+.slide-43-marka.marka-screen.item-master-screen .account-master-screen__head {
+  padding: 0.35rem 0.45rem;
+  gap: 0.28rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+}
+
+.slide-43-marka.marka-screen.item-master-screen .sale-bill-page__title {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  text-align: left;
+  width: auto;
+  color: #1e3a5f;
+}
+
+.slide-43-marka.marka-screen .account-master-screen__toolbar {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  max-height: 28px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.marka-screen__head-bar.cost-mast-screen__head-bar .account-master-screen__toolbar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.marka-screen .marka-screen__session-line.company-info,
+.marka-screen .session-info-line .company-info {
+  margin: 0;
+  padding: 0.22rem 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  border-radius: 4px;
+}
+
+.marka-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.marka-screen .session-info-line__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.marka-screen .session-info-line__actions {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.marka-screen .session-info-line__actions .fas-flow-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.marka-screen .session-info-line__actions .btn-report-help,
+.marka-screen .session-info-line__actions .toolbar-icon-btn,
+.marka-screen .session-info-line__actions .voice-command-btn {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  flex-shrink: 0;
+  position: static;
+}
+
+.marka-screen .session-info-line__actions .btn-report-help__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.marka-screen__body {
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow: hidden;
+}
+
+.marka-screen__err {
+  margin: 0;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.82rem;
+}
+
+.marka-screen__mode-hint {
+  margin: 0;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.8rem;
+  color: #8a4b00;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 4px;
+}
+
+.marka-screen__form {
+  display: grid;
+  grid-template-columns: minmax(12rem, 2fr) repeat(3, minmax(5.5rem, 1fr));
+  gap: 0.35rem 0.5rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  align-items: end;
+}
+
+.marka-screen__field {
+  margin: 0;
+  min-width: 0;
+}
+
+.marka-screen__field .sale-bill-field__label {
+  font-size: 0.72rem;
+  margin-bottom: 0.12rem;
+}
+
+.marka-screen__field--marka {
+  grid-column: auto;
+}
+
+.marka-screen__marka-row {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.marka-screen__marka-row .form-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 1.85rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.85rem;
+}
+
+.marka-screen__find-btn.gfas-toolbar-btn {
+  flex: 0 0 auto;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+.marka-screen__field .form-input {
+  min-height: 1.85rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.85rem;
+}
+
+.marka-screen__input--num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.marka-screen__filters.account-master-screen__filters {
+  margin: 0;
+  padding: 0.2rem 0.35rem;
+  gap: 0.35rem;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.marka-screen__filters .account-master-filter--search {
+  margin: 0;
+  min-width: 0;
+  max-width: none;
+  flex: 1 1 12rem;
+}
+
+.marka-screen__filters .sale-bill-field__label {
+  margin-bottom: 0.1rem;
+  font-size: 0.7rem;
+}
+
+.marka-screen__filters .account-master-search-input {
+  min-height: 1.65rem;
+  padding: 0.15rem 0.38rem;
+  font-size: 0.82rem;
+}
+
+/* Search list (help browser) ‚Äî capped height; do not grow to fill screen */
+.marka-screen__grid-wrap.account-master-screen__list-wrap {
+  flex: 0 1 auto;
+  min-height: 2.75rem;
+  max-height: min(24vh, 9.5rem);
+  overflow: auto;
+}
+
+.marka-grid {
+  min-width: 28rem;
+  font-size: 0.82rem;
+}
+
+.marka-screen .marka-grid th,
+.marka-screen .marka-grid td {
+  padding: 0.2rem 0.4rem;
+}
+
+.marka-screen .account-master-table__empty {
+  padding: 0.5rem !important;
+  font-size: 0.8rem;
+}
+
+.marka-grid th.num,
+.marka-grid td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.marka-screen__hint {
+  margin: 0;
+  padding: 0.22rem 0.4rem;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+}
+
+@media (max-width: 900px) {
+  .marka-screen__form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .marka-screen__field--marka {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .marka-screen__head-bar.cost-mast-screen__head-bar {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .marka-screen__head-bar .sale-bill-page__title {
+    flex: 1 1 100%;
+  }
+
+  .marka-screen__head-bar .account-master-screen__toolbar {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    max-height: none;
+  }
+
+  .marka-screen .session-info-line--with-actions {
+    flex-wrap: wrap;
+  }
+
+  .marka-screen .session-info-line__actions {
+    margin-left: auto;
+  }
+
+  .marka-screen__form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Purchase Exp Master (Slide 44) ‚Äî VFP DO FORM PUREXP / PUREXP */
+.slide-44-pur-exp.pur-exp-screen.cost-mast-screen {
+  padding: 0.35rem 0.5rem 0.45rem;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.slide-44-pur-exp.pur-exp-screen .account-master-screen__chrome {
+  gap: 0.28rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+.slide-44-pur-exp.pur-exp-screen.item-master-screen .account-master-screen__head {
+  padding: 0.35rem 0.45rem;
+  gap: 0.28rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+}
+
+.slide-44-pur-exp.pur-exp-screen.item-master-screen .sale-bill-page__title {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  text-align: left;
+  color: #1e3a5f;
+}
+
+.slide-44-pur-exp.pur-exp-screen .account-master-screen__toolbar {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  max-height: 28px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.pur-exp-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.pur-exp-screen .session-info-line__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pur-exp-screen .session-info-line__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.pur-exp-screen .session-info-line__actions .btn-report-help,
+.pur-exp-screen .session-info-line__actions .toolbar-icon-btn,
+.pur-exp-screen .session-info-line__actions .voice-command-btn {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.pur-exp-screen .session-info-line__actions .btn-report-help__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.pur-exp-screen__body {
+  width: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow: hidden;
+}
+
+.pur-exp-screen__err {
+  margin: 0;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.82rem;
+}
+
+.pur-exp-screen__hint {
+  margin: 0;
+  padding: 0.22rem 0.4rem;
+  font-size: 0.78rem;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+}
+
+.pur-exp-screen__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.4rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.pur-exp-screen__row-actions .gfas-toolbar-btn {
+  min-height: 28px;
+}
+
+.pur-exp-grid__code-cell .master-party-pick {
+  width: 100%;
+  max-width: 11rem;
+  min-width: 7rem;
+}
+
+.pur-exp-grid__code-cell .master-party-pick__trigger {
+  min-height: 1.85rem;
+  font-size: 0.76rem;
+}
+
+.pur-exp-grid__code-wrap {
+  min-width: 7rem;
+}
+
+.pur-exp-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 8rem;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.pur-exp-grid {
+  min-width: 36rem;
+}
+
+.pur-exp-grid th.num,
+.pur-exp-grid td.num {
+  text-align: right;
+}
+
+.pur-exp-grid__cal-cell {
+  width: 7.5rem;
+}
+
+.pur-exp-grid__cal-select {
+  min-width: 6.5rem;
+  padding: 0.15rem 0.25rem;
+}
+
+.pur-exp-grid__name-col {
+  min-width: 8rem;
+}
+
+.pur-exp-grid__name-cell {
+  font-size: 0.82rem;
+  color: #334155;
+  vertical-align: middle;
+  padding: 0.2rem 0.35rem;
+}
+
+@media (max-width: 768px) {
+  .pur-exp-screen__head-bar .account-master-screen__toolbar {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    max-height: none;
+  }
+}
+
+/* Sale Bill Condition (Slide 45) ‚Äî VFP DO SALECOND / SALE_COND */
+.slide-45-sale-cond.sale-cond-screen.cost-mast-screen {
+  padding: 0.35rem 0.5rem 0.45rem;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.slide-45-sale-cond.sale-cond-screen .account-master-screen__chrome {
+  gap: 0.28rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+.slide-45-sale-cond.sale-cond-screen.item-master-screen .account-master-screen__head {
+  padding: 0.35rem 0.45rem;
+  gap: 0.28rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+}
+
+.slide-45-sale-cond.sale-cond-screen.item-master-screen .sale-bill-page__title {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  text-align: left;
+  color: #1e3a5f;
+}
+
+.slide-45-sale-cond.sale-cond-screen .account-master-screen__toolbar {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  max-height: 28px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.sale-cond-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.sale-cond-screen__body {
+  width: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow: hidden;
+}
+
+.sale-cond-screen__err {
+  margin: 0;
+}
+
+.sale-cond-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #4b5563;
+  line-height: 1.35;
+}
+
+.sale-cond-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.sale-cond-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sale-cond-grid__no-col {
+  width: 2.5rem;
+}
+
+.sale-cond-grid__no-cell {
+  text-align: center;
+  color: #64748b;
+  font-weight: 600;
+  vertical-align: top;
+  padding: 0.35rem 0.25rem;
+}
+
+.sale-cond-grid__cond-cell {
+  padding: 0.2rem 0.35rem;
+}
+
+.sale-cond-grid__cond-input {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Location Wise BType (Slide 46) ‚Äî VFP DO LOC_B_TYPE / LOC_B_TYPE */
+.slide-46-loc-btype.loc-btype-screen.cost-mast-screen {
+  padding: 0.35rem 0.5rem 0.45rem;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.slide-46-loc-btype.loc-btype-screen .account-master-screen__chrome {
+  gap: 0.28rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+.slide-46-loc-btype.loc-btype-screen.item-master-screen .account-master-screen__head {
+  padding: 0.35rem 0.45rem;
+  gap: 0.28rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+}
+
+.slide-46-loc-btype.loc-btype-screen.item-master-screen .sale-bill-page__title {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  text-align: left;
+  color: #1e3a5f;
+}
+
+.slide-46-loc-btype.loc-btype-screen .account-master-screen__toolbar {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  max-height: 28px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.loc-btype-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.loc-btype-screen__body {
+  width: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow: hidden;
+}
+
+.loc-btype-screen__err {
+  margin: 0;
+}
+
+.loc-btype-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #4b5563;
+  line-height: 1.35;
+}
+
+.loc-btype-screen__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.loc-btype-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 8rem;
+  max-height: min(50vh, 22rem);
+  overflow: auto;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.loc-btype-grid__btype-col,
+.loc-btype-grid__fin-col {
+  width: 4.5rem;
+}
+
+.loc-btype-grid__fin-cell .dane-grid__input--code {
+  text-align: center;
+}
+
+/* Detail Master (Slide 47) ‚Äî VFP DO FORM DETAIL / DETAIL_MASTER */
+.slide-47-detail-mast.detail-mast-screen.cost-mast-screen {
+  padding: 0.35rem 0.5rem 0.45rem;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.slide-47-detail-mast.detail-mast-screen .account-master-screen__head {
+  padding: 0.35rem 0.45rem;
+  gap: 0.28rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+}
+
+.detail-mast-screen__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.detail-mast-screen__form {
+  display: grid;
+  grid-template-columns: 5rem minmax(8rem, 1fr) minmax(10rem, 2fr);
+  gap: 0.35rem 0.5rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  align-items: end;
+}
+
+.detail-mast-screen__field {
+  margin: 0;
+  min-width: 0;
+}
+
+.detail-mast-screen__field .sale-bill-field__label {
+  font-size: 0.72rem;
+  margin-bottom: 0.12rem;
+}
+
+.detail-mast-screen__code-wrap .master-party-pick {
+  width: 100%;
+}
+
+.detail-mast-screen__mode-hint {
+  margin: 0;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.8rem;
+  color: #8a4b00;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 4px;
+}
+
+.detail-mast-screen__grid-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.detail-mast-screen__grid-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.detail-mast-grid__row.is-selected td {
+  background: #eff6ff;
+}
+
+.detail-mast-screen__grid-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.detail-mast-screen__grid-wrap {
+  flex: 0 1 auto;
+  max-height: min(28vh, 12rem);
+  overflow: auto;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.detail-mast-grid__trn-col {
+  width: 4.5rem;
+}
+
+.detail-mast-screen__filters.account-master-screen__filters {
+  padding: 0.2rem 0.35rem;
+  margin: 0;
+}
+
+.detail-mast-screen__list-wrap.account-master-screen__list-wrap {
+  flex: 1 1 0%;
+  min-height: 6rem;
+  max-height: min(32vh, 14rem);
+}
+
+.detail-mast-list-grid__detail {
+  white-space: normal;
+  max-width: 24rem;
+}
+
+@media (max-width: 900px) {
+  .detail-mast-screen__form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .detail-mast-screen__field--sno {
+    grid-column: 1 / -1;
+  }
+
+  .detail-mast-screen__field--name {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Opening Bills Detail (Slide 54) ‚Äî VFP DO FORM OPDET */
+.slide-54-opdet.opdet-screen.detail-mast-screen.cost-mast-screen {
+  padding: 0.35rem 0.5rem 0.45rem;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.slide-54-opdet.opdet-screen.detail-mast-screen .account-master-screen__head {
+  padding: 0.35rem 0.45rem;
+  gap: 0.28rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+}
+
+.opdet-screen__form {
+  grid-template-columns:
+    4.5rem minmax(7rem, 1fr) minmax(9rem, 1.4fr)
+    minmax(7rem, 1fr) minmax(9rem, 1.4fr)
+    minmax(10.5rem, 1.15fr) minmax(6rem, 0.8fr) minmax(10.5rem, 1.15fr) minmax(4rem, 0.6fr) minmax(8rem, 1fr);
+  gap: 0.35rem 0.45rem;
+}
+
+.opdet-screen__field--billdate,
+.opdet-screen__field--vdate {
+  min-width: 10.5rem;
+}
+
+.opdet-screen__date-input {
+  min-width: 10.5rem;
+  width: 100%;
+}
+
+.opdet-grid__date-col {
+  width: 11rem;
+  min-width: 11rem;
+}
+
+.opdet-grid input[type='date'].opdet-screen__date-input {
+  min-width: 10.5rem;
+}
+
+.opdet-grid__amt-col {
+  width: 7rem;
+}
+
+.opdet-grid__amt-input {
+  text-align: right;
+}
+
+.opdet-list-grid th,
+.opdet-list-grid td {
+  font-size: 0.78rem;
+}
+
+.opdet-bills-summary {
+  margin: 0.15rem 0 0.25rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  background: #eff6ff;
+}
+
+.opdet-bills-summary__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.3rem;
+}
+
+.opdet-bills-summary__title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1e40af;
+}
+
+.opdet-bills-summary__hint {
+  font-size: 0.72rem;
+  color: #475569;
+}
+
+.opdet-bills-summary__grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  background: #fff;
+}
+
+.opdet-bills-summary__grid th,
+.opdet-bills-summary__grid td {
+  border: 1px solid #cbd5e1;
+  padding: 0.28rem 0.45rem;
+}
+
+.opdet-bills-summary__grid th {
+  background: #f1f5f9;
+  text-align: left;
+}
+
+.opdet-bills-summary__grid th.num,
+.opdet-bills-summary__grid td.num {
+  text-align: right;
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+@media (max-width: 1100px) {
+  .opdet-screen__form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .opdet-screen__field--sno {
+    grid-column: 1 / -1;
+  }
+
+  .opdet-screen__field--name,
+  .opdet-screen__field--bname {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Interest Transfer (Slide 55) ‚Äî VFP DO FORM INTTRF ‚Äî single-screen layout */
+.slide-55-inttrf.inttrf-screen.detail-mast-screen,
+.slide-57-square.square-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.2rem 0.35rem 0.25rem;
+  gap: 0.2rem;
+  align-items: stretch;
+  max-width: min(1100px, 100%);
+}
+
+.slide-55-inttrf .account-master-screen__head,
+.slide-57-square .account-master-screen__head {
+  padding: 0.2rem 0.35rem;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  border: 1px solid #dbe4ef;
+  border-radius: 6px;
+}
+
+.slide-55-inttrf .sale-bill-page__title {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.inttrf-screen__title {
+  color: #b91c1c;
+}
+
+.inttrf-screen__header-panel,
+.inttrf-screen__footer-panel {
+  flex: 0 0 auto;
+  background: #ffffb3;
+  border: 1px solid #d4c96a;
+  border-radius: 4px;
+  padding: 0.22rem 0.35rem;
+}
+
+.inttrf-screen__header-top {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.15rem;
+}
+
+.inttrf-screen__header-actions {
+  display: flex;
+  gap: 0.3rem;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.inttrf-screen__header-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.inttrf-screen__header-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.2rem 0.35rem;
+  align-items: center;
+}
+
+.inttrf-screen__header-row--detail {
+  grid-template-columns: 1fr;
+}
+
+.inttrf-field {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.inttrf-field__lbl {
+  flex: 0 0 5.4rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #1e293b;
+  text-align: right;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.inttrf-field__ctl {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.inttrf-field--schedule .inttrf-field__lbl {
+  flex-basis: 5.4rem;
+}
+
+.inttrf-field--wide {
+  grid-column: span 2;
+}
+
+.inttrf-field--detail .inttrf-field__lbl {
+  flex-basis: 5.4rem;
+}
+
+.inttrf-screen__inline-pair {
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.inttrf-screen__inline-pair .master-party-pick {
+  flex: 0 0 4.8rem;
+  min-width: 4.8rem;
+}
+
+.inttrf-screen__schname {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 1.45rem;
+  border: 1px solid #94a3b8;
+  border-radius: 2px;
+  background: #fff;
+  padding: 0 0.3rem;
+  font-size: 0.72rem;
+}
+
+.inttrf-input {
+  width: 100%;
+  height: 1.45rem;
+  border: 1px solid #94a3b8;
+  border-radius: 2px;
+  padding: 0 0.3rem;
+  font-size: 0.72rem;
+  box-sizing: border-box;
+}
+
+.inttrf-input--xs {
+  max-width: 2rem;
+}
+
+.inttrf-input--code {
+  max-width: 4.5rem;
+}
+
+.inttrf-input--num {
+  max-width: 5.5rem;
+}
+
+.inttrf-input--vno {
+  width: 3.4rem;
+  flex: 0 0 3.4rem;
+}
+
+.inttrf-field .master-party-pick {
+  width: 100%;
+  min-width: 0;
+}
+
+.inttrf-field .master-party-pick__trigger {
+  min-height: 1.45rem;
+  height: 1.45rem;
+  padding: 0 0.3rem;
+  font-size: 0.72rem;
+  border-radius: 2px;
+}
+
+.inttrf-btn {
+  min-height: 1.45rem;
+  padding: 0 0.45rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.inttrf-screen__body {
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  overflow: hidden;
+}
+
+.inttrf-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #64748b;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.inttrf-screen__grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.inttrf-screen__grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #94c9c9;
+  color: #fff;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid #6b9e9e;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 0.68rem;
+}
+
+.inttrf-screen__grid thead th.amount,
+.inttrf-screen__grid td.amount {
+  text-align: right;
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+.inttrf-screen__grid tbody td {
+  border: 1px solid #cbd5e1;
+  padding: 0.12rem 0.3rem;
+  vertical-align: middle;
+  line-height: 1.2;
+}
+
+.inttrf-screen__grid tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.inttrf-screen__row--selected {
+  background: #dbeafe !important;
+}
+
+.inttrf-screen__grid-empty {
+  text-align: center;
+  color: #64748b;
+  padding: 0.75rem !important;
+}
+
+.inttrf-screen__save-status {
+  margin: 0 0 0.15rem;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  text-align: center;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+  border-radius: 3px;
+}
+
+.inttrf-screen__footer-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 0.35rem;
+  justify-content: space-between;
+}
+
+.inttrf-screen__footer-left {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.inttrf-screen__footer-delete,
+.inttrf-screen__footer-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  flex: 0 0 auto;
+}
+
+.inttrf-screen__footer-delete {
+  margin-left: auto;
+}
+
+.inttrf-screen__footer-delete-row,
+.inttrf-screen__footer-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.inttrf-screen__footer-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #7f1d1d;
+  white-space: nowrap;
+}
+
+.inttrf-screen__footer-label--filter {
+  text-align: right;
+}
+
+.inttrf-screen__error {
+  margin: 0;
+  flex: 0 0 auto;
+  color: #b91c1c;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .inttrf-screen__header-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .inttrf-field--wide {
+    grid-column: span 2;
+  }
+
+  .inttrf-screen__footer-toolbar {
+    flex-wrap: wrap;
+  }
+}
+
+/* Account Merge (Slide 59) ‚Äî VFP DO FORM amerge */
+.slide-59-amerge.amerge-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(920px, 100%);
+}
+
+.amerge-screen__panel {
+  flex: 1 1 auto;
+}
+
+.amerge-screen__lead {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #334155;
+  flex: 1 1 240px;
+}
+
+.amerge-screen__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.25rem;
+  margin-top: 0.75rem;
+}
+
+.amerge-screen__accounts,
+.amerge-screen__dates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.amerge-screen__dates-title {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.amerge-screen__status {
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 720px) {
+  .amerge-screen__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Bikri No. Merge (Slide 60) ‚Äî VFP DO FORM bnotrf */
+.slide-60-bnotrf.bnotrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(920px, 100%);
+}
+
+.bnotrf-screen__hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.bnotrf-screen__bno .inttrf-input--vno {
+  max-width: 8rem;
+}
+
+/* Bikri Lot Merge (Slide 61) ‚Äî VFP DO FORM bnotrf_lot */
+.slide-61-bnotrf-lot.bnotrf-lot-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(920px, 100%);
+}
+
+/* Shortage Transfer (Slide 62) ‚Äî VFP DO FORM shortage */
+.slide-62-shortage.shortage-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(1280px, 100%);
+}
+
+.slide-62-shortage .shortage-screen__grid-wrap {
+  overflow-x: auto;
+}
+
+.slide-62-shortage .shortage-screen__grid {
+  min-width: 1100px;
+  font-size: 0.78rem;
+}
+
+.slide-62-shortage .shortage-screen__footer .inttrf-screen__footer-toolbar {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+}
+
+.slide-62-shortage .shortage-screen__legtrf {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.slide-62-shortage .shortage-screen__proceed {
+  margin-left: auto;
+}
+
+.slide-62-shortage .shortage-row-clickable {
+  cursor: pointer;
+}
+
+.slide-62-shortage .shortage-row-clickable:hover,
+.slide-62-shortage .shortage-row-clickable:focus,
+.slide-62-shortage .shortage-row-clickable--active {
+  outline: none;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+/* Unused Account List (Slide 63) ‚Äî VFP DO FORM master_delete */
+.slide-63-unused.unused-ac-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(1280px, 100%);
+}
+
+.slide-63-unused .unused-ac-screen__head {
+  flex: 0 0 auto;
+}
+
+.slide-63-unused .unused-ac-screen__hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  flex: 1 1 100%;
+}
+
+.slide-63-unused .unused-ac-screen__grid {
+  min-width: 900px;
+  font-size: 0.78rem;
+}
+
+.slide-63-unused .unused-ac-screen__proceed {
+  margin-left: auto;
+}
+
+/* Desktop-only utility gate (mobile / Mobile View) */
+.utility-denied {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.utility-denied--mobile {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.utility-denied--desktop {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.utility-denied__badge {
+  display: inline-block;
+  margin: 0 0 0.65rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.slide-utility-denied.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(720px, 100%);
+}
+
+/* Unused Cost Centre Codes (Slide 64) ‚Äî VFP DO FORM cost_delete */
+.slide-64-unused-cc.unused-cc-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(1100px, 100%);
+}
+
+.slide-64-unused-cc .unused-cc-screen__head {
+  flex: 0 0 auto;
+}
+
+.slide-64-unused-cc .unused-cc-screen__hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  flex: 1 1 100%;
+}
+
+.slide-64-unused-cc .unused-cc-screen__grid {
+  min-width: 720px;
+  font-size: 0.78rem;
+}
+
+.slide-64-unused-cc .unused-cc-screen__proceed {
+  margin-left: auto;
+}
+
+/* Unused Godown Codes (Slide 65) ‚Äî VFP DO FORM godown_delete */
+.slide-65-unused-gd.unused-gd-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(1000px, 100%);
+}
+
+.slide-65-unused-gd .unused-gd-screen__head {
+  flex: 0 0 auto;
+}
+
+.slide-65-unused-gd .unused-gd-screen__hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  flex: 1 1 100%;
+}
+
+.slide-65-unused-gd .unused-gd-screen__grid {
+  min-width: 640px;
+  font-size: 0.78rem;
+}
+
+.slide-65-unused-gd .unused-gd-screen__proceed {
+  margin-left: auto;
+}
+
+/* Missing Codes (Slide 66) ‚Äî VFP DO FORM master_missing_numbers */
+.slide-66-missing.missing-codes-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(900px, 100%);
+}
+
+.slide-66-missing .missing-codes-screen__head {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: flex-end;
+}
+
+.slide-66-missing .missing-codes-screen__hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  flex: 1 1 100%;
+}
+
+.slide-66-missing .missing-codes-screen__grid {
+  min-width: 320px;
+  font-size: 0.78rem;
+}
+
+.slide-66-missing .missing-codes-screen__proceed {
+  margin-left: auto;
+}
+
+/* Brok.Find (Slide 67) ‚Äî VFP DO FORM brokchk WITH 1 */
+.slide-67-brok-find.brok-find-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(1280px, 100%);
+}
+
+.slide-67-brok-find .brok-find-screen__subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #854d0e;
+}
+
+.slide-67-brok-find .brok-find-screen__head {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: flex-end;
+}
+
+.slide-67-brok-find .brok-find-screen__hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  flex: 1 1 100%;
+}
+
+.slide-67-brok-find .brok-find-screen__grid {
+  min-width: 1100px;
+  font-size: 0.76rem;
+}
+
+.slide-67-brok-find .brok-find-screen__proceed {
+  margin-left: auto;
+}
+
+.slide-67-brok-find .brok-find-row-clickable {
+  cursor: pointer;
+}
+
+.slide-67-brok-find .brok-find-row-clickable:hover,
+.slide-67-brok-find .brok-find-row-clickable:focus {
+  outline: none;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+/* Dane Find (Slide 68) ‚Äî VFP DO FORM brokchk WITH 2 */
+.slide-68-dane-find.dane-find-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(1320px, 100%);
+}
+
+.slide-68-dane-find .dane-find-screen__head {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: flex-end;
+}
+
+.slide-68-dane-find .dane-find-screen__hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  flex: 1 1 100%;
+}
+
+.slide-68-dane-find .dane-find-screen__grid {
+  min-width: 1180px;
+  font-size: 0.76rem;
+}
+
+.slide-68-dane-find .dane-find-screen__proceed {
+  margin-left: auto;
+}
+
+.slide-68-dane-find .dane-find-row-clickable {
+  cursor: pointer;
+}
+
+.slide-68-dane-find .dane-find-row-clickable:hover,
+.slide-68-dane-find .dane-find-row-clickable:focus {
+  outline: none;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+/* Stock Transfer (Slide 69) ‚Äî VFP DO FORM stktrf */
+.slide-69-stktrf.stktrf-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(1100px, 100%);
+}
+
+.slide-69-stktrf .stktrf-screen__subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #854d0e;
+}
+
+.slide-69-stktrf .stktrf-screen__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  flex: 0 0 auto;
+}
+
+.slide-69-stktrf .stktrf-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.slide-69-stktrf .stktrf-screen__flags {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.slide-69-stktrf .stktrf-yn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+
+.slide-69-stktrf .stktrf-yn__lbl {
+  flex: 1 1 auto;
+}
+
+.slide-69-stktrf .stktrf-yn__sel {
+  width: 4rem;
+  flex: 0 0 auto;
+}
+
+.slide-69-stktrf .stktrf-screen__results {
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.slide-69-stktrf .stktrf-screen__results p {
+  margin: 0.1rem 0;
+}
+
+.slide-69-stktrf .stktrf-screen__grid {
+  min-width: 820px;
+  font-size: 0.76rem;
+}
+
+.slide-69-stktrf .stktrf-screen__proceed {
+  margin-left: auto;
+}
+
+.slide-69-stktrf .stktrf-screen__count {
+  font-size: 0.78rem;
+  color: #475569;
+  align-self: center;
+}
+
+.slide-69-stktrf .stktrf-screen__grid-end {
+  height: 0;
+  padding: 0;
+  border: none;
+}
+
+.slide-69-stktrf .stktrf-screen__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.slide-69-stktrf .stktrf-screen__progress-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  font-size: 0.82rem;
+  color: #334155;
+}
+
+.slide-69-stktrf .stktrf-screen__progress-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.slide-69-stktrf .stktrf-screen__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #16a34a);
+  transition: width 0.2s ease;
+}
+
+.slide-69-stktrf .stktrf-row-done {
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.slide-69-stktrf .stktrf-row-active {
+  background: rgba(37, 99, 235, 0.12);
+  outline: 1px solid rgba(37, 99, 235, 0.35);
+}
+
+/* Sale Transfer (Slide 70) ‚Äî VFP DO FORM saletrf */
+.slide-70-saletrf.saletrf-screen.inttrf-screen.detail-mast-screen,
+.slide-71-voutrf.voutrf-screen.saletrf-screen.inttrf-screen.detail-mast-screen,
+.slide-72-purtrf.purtrf-screen.saletrf-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(1180px, 100%);
+}
+
+.slide-70-saletrf .saletrf-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.slide-70-saletrf .saletrf-screen__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.slide-70-saletrf .saletrf-screen__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: flex-end;
+}
+
+.slide-70-saletrf .saletrf-screen__grid {
+  min-width: 820px;
+  font-size: 0.76rem;
+}
+
+.slide-71-voutrf .voutrf-screen__grid {
+  min-width: 920px;
+  font-size: 0.76rem;
+}
+
+.slide-71-voutrf .voutrf-screen__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.slide-71-voutrf .voutrf-screen__post:disabled,
+.slide-72-purtrf .purtrf-screen__post:disabled {
+  opacity: 0.55;
+}
+
+.slide-72-purtrf .purtrf-screen__grid {
+  min-width: 820px;
+  font-size: 0.76rem;
+}
+
+.slide-72-purtrf .purtrf-screen__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Update SaleInvNo (Slide 73) ‚Äî VFP DO FORM update_sale_inv_no */
+.slide-73-usinv.usinv-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  max-width: min(960px, 100%);
+}
+
+.slide-73-usinv .usinv-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.slide-73-usinv .usinv-screen__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.slide-73-usinv .usinv-field {
+  flex: 1 1 140px;
+}
+
+.slide-73-usinv .usinv-screen__grid {
+  min-width: 0;
+  font-size: 0.76rem;
+}
+
+.slide-73-usinv .usinv-screen__grid td.usinv-new {
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+.slide-73-usinv .usinv-screen__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.slide-73-usinv .usinv-screen__progress-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.slide-73-usinv .usinv-screen__progress-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.slide-73-usinv .usinv-screen__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #16a34a);
+  transition: width 0.25s ease;
+}
+
+.slide-73-usinv .usinv-row-done {
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.slide-73-usinv .usinv-row-active {
+  background: rgba(37, 99, 235, 0.12);
+  outline: 1px solid rgba(37, 99, 235, 0.35);
+}
+
+.slide-73-usinv .usinv-screen__footer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slide-73-usinv .usinv-screen__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.slide-73-usinv .usinv-screen__post:disabled {
+  opacity: 0.55;
+}
+
+/* Update Pan With GstIn (Slide 74) ‚Äî VFP DO pan_with_gstin */
+.slide-74-panpgst.panpgst-screen.inttrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  max-width: min(960px, 100%);
+}
+
+.slide-74-panpgst .panpgst-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.slide-74-panpgst .panpgst-screen__grid {
+  min-width: 0;
+  font-size: 0.76rem;
+}
+
+.slide-74-panpgst .panpgst-screen__grid td.panpgst-new {
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+.slide-74-panpgst .panpgst-screen__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.slide-74-panpgst .panpgst-screen__progress-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.slide-74-panpgst .panpgst-screen__progress-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.slide-74-panpgst .panpgst-screen__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #16a34a);
+  transition: width 0.25s ease;
+}
+
+.slide-74-panpgst .panpgst-row-done {
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.slide-74-panpgst .panpgst-row-active {
+  background: rgba(37, 99, 235, 0.12);
+  outline: 1px solid rgba(37, 99, 235, 0.35);
+}
+
+.slide-74-panpgst .panpgst-screen__footer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slide-74-panpgst .panpgst-screen__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.slide-74-panpgst .panpgst-screen__post:disabled {
+  opacity: 0.55;
+}
+
+/* User Report (Slide 75) ‚Äî VFP DO FORM userrpt */
+.slide-75-usrrpt.usrrpt-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  max-width: min(1180px, 100%);
+}
+
+.slide-75-usrrpt .usrrpt-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.slide-75-usrrpt .usrrpt-screen__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.slide-75-usrrpt .usrrpt-field {
+  flex: 1 1 160px;
+}
+
+.slide-75-usrrpt .usrrpt-field--user {
+  flex: 1 1 220px;
+  position: relative;
+}
+
+.slide-75-usrrpt .usrrpt-screen__user-no {
+  display: block;
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+.slide-75-usrrpt .usrrpt-screen__user-list {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin: 0.15rem 0 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.35rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  max-height: 200px;
+  overflow: auto;
+}
+
+.slide-75-usrrpt .usrrpt-screen__user-pick {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.35rem 0.55rem;
+  border: none;
+  background: transparent;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.slide-75-usrrpt .usrrpt-screen__user-pick:hover {
+  background: #eff6ff;
+}
+
+.slide-75-usrrpt .usrrpt-screen__summary,
+.slide-75-usrrpt .usrrpt-screen__count {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.slide-75-usrrpt .usrrpt-screen__grid {
+  min-width: 900px;
+  font-size: 0.76rem;
+}
+
+.slide-75-usrrpt .usrrpt-screen__footer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slide-75-usrrpt .usrrpt-screen__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* Audit Trail Reports (Slide 76) ‚Äî VFP DO FORM audit_report */
+.slide-76-audtrf.audtrf-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  max-width: min(1180px, 100%);
+}
+
+.slide-76-audtrf .audtrf-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.slide-76-audtrf .audtrf-screen__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.slide-76-audtrf .audtrf-field {
+  min-width: 0;
+}
+
+.slide-76-audtrf .audtrf-field .inttrf-field__lbl {
+  flex: 0 0 6.5rem;
+}
+
+.slide-76-audtrf .audtrf-field input[type='date'].inttrf-input {
+  min-width: 9.25rem;
+}
+
+.slide-76-audtrf .audtrf-field--vno {
+  grid-column: span 1;
+}
+
+.slide-76-audtrf .audtrf-field--user {
+  position: relative;
+}
+
+.slide-76-audtrf .audtrf-screen__user-list {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin: 0.15rem 0 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.35rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  max-height: 200px;
+  overflow: auto;
+}
+
+.slide-76-audtrf .audtrf-screen__user-pick {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.35rem 0.55rem;
+  border: none;
+  background: transparent;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.slide-76-audtrf .audtrf-screen__user-pick:hover {
+  background: #eff6ff;
+}
+
+.slide-76-audtrf .audtrf-screen__summary,
+.slide-76-audtrf .audtrf-screen__count {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.slide-76-audtrf .audtrf-screen__grid {
+  min-width: 1200px;
+  font-size: 0.72rem;
+}
+
+.slide-76-audtrf .audtrf-screen__grid td.audtrf-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.slide-76-audtrf .audtrf-screen__footer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slide-76-audtrf .audtrf-screen__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* Company Detail Edit (Slide 77) ‚Äî VFP DO FORM compdet */
+.slide-77-compdet.compdet-screen.detail-mast-screen {
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  max-width: min(1180px, 100%);
+  min-height: 0;
+}
+
+.slide-77-compdet .compdet-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.slide-77-compdet .compdet-screen__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
+
+.slide-77-compdet .compdet-screen__tab {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 4px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.slide-77-compdet .compdet-screen__tab--active {
+  background: #1e40af;
+  border-color: #1e40af;
+  color: #fff;
+}
+
+.slide-77-compdet .compdet-screen__tab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.slide-77-compdet .compdet-screen__panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  padding: 0.5rem;
+}
+
+.slide-77-compdet .compdet-screen__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(14rem, 1fr));
+  gap: 0.45rem 0.75rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .slide-77-compdet .compdet-screen__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.slide-77-compdet .compdet-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.slide-77-compdet .compdet-field__lbl {
+  font-size: 0.72rem;
+  color: #475569;
+  font-weight: 600;
+}
+
+.slide-77-compdet .compdet-field__input {
+  width: 100%;
+  min-width: 0;
+  font-size: 0.8rem;
+  padding: 0.28rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.slide-77-compdet .compdet-field__input:disabled,
+.slide-77-compdet .compdet-field__input[readonly] {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.slide-77-compdet .compdet-field__hint {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.slide-77-compdet .compdet-field--locked .compdet-field__lbl {
+  color: #9a3412;
+}
+
+.slide-77-compdet .compdet-field--locked .compdet-field__input {
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+
+.slide-77-compdet .compdet-password-gate {
+  min-height: calc(100dvh - 2rem);
+}
+
+/* Gst Profile Setting (Slide 78) ‚Äî VFP DO FORM gst_profile */
+.slide-78-gstprof.gstprof-screen.detail-mast-screen {
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  max-width: min(1180px, 100%);
+  min-height: 0;
+}
+
+.slide-78-gstprof .gstprof-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.slide-78-gstprof .gstprof-screen__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
+
+.slide-78-gstprof .gstprof-screen__tab {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 4px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.slide-78-gstprof .gstprof-screen__tab--active {
+  background: #1e40af;
+  border-color: #1e40af;
+  color: #fff;
+}
+
+.slide-78-gstprof .gstprof-screen__panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  padding: 0.5rem;
+}
+
+.slide-78-gstprof .gstprof-screen__form {
+  margin: 0;
+  min-height: 0;
+}
+
+.slide-78-gstprof .gstprof-screen__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(14rem, 1fr));
+  gap: 0.45rem 0.75rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .slide-78-gstprof .gstprof-screen__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.slide-78-gstprof .gstprof-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.slide-78-gstprof .gstprof-field__lbl {
+  font-size: 0.72rem;
+  color: #475569;
+  font-weight: 600;
+}
+
+.slide-78-gstprof .gstprof-field__input {
+  width: 100%;
+  min-width: 0;
+  font-size: 0.8rem;
+  padding: 0.28rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.slide-78-gstprof .gstprof-field__input:disabled,
+.slide-78-gstprof .gstprof-field__input[readonly] {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.slide-78-gstprof .gstprof-field__hint {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.slide-78-gstprof .gstprof-password-gate {
+  min-height: calc(100dvh - 2rem);
+}
+
+.slide-78-gstprof .gstprof-screen__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+}
+
+.slide-78-gstprof .gstprof-screen__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* Updation (Slide 79) ‚Äî VFP DO FORM update (desktop only) */
+.slide-79-updt.updt-screen.detail-mast-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: none;
+  padding: 1rem 0.75rem;
+  gap: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .slide-79-updt.updt-screen.detail-mast-screen {
+    justify-content: center;
+    min-height: calc(100dvh - 3rem);
+    padding: 1.25rem;
+  }
+}
+
+.slide-79-updt .updt-screen__card {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid #dbe4ef;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
+}
+
+.slide-79-updt .updt-screen__hint {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.slide-79-updt .updt-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.slide-79-updt .updt-field.inttrf-field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.12rem;
+}
+
+.slide-79-updt .updt-field .inttrf-field__lbl {
+  flex: none;
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  font-size: 0.72rem;
+}
+
+.slide-79-updt .updt-field .inttrf-field__ctl {
+  width: 100%;
+}
+
+.slide-79-updt .updt-field .inttrf-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.slide-79-updt .updt-screen__status {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.slide-79-updt .updt-screen__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  margin-top: 0.25rem;
+}
+
+.slide-79-updt .inttrf-screen__error {
+  margin: 0;
+}
+
+.slide-79-updt .updt-screen__card--loading {
+  align-items: center;
+  justify-content: center;
+  min-height: 8rem;
+}
+
+.slide-77-compdet .compdet-screen__form {
+  margin: 0;
+  min-height: 0;
+}
+
+.slide-77-compdet .compdet-screen__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+}
+
+.slide-77-compdet .compdet-screen__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.slide-70-saletrf .saletrf-screen__progress-label,
+.slide-71-voutrf .saletrf-screen__progress-label,
+.slide-72-purtrf .saletrf-screen__progress-label,
+.slide-69-stktrf .stktrf-screen__progress-label {
+  flex-wrap: wrap;
+}
+
+.inttrf-transfer-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-left: auto;
+}
+
+.inttrf-transfer-clock__icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.inttrf-transfer-clock--live strong {
+  color: #2563eb;
+  font-variant-numeric: tabular-nums;
+}
+
+.inttrf-transfer-clock strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.slide-70-saletrf .saletrf-screen__proceed {
+  margin-left: auto;
+}
+
+.slide-70-saletrf .saletrf-screen__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.slide-70-saletrf .saletrf-screen__progress-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  font-size: 0.82rem;
+  color: #334155;
+}
+
+.slide-70-saletrf .saletrf-screen__progress-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.slide-70-saletrf .saletrf-screen__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #16a34a);
+  transition: width 0.2s ease;
+}
+
+.slide-70-saletrf .saletrf-row-done {
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.slide-70-saletrf .saletrf-row-active {
+  background: rgba(37, 99, 235, 0.12);
+  outline: 1px solid rgba(37, 99, 235, 0.35);
+}
+
+/* Trial Difference (Slide 58) ‚Äî VFP DO trldif */
+.slide-58-trldif.trldif-screen.detail-mast-screen {
+  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  align-items: stretch;
+  max-width: min(1200px, 100%);
+}
+
+.trldif-screen__head {
+  flex: 0 0 auto;
+}
+
+.trldif-screen__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.trldif-screen__done {
+  margin-left: auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #166534;
+}
+
+.trldif-screen__error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.8rem;
+}
+
+.trldif-screen__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
+
+.trldif-screen__tab {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 4px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.trldif-screen__tab--active {
+  background: #1e40af;
+  border-color: #1e40af;
+  color: #fff;
+}
+
+.trldif-screen__tab--alert:not(.trldif-screen__tab--active) {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.trldif-screen__tab-count {
+  opacity: 0.85;
+  margin-left: 0.15rem;
+}
+
+.trldif-screen__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  padding: 0.5rem;
+}
+
+.trldif-screen__section-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  color: #1e293b;
+}
+
+.trldif-screen__row-hint {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  color: #475569;
+}
+
+.trldif-screen__row--clickable {
+  cursor: pointer;
+}
+
+.trldif-screen__row--clickable:hover {
+  background: #e0f2fe !important;
+}
+
+.trldif-screen__row--clickable:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.trldif-screen__grid-wrap {
+  overflow: auto;
+  max-height: 100%;
+}
+
+.trldif-screen__grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.trldif-screen__grid thead th {
+  position: sticky;
+  top: 0;
+  background: #1e3a5f;
+  color: #fff;
+  padding: 0.35rem 0.45rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.trldif-screen__grid thead th.amount,
+.trldif-screen__grid td.amount {
+  text-align: right;
+}
+
+.trldif-screen__grid tbody td {
+  padding: 0.28rem 0.45rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.trldif-screen__grid tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.trldif-screen__grid-empty {
+  text-align: center;
+  color: #64748b;
+  padding: 1rem !important;
+}
+
+.trldif-screen__opening h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.trldif-screen__opening-diff {
+  color: #b45309;
+  font-size: 0.9rem;
+}
+
+.trldif-screen__opening-ok {
+  color: #166534;
+  font-size: 0.9rem;
+}
+
+/* GST State Master (Slide 48) ‚Äî VFP DO GST_STATE */
+.slide-48-gst-state.gst-state-screen.cost-mast-screen {
+  padding: 0.35rem 0.5rem 0.45rem;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.slide-48-gst-state.gst-state-screen .account-master-screen__head {
+  padding: 0.35rem 0.45rem;
+  gap: 0.28rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+}
+
+.gst-state-screen__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gst-state-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.gst-state-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 8rem;
+  max-height: min(52vh, 22rem);
+  overflow: auto;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.gst-state-grid__code-col {
+  width: 6rem;
+}
+
+.gst-state-grid__row.is-selected td {
+  background: #eff6ff;
+}
+
+/* Godown Master (Slide 38) ‚Äî VFP DO FORM godown */
+.slide-38-godown.godown-master-screen {
+  max-width: min(1280px, 100%);
+  gap: 0.2rem;
+}
+
+.godown-master-screen__chrome {
+  gap: 0.05rem;
+}
+
+.godown-master-screen__head {
+  padding: 0.15rem 0.35rem 0.1rem;
+  gap: 0.1rem;
+}
+
+.godown-master-screen__head-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.godown-master-screen__head-bar .sale-bill-page__title {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.15;
+  font-weight: 700;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.godown-master-screen__toolbar-cluster {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.15rem 0.2rem;
+  min-width: 0;
+}
+
+.godown-master-screen__toolbar-cluster .account-master-screen__toolbar {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  max-height: 28px;
+}
+
+.godown-master-screen__toolbar-cluster .fas-flow-header-actions {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.godown-master-screen__toolbar-cluster .btn-report-help {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  margin: 0;
+  border-radius: 6px;
+}
+
+.godown-master-screen__toolbar-cluster .btn-report-help__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.godown-master-screen__toolbar-cluster .btn-report-help__icon {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.godown-master-screen__toolbar-cluster .toolbar-icon-btn,
+.godown-master-screen__toolbar-cluster .voice-command-btn {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile: one scrollable toolbar row ‚Äî Back, Excel, PDF, WhatsApp stay reachable */
+@media (max-width: 768px) {
+  .godown-master-screen__head-bar {
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+
+  .godown-master-screen__head-bar .sale-bill-page__title {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .godown-master-screen__toolbar-cluster {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+    gap: 0.15rem;
+  }
+
+  .godown-master-screen__toolbar-cluster .gfas-toolbar,
+  .godown-master-screen__toolbar-cluster .account-master-screen__toolbar {
+    flex: 0 0 auto;
+    width: max-content;
+    min-width: max-content;
+    max-width: none;
+    max-height: 28px;
+    overflow: visible;
+  }
+
+  .godown-master-screen__toolbar-cluster .gfas-toolbar-btn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .godown-master-screen__toolbar-cluster .gfas-toolbar-btn {
+    min-width: 28px;
+    padding: 0 0.35rem !important;
+  }
+
+  .godown-master-screen__toolbar-cluster .fas-flow-header-actions {
+    flex: 0 0 auto;
+  }
+}
+
+.app--mobile .godown-master-screen__head-bar {
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.app--mobile .godown-master-screen__head-bar .sale-bill-page__title {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.app--mobile .godown-master-screen__toolbar-cluster {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+
+.app--mobile .godown-master-screen__toolbar-cluster .gfas-toolbar,
+.app--mobile .godown-master-screen__toolbar-cluster .account-master-screen__toolbar {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+  overflow: visible;
+}
+
+.app--mobile .godown-master-screen__toolbar-cluster .gfas-toolbar-btn__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app--mobile .godown-master-screen__toolbar-cluster .gfas-toolbar-btn {
+  min-width: 28px;
+  padding: 0 0.35rem !important;
+}
+
+.godown-master-screen .godown-master-screen__session-line.company-info,
+.godown-master-screen .session-info-line .company-info {
+  margin: 0;
+  padding: 0.18rem 0.35rem;
+  font-size: 0.7rem;
+  line-height: 1.15;
+  border-radius: 4px;
+}
+
+.godown-master-screen .session-info-line--with-actions {
+  display: block;
+  padding: 0 0.35rem 0.06rem;
+}
+
+.godown-master-screen .session-info-line__main {
+  width: 100%;
+  min-width: 0;
+}
+
+.godown-master-screen .session-info-line__actions {
+  display: none;
+}
+
+.slide-38-godown.godown-master-screen .account-master-screen__err {
+  margin: 0 0.35rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.76rem;
+  line-height: 1.2;
+}
+
+.godown-master-screen__workspace {
+  display: flex;
+  flex: 1 1 0%;
+  min-height: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.godown-master-screen__sidebar {
+  flex: 0 0 clamp(12rem, 24vw, 17rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.godown-master-screen__sidebar-search {
+  flex-shrink: 0;
+  margin: 0.5rem 0.45rem 0.35rem;
+  width: calc(100% - 0.9rem);
+  min-height: 2rem;
+  font-size: 0.85rem;
+}
+
+.godown-master-screen__list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0.35rem 0.5rem;
+  overflow-y: auto;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.godown-master-screen__list-empty {
+  padding: 0.75rem 0.5rem;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.godown-master-screen__list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0.45rem 0.4rem;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.godown-master-screen__list-item:hover {
+  background: #e2e8f0;
+}
+
+.godown-master-screen__list-item.is-selected {
+  background: #2563eb;
+  color: #fff;
+}
+
+.godown-master-screen__list-item.is-selected .godown-master-screen__list-body span {
+  color: #dbeafe;
+}
+
+.godown-master-screen__list-idx {
+  flex: 0 0 1.25rem;
+  font-size: 0.72rem;
+  opacity: 0.75;
+  padding-top: 0.1rem;
+}
+
+.godown-master-screen__list-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.godown-master-screen__list-body strong {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.godown-master-screen__list-body span {
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.godown-master-screen__detail {
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #fff;
+}
+
+.godown-master-screen__detail-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.godown-master-screen__detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.65rem 0.3rem;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.godown-master-screen__detail-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.godown-master-screen__detail-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.godown-master-screen__detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.godown-master-screen__view-link {
+  font-size: 0.82rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.godown-master-screen__detail-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.35rem 0.65rem 0.5rem;
+}
+
+.godown-master-screen__detail-loading {
+  margin: 1rem 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.godown-master-screen__detail-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem 0.65rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.7rem;
+  color: #64748b;
+  flex-shrink: 0;
+  background: #f8fafc;
+}
+
+/* Godown entry form ‚Äî sectioned detail panel */
+.godown-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.godown-entry__section {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.4rem;
+}
+
+.godown-entry__section:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.godown-entry__section-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.godown-entry__section-icon {
+  color: #94a3b8;
+  font-size: 0.65rem;
+}
+
+.godown-entry__section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.godown-entry__row {
+  display: grid;
+  gap: 0.4rem 0.65rem;
+  align-items: end;
+}
+
+.godown-entry__row--code-name {
+  grid-template-columns: minmax(4.5rem, 5.5rem) minmax(0, 1fr);
+}
+
+.godown-entry__row--loc-pin {
+  grid-template-columns: minmax(0, 1fr) minmax(5.5rem, 7rem);
+}
+
+.godown-entry__row--state {
+  grid-template-columns: 4.75rem minmax(0, 1fr);
+}
+
+.godown-entry__row--gst-fssai {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+
+.godown-entry__row--tel,
+.godown-entry__row--settings {
+  grid-template-columns: 1fr 1fr;
+}
+
+.godown-entry__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.godown-entry__field--full {
+  grid-column: 1 / -1;
+}
+
+.godown-entry__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.godown-entry__input {
+  width: 100%;
+  min-height: 2.1rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.88rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.godown-entry__input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
+}
+
+.godown-entry__input:read-only,
+.godown-entry__input:disabled {
+  background: #f1f5f9;
+  color: #334155;
+  cursor: default;
+}
+
+.godown-entry__input--code {
+  max-width: 5.5rem;
+  text-align: center;
+}
+
+.godown-entry__input--pin {
+  text-align: center;
+}
+
+.godown-entry__input--stcd {
+  text-align: center;
+}
+
+.godown-entry__input--btype {
+  max-width: 4rem;
+  text-align: center;
+}
+
+.godown-entry__state-code-wrap {
+  width: 4.75rem;
+  max-width: 4.75rem;
+}
+
+.godown-entry__state-code-wrap .master-party-pick,
+.godown-entry__state-code-wrap .master-party-pick--with-search-btn {
+  width: 100%;
+  max-width: 4.75rem;
+}
+
+.godown-master-screen__detail .godown-entry__state-code-wrap .master-party-pick__trigger {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 2.85rem;
+  min-height: 2.1rem;
+  padding: 0.35rem 0.25rem;
+  text-align: center;
+  font-size: 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+.godown-entry__state-code-wrap .master-party-pick__search-btn {
+  flex: 0 0 1.65rem;
+  min-width: 1.65rem;
+  width: 1.65rem;
+}
+
+.godown-master-screen__detail .master-party-pick__trigger {
+  min-height: 2.1rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+@media (max-width: 768px) {
+  .godown-master-screen__workspace {
+    flex-direction: column;
+  }
+
+  .godown-master-screen__sidebar {
+    flex: 0 0 auto;
+    max-height: 12rem;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .godown-entry__row--tel,
+  .godown-entry__row--settings,
+  .godown-entry__row--gst-fssai {
+    grid-template-columns: 1fr;
+  }
+}
+
+.godown-modal.item-master-modal {
+  max-width: min(44rem, 96vw);
+  max-height: min(92dvh, 860px);
+}
+
+.godown-modal .item-master-modal__body {
+  overflow: hidden;
+}
+
+.godown-modal .item-master-modal__scroll {
+  flex: 1 1 auto;
+  min-height: 12rem;
+  max-height: min(68dvh, 620px);
+}
+
+.godown-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.85rem 1rem 1rem;
+}
+
+.godown-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+}
+
+.godown-form__field .sale-bill-field__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.godown-form__input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.godown-form__field--code .godown-form__code {
+  max-width: 6rem;
+}
+
+.godown-form__pin {
+  max-width: 8rem;
+}
+
+.godown-form__field--btype .godown-form__btype {
+  max-width: 4rem;
+}
+
+.godown-form__state-head {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: end;
+}
+
+.godown-form__state-row {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: center;
+  width: 100%;
+}
+
+.godown-form__state-code-wrap {
+  width: 4.75rem;
+  max-width: 4.75rem;
+  min-width: 4.75rem;
+}
+
+.godown-form__state-code-wrap .master-party-pick,
+.godown-form__state-code-wrap .master-party-pick--with-search-btn {
+  width: 100%;
+  max-width: 4.75rem;
+}
+
+.godown-modal .godown-form__state-code-wrap .master-party-pick__trigger {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 2.85rem;
+  padding-left: 0.35rem;
+  padding-right: 0.2rem;
+  text-align: center;
+}
+
+.godown-form__state-code-wrap .master-party-pick__search-btn {
+  flex: 0 0 1.65rem;
+  min-width: 1.65rem;
+  width: 1.65rem;
+  padding: 0;
+}
+
+.godown-form__state-code {
+  width: 100%;
+  max-width: 4.75rem;
+  text-align: center;
+}
+
+.godown-form__state-name {
+  width: 100%;
+  min-width: 0;
+}
+
+.godown-modal .item-master-modal__foot {
+  flex-shrink: 0;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.app--fas-flow.app--mobile .app-main .slide.slide-36-bikri-exp.bikri-exp-screen,
+.app--fas-flow.app--mobile .app-main .slide.slide-37-godown-rent.godown-rent-screen,
+.app--fas-flow.app--mobile .app-main .slide.slide-38-godown.godown-master-screen {
+  flex: 1 1 auto;
+  min-height: calc(100dvh - 1.5rem);
+  height: auto;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 900px) {
+  .user-password-screen__body {
+    flex-direction: column;
+  }
+
+  .user-password-screen__form-panel {
+    flex: 0 0 auto;
+    max-width: none;
+    width: 100%;
+  }
+
+  .user-password-screen__list-wrap {
+    max-height: min(40dvh, 280px);
   }
 }
 
@@ -8684,6 +15487,57 @@ body.force-desktop-view .app--desktop {
   padding-top: 0.35rem;
   border-top: 1px solid #e2e8f0;
   margin-top: 0.35rem;
+  max-height: 28px;
+}
+
+/* User Master ‚Äî tighter header (wins over generic item-master-screen head above) */
+.slide-32-user-master.user-master-screen.item-master-screen .account-master-screen__head {
+  padding: 0.4rem 0.55rem;
+  gap: 0.28rem;
+}
+
+.slide-32-user-master.user-master-screen.item-master-screen .sale-bill-page__title {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.slide-32-user-master.user-master-screen.item-master-screen .account-master-screen__toolbar {
+  margin-top: 0.15rem;
+  padding-top: 0.2rem;
+}
+
+/* User Password ‚Äî tighter header (wins over generic item-master-screen head above) */
+.slide-35-user-password.user-password-screen.item-master-screen .account-master-screen__head {
+  padding: 0.35rem 0.5rem;
+  gap: 0.22rem;
+}
+
+.slide-35-user-password.user-password-screen.item-master-screen .sale-bill-page__title {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.slide-35-user-password.user-password-screen.item-master-screen .account-master-screen__toolbar {
+  margin-top: 0.1rem;
+  padding-top: 0.15rem;
+}
+
+/* Bikri Exp ‚Äî tighter header (wins over generic item-master-screen head above) */
+.slide-36-bikri-exp.bikri-exp-screen.item-master-screen .account-master-screen__head {
+  padding: 0.3rem 0.45rem;
+  gap: 0.12rem;
+}
+
+.slide-36-bikri-exp.bikri-exp-screen.item-master-screen .sale-bill-page__title {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.slide-36-bikri-exp.bikri-exp-screen .account-master-screen__toolbar,
+.bikri-exp-screen__toolbar-row .account-master-screen__toolbar {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .item-master-screen .account-master-screen__filters {
@@ -8694,7 +15548,6 @@ body.force-desktop-view .app--desktop {
 }
 
 .item-master-screen__list-wrap {
-  max-height: min(68vh, 620px);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
@@ -9099,4 +15952,384 @@ body.force-desktop-view .app--desktop {
     border-top: 1px solid #cbd5e1;
     min-height: 2.25rem;
   }
+}
+
+.cost-mast-form__ac-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cost-mast-form__ac-row .master-party-pick {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+
+.cost-mast-form__ac-name {
+  flex: 1 1 8rem;
+  font-size: 0.85rem;
+  color: #475569;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cost-mast-table th:nth-child(1),
+.cost-mast-table td:nth-child(1) {
+  width: 7rem;
+}
+
+.cost-mast-table th:nth-child(3),
+.cost-mast-table td:nth-child(3) {
+  width: 6rem;
+}
+
+/* Cost Centre Master ‚Äî compact header; Help/Settings/Voice on company line */
+.slide-39-cost-mast.cost-mast-screen {
+  padding: 0.35rem 0.5rem 0.5rem;
+  gap: 0.4rem;
+}
+
+.slide-39-cost-mast.cost-mast-screen .account-master-screen__chrome {
+  gap: 0.35rem;
+}
+
+.slide-39-cost-mast.cost-mast-screen .account-master-screen__head,
+.slide-39-cost-mast.cost-mast-screen.item-master-screen .account-master-screen__head {
+  padding: 0.35rem 0.45rem;
+  gap: 0.28rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+}
+
+.slide-39-cost-mast.cost-mast-screen .sale-bill-page__title {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.cost-mast-screen__head-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.cost-mast-screen__head-bar .sale-bill-page__title {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.cost-mast-screen__head-bar .account-master-screen__toolbar {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0;
+  border-top: none;
+  max-height: 28px;
+}
+
+.cost-mast-screen .cost-mast-screen__session-line.company-info,
+.cost-mast-screen .session-info-line .company-info {
+  margin: 0;
+  padding: 0.22rem 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  border-radius: 4px;
+}
+
+.cost-mast-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.cost-mast-screen .session-info-line__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cost-mast-screen .session-info-line__actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.cost-mast-screen .session-info-line__actions .fas-flow-header-actions,
+.cost-mast-screen .session-info-line__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.cost-mast-screen .session-info-line__actions .btn-report-help,
+.cost-mast-screen .session-info-line__actions .toolbar-icon-btn,
+.cost-mast-screen .session-info-line__actions .voice-command-btn {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.cost-mast-screen .session-info-line__actions .btn-report-help__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.slide-39-cost-mast.cost-mast-screen .account-master-screen__filters {
+  padding: 0.45rem 0.55rem;
+}
+
+@media (max-width: 768px) {
+  .cost-mast-screen__head-bar {
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+
+  .cost-mast-screen__head-bar .sale-bill-page__title {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .cost-mast-screen__head-bar .account-master-screen__toolbar {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+  }
+
+  .cost-mast-screen .session-info-line--with-actions {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .cost-mast-screen .session-info-line__main {
+    flex: 1 1 100%;
+  }
+
+  .cost-mast-screen .session-info-line__actions {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+}
+
+.app--mobile .slide-39-cost-mast.cost-mast-screen .account-master-screen__head {
+  padding: 0.3rem 0.4rem;
+  gap: 0.22rem;
+}
+
+/* Customer Interest (Slide 40) ‚Äî VFP DO CUSTINT / NEWINT grid */
+.slide-40-cust-int.cust-int-screen {
+  padding: 0.35rem 0.5rem 0.5rem;
+  gap: 0.35rem;
+}
+
+.cust-int-screen__chrome {
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.slide-40-cust-int.cust-int-screen .account-master-screen__head,
+.slide-40-cust-int.cust-int-screen.item-master-screen .account-master-screen__head {
+  padding: 0.35rem 0.45rem;
+  gap: 0.28rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4fb 100%);
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+}
+
+.slide-40-cust-int.cust-int-screen .sale-bill-page__title {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.cust-int-screen__head-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.cust-int-screen__toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.35rem;
+}
+
+.cust-int-screen__toolbar-row .account-master-screen__toolbar {
+  margin: 0;
+  padding: 0;
+  border-top: none;
+  max-height: 28px;
+}
+
+.cust-int-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  margin-left: auto;
+}
+
+.cust-int-screen__actions .btn {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+  min-height: 1.75rem;
+}
+
+.cust-int-screen .cust-int-screen__session-line.company-info,
+.cust-int-screen .session-info-line .company-info {
+  margin: 0;
+  padding: 0.22rem 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.cust-int-screen .session-info-line--with-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.cust-int-screen .session-info-line__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cust-int-screen .session-info-line__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.cust-int-screen .session-info-line__actions .btn-report-help,
+.cust-int-screen .session-info-line__actions .toolbar-icon-btn,
+.cust-int-screen .session-info-line__actions .voice-command-btn {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.cust-int-screen .session-info-line__actions .btn-report-help__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.cust-int-screen__grid-wrap {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #b8c4d4;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.cust-int-grid {
+  width: 100%;
+  min-width: 52rem;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.cust-int-grid th,
+.cust-int-grid td {
+  border: 1px solid #d8e0ea;
+  padding: 0.15rem 0.3rem;
+  vertical-align: middle;
+}
+
+.cust-int-grid thead th {
+  background: #e8eef5;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cust-int-grid__input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.12rem 0.3rem;
+  font-size: 0.8rem;
+}
+
+.cust-int-grid__date {
+  min-width: 8.5rem;
+}
+
+.cust-int-grid__num-cell {
+  text-align: right;
+  min-width: 3.5rem;
+}
+
+.cust-int-grid__num-cell .cust-int-grid__input {
+  text-align: right;
+}
+
+.cust-int-grid__type-cell {
+  min-width: 3rem;
+}
+
+.cust-int-grid__type {
+  text-align: center;
+}
+
+.cust-int-grid__act-col,
+.cust-int-grid__act-cell {
+  width: 2.5rem;
+  text-align: center;
+}
+
+.cust-int-grid__del {
+  padding: 0.1rem 0.4rem;
+  min-height: 1.5rem;
+}
+
+.cust-int-screen__hint {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.app--mobile .slide-40-cust-int.cust-int-screen .account-master-screen__head {
+  padding: 0.3rem 0.4rem;
 }

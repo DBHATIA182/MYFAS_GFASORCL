@@ -1,0 +1,39 @@
+DEMO LOGIN 500 — FIX (GFASORCL\APPTEST on dev PC)
+================================================
+
+Symptom
+  https://demo.fasaccountingsoftware.in  → page loads (200)
+  https://demo.fasaccountingsoftware.in/api/login  → 500
+  http://localhost:5173/api/login on same PC → works
+
+Cause
+  Two tunnel connectors fight each other:
+  1) Windows service "Cloudflared" (auto-start, often OLD routes: all traffic → :5173, Vite /api proxy fails)
+  2) Manual tunnel from start services batch file.bat (uses config.yml in this folder)
+
+  Login is NOT broken in Oracle — the public URL never reaches API :5002 reliably.
+
+Fix (do once, as Administrator)
+  1. Right-click: stop-cloudflared-service-admin.cmd → Run as administrator
+  2. Run: start services batch file.bat   (or start-gfasorcl.cmd)
+  3. Wait 10 seconds, then on PC browser open:
+       https://demo.fasaccountingsoftware.in/api/health
+     Must show: {"ok":true,"port":5002}
+     If still 500, see "Cloudflare dashboard" below.
+
+  4. Hard refresh demo site (Ctrl+F5). Sign in MAIN / MAIN on phone.
+
+config.yml (this folder) — already set for when ONLY manual tunnel runs:
+  demo.fasaccountingsoftware.in  /api/*  → 127.0.0.1:5002
+  demo.fasaccountingsoftware.in  other   → 127.0.0.1:5173
+  demo-api.fasaccountingsoftware.in       → 127.0.0.1:5002
+
+Cloudflare dashboard (if health URL still 500 after step 1–2)
+  Zero Trust → Networks → Tunnels → your demo tunnel → Public Hostname
+  Add route BEFORE the catch-all:
+    Host: demo.fasaccountingsoftware.in
+    Path: /api/*
+    Service: http://localhost:5002
+  Keep UI route: demo.fasaccountingsoftware.in → http://localhost:5173
+
+Do NOT use C:\Windows\System32\cloudflared.exe — use Program Files (x86)\Cloudflared.

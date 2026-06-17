@@ -4,6 +4,15 @@ import ReportTable from '../components/ReportTable';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { downloadExcelRows } from '../utils/excelExport';
 import { toInputDateString, toOracleDate, toDisplayDate, getCurBal, formatCurBal } from '../utils/dateFormat';
+import SessionInfoLine from '../components/SessionInfoLine';
+import VoiceSearchButton from '../components/VoiceSearchButton';
+import { filterCodeNameCityRowsSmart, SEARCH_NO_MATCH, SEARCH_TYPE_HINT } from '../utils/masterSearchFilter';
+import { applyVoicePartyBrokerSearch } from '../utils/voiceSearchApply';
+import {
+  advanceReportFormOnEnter,
+  focusNextReportField,
+  handleReportDateEnter,
+} from '../utils/reportFormFocus';
 
 const DEFAULT_HISTORY_START_DATE = '2001-04-01';
 
@@ -54,6 +63,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const formRef = useRef(null);
   const partySearchInputRef = useRef(null);
   const billStartInputRef = useRef(null);
   const customerLedgerDrillRanRef = useRef(null);
@@ -129,16 +139,10 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
     loadInterestDefaults();
   }, [apiBase, compCode, compUid]);
 
-  const filteredParties = useMemo(() => {
-    const q = partySearch.trim().toLowerCase();
-    if (!q) return parties.slice(0, 150);
-    return parties.filter((p) => {
-      const code = String(p.CODE ?? p.code ?? '').toLowerCase();
-      const name = String(p.NAME ?? p.name ?? '').toLowerCase();
-      const city = String(p.CITY ?? p.city ?? '').toLowerCase();
-      return code.includes(q) || name.includes(q) || city.includes(q);
-    });
-  }, [parties, partySearch]);
+  const filteredParties = useMemo(
+    () => filterCodeNameCityRowsSmart(parties, partySearch, 50),
+    [parties, partySearch]
+  );
 
   useEffect(() => {
     setListHighlight(0);
@@ -163,38 +167,45 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
     focusBillStart();
   };
 
+  const applyPartyVoiceSearch = (transcript) => {
+    applyVoicePartyBrokerSearch({
+      transcript,
+      rows: parties,
+      setQuery: setPartySearch,
+      setHighlight: setListHighlight,
+      clearSelection: () => setSelectedCode(''),
+      inputRef: partySearchInputRef,
+    });
+  };
+
   const selectedPartyRow = parties.find((p) => String(p.CODE ?? p.code) === String(selectedCode));
 
   const runBillLedgerQuery = async (overrides = {}) => {
-    const code = overrides.code ?? selectedCode;
-    const bs = overrides.billStart ?? billStart;
-    const be = overrides.billEnd ?? billEnd;
-    const pe = overrides.payEndDate ?? payEndDate;
-    const mcoVal = overrides.mco ?? mco;
-    const reqInt = overrides.requireInterest ?? requireInterest;
-    const intAsOf = overrides.interestAsOf ?? interestAsOf;
-
+    const code = overrides.code !== undefined ? String(overrides.code || '').trim() : selectedCode;
     if (!code) {
       alert('Please select a party (search and pick from the list).');
       return false;
     }
-    if (!bs || !be || !pe) {
+    const bs = overrides.billStart ?? billStart;
+    const be = overrides.billEnd ?? billEnd;
+    const ped = overrides.payEndDate ?? payEndDate;
+    const filterMco = overrides.mco ?? mco;
+    if (!bs || !be || !ped) {
       alert('Please set bill date range and payment ending date.');
       return false;
     }
-
     const params = {
       comp_code: compCode,
       code,
       s_date: toOracleDate(bs),
       e_date: toOracleDate(be),
-      p_edt: toOracleDate(pe),
-      mco: mcoVal,
+      p_edt: toOracleDate(ped),
+      mco: filterMco,
       comp_uid: compUid,
       ledger_kind: ledgerKind,
     };
-    if (reqInt === 'Y') {
-      const asOf = intAsOf || pe;
+    if (requireInterest === 'Y') {
+      const asOf = overrides.interestAsOf ?? interestAsOf ?? ped;
       if (!asOf) {
         alert('Interest as-of date is required when interest is Yes.');
         return false;
@@ -316,12 +327,23 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
 
   if (showReport && reportData.length > 0) {
     return (
-      <div className="slide slide-report">
+      <div className="slide slide-report slide-report--mobile-toolbar-row slide-report--bill-ledger">
+        <SessionInfoLine formData={formData} helpReportId="customer-ledger" />
         <div className="report-toolbar">
           <h2>{ledgerTitle}</h2>
           <div className="toolbar-actions">
-            <button type="button" className="btn btn-toolbar-back" onClick={handleReportBack}>
-              {openedFromOverdue ? '← Back to overdue' : '← Back'}
+            <button
+              type="button"
+              className="btn btn-toolbar-back"
+              aria-label={openedFromOverdue ? 'Back to overdue' : 'Back'}
+              onClick={handleReportBack}
+            >
+              <span className="report-toolbar-back-full">
+                {openedFromOverdue ? '← Back to overdue' : '← Back'}
+              </span>
+              <span className="report-toolbar-back-short" aria-hidden="true">
+                ←
+              </span>
             </button>
             <button
               type="button"
@@ -391,49 +413,57 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
         </div>
 
         <div className="button-group">
-          <button type="button" className="btn btn-secondary" onClick={handleReportBack}>
-            {openedFromOverdue ? '← Back to overdue' : '← Back'}
+          <button type="button" className="btn btn-secondary" onClick={() => setShowReport(false)}>
+            ← Back
           </button>
         </div>
       </div>
     );
   }
 
+  const onFormFieldEnter = (e) => advanceReportFormOnEnter(e, formRef.current);
+  const onDateEnter = (e) => handleReportDateEnter(e, formRef.current);
+
   return (
-    <div className="slide slide-6">
-      <h2>{ledgerTitle} — parameters</h2>
-
-      <p className="company-info">
-        {compName} | FY {compYear}
-        <br />
-        <span className="compdet-date-hint">
-          {isSupplierLedger
-            ? 'Search supplier (schedule 11.10). Bill dates and payment ending date match your legacy prompts.'
-            : 'Search customer (schedule 8-9). Bill dates and payment ending date match your legacy prompts.'}
-        </span>
-      </p>
-
-      <form onSubmit={handleSubmit} className="report-form">
-        <div className="button-group button-group--form-top">
-          <button type="button" onClick={onPrev} className="btn btn-secondary">
+    <div className="slide slide-6 slide-6-ledger-form">
+      <div className="report-toolbar report-toolbar--ledger-form">
+        <h2>{ledgerTitle} — parameters</h2>
+        <div className="toolbar-actions">
+          <button type="button" onClick={onPrev} className="btn btn-secondary btn-toolbar-back">
             ← Back
           </button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button
+            type="submit"
+            form="bill-ledger-form"
+            className="btn btn-primary"
+            disabled={loading}
+          >
             {loading ? 'Loading...' : 'Run'}
           </button>
         </div>
+      </div>
 
+      <SessionInfoLine formData={formData} helpReportId="customer-ledger" />
+
+      <form
+        id="bill-ledger-form"
+        ref={formRef}
+        onSubmit={handleSubmit}
+        className="report-form report-form--ledger"
+        onKeyDown={onFormFieldEnter}
+      >
         <div className="form-group account-search-group">
           <label htmlFor="party-search">{isSupplierLedger ? 'Search supplier' : 'Search customer'}</label>
-          <input
-            id="party-search"
-            ref={partySearchInputRef}
-            type="search"
-            autoComplete="off"
-            placeholder="Code, name, or city… (↑↓ Enter)"
-            value={partySearch}
-            onChange={(e) => setPartySearch(e.target.value)}
-            onKeyDown={(e) => {
+          <div className="account-search-input-row">
+            <input
+              id="party-search"
+              ref={partySearchInputRef}
+              type="search"
+              autoComplete="off"
+              placeholder="Code, name, or city… (↑↓ Enter)"
+              value={partySearch}
+              onChange={(e) => setPartySearch(e.target.value)}
+              onKeyDown={(e) => {
               if (selectedCode) return;
               const max = Math.max(0, filteredParties.length - 1);
               if (e.key === 'ArrowDown') {
@@ -445,14 +475,25 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
                 setListHighlight((h) => Math.max(0, h - 1));
               } else if (e.key === 'Enter') {
                 const row = filteredParties[safeHighlight];
-                if (row) {
+                if (!selectedCode && partySearch.trim() && row) {
                   e.preventDefault();
+                  e.stopPropagation();
                   selectParty(row);
+                  return;
                 }
+                e.preventDefault();
+                e.stopPropagation();
+                focusNextReportField(formRef.current, e.target);
               }
-            }}
-            className="form-input"
-          />
+              }}
+              className="form-input account-search-input-row__field"
+            />
+            <VoiceSearchButton
+              disabled={!!selectedCode}
+              title={isSupplierLedger ? 'Speak supplier name to search' : 'Speak customer name to search'}
+              onTranscript={applyPartyVoiceSearch}
+            />
+          </div>
           {selectedCode ? (
             <p className="account-selected-hint">
               Selected: <strong>{selectedPartyRow?.NAME ?? '—'}</strong> (<code>{selectedCode}</code>)
@@ -476,7 +517,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
               </button>
             </p>
           ) : null}
-          {!selectedCode ? (
+          {!selectedCode && partySearch.trim() ? (
             <div className="account-search-results party-search-results" role="listbox" aria-label="Matching parties">
               <div className={`account-search-header party-search-header${showPartyBal ? ' party-search-header--with-bal' : ''}`} aria-hidden="true">
                 <span>Code</span>
@@ -485,7 +526,7 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
                 {showPartyBal ? <span className="account-search-bal-h">Bal</span> : null}
               </div>
               {filteredParties.length === 0 ? (
-                <div className="account-search-empty">No parties match your search.</div>
+                <div className="account-search-empty">{SEARCH_NO_MATCH}</div>
               ) : (
                 filteredParties.map((row, index) => {
                   const code = row.CODE ?? row.code;
@@ -522,6 +563,8 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
                 })
               )}
             </div>
+          ) : !selectedCode ? (
+            <p className="sale-bill-section__hint dc-party-search-hint">{SEARCH_TYPE_HINT}</p>
           ) : null}
         </div>
 
@@ -539,41 +582,44 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
           </div>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="bill-start">Bill start date (DD-MM-YYYY via calendar)</label>
-          <input
-            id="bill-start"
-            ref={billStartInputRef}
-            type="date"
-            lang="en-GB"
-            className="form-input"
-            value={billStart}
-            onChange={(e) => setBillStart(e.target.value)}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="bill-end">Bill end date</label>
-          <input
-            id="bill-end"
-            type="date"
-            lang="en-GB"
-            className="form-input"
-            value={billEnd}
-            onChange={(e) => setBillEnd(e.target.value)}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="pay-end">Payment ending date (voucher cut-off for CV/BV/JV)</label>
-          <input
-            id="pay-end"
-            type="date"
-            lang="en-GB"
-            className="form-input"
-            value={payEndDate}
-            onChange={(e) => setPayEndDate(e.target.value)}
-          />
+        <div className="form-row-broker form-row-broker--dates">
+          <div className="form-group">
+            <label htmlFor="bill-start">Bill start date</label>
+            <input
+              id="bill-start"
+              ref={billStartInputRef}
+              type="date"
+              lang="en-GB"
+              className="form-input"
+              value={billStart}
+              onChange={(e) => setBillStart(e.target.value)}
+              onKeyDown={onDateEnter}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="bill-end">Bill end date</label>
+            <input
+              id="bill-end"
+              type="date"
+              lang="en-GB"
+              className="form-input"
+              value={billEnd}
+              onChange={(e) => setBillEnd(e.target.value)}
+              onKeyDown={onDateEnter}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="pay-end">Payment ending date</label>
+            <input
+              id="pay-end"
+              type="date"
+              lang="en-GB"
+              className="form-input"
+              value={payEndDate}
+              onChange={(e) => setPayEndDate(e.target.value)}
+              onKeyDown={onDateEnter}
+            />
+          </div>
         </div>
 
         <div className="form-group">
@@ -672,15 +718,6 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
             </div>
           </>
         ) : null}
-
-        <div className="button-group">
-          <button type="button" className="btn btn-secondary" onClick={onPrev}>
-            ← Back
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? '⏳ Loading…' : 'Run'}
-          </button>
-        </div>
       </form>
     </div>
   );

@@ -1,0 +1,51 @@
+2026-06-03T07:00:13Z INF Starting tunnel tunnelID=1f7d513b-066e-4d0c-bc0f-7718109dad24
+2026-06-03T07:00:13Z INF Version 2026.3.0 (Checksum 59b12880b24af581cf5b1013db601c7d843b9b097e9c78aa5957c7f39f741885)
+2026-06-03T07:00:13Z INF GOOS: windows, GOVersion: go1.24.13, GoArch: amd64
+2026-06-03T07:00:13Z INF Settings: map[config:e:\GFASORCL\APPTEST\config.yml cred-file:./1f7d513b-066e-4d0c-bc0f-7718109dad24.json credentials-file:./1f7d513b-066e-4d0c-bc0f-7718109dad24.json]
+2026-06-03T07:00:13Z INF cloudflared will not automatically update on Windows systems.
+2026-06-03T07:00:13Z INF Generated Connector ID: 087a72d0-83b5-49ac-ab50-7da5dd50b358
+2026-06-03T07:00:13Z INF Initial protocol quic
+2026-06-03T07:00:13Z INF ICMP proxy will use 192.168.1.16 as source for IPv4
+2026-06-03T07:00:13Z INF ICMP proxy will use fe80::ac9e:c79e:fbf4:e038 in zone Wi-Fi as source for IPv6
+2026-06-03T07:00:13Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-06-03T07:00:13Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-06-03T07:00:13Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-06-03T07:00:13Z INF ICMP proxy will use 192.168.1.16 as source for IPv4
+2026-06-03T07:00:13Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=0 event=0 ip=198.41.192.167
+2026-06-03T07:00:13Z INF ICMP proxy will use fe80::ac9e:c79e:fbf4:e038 in zone Wi-Fi as source for IPv6
+2026-06-03T07:00:13Z INF Starting metrics server on 127.0.0.1:20242/metrics
+2026-06-03T07:00:14Z INF Registered tunnel connection connIndex=0 connection=0fb9adc3-0d04-4abc-aaa1-fc1e7dbe411f event=0 ip=198.41.192.167 location=del01 protocol=quic
+2026-06-03T07:00:14Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=1 event=0 ip=198.41.200.33
+2026-06-03T07:00:14Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-06-03T07:00:14Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-06-03T07:00:14Z INF Updated to new configuration config="{\"ingress\":[{\"hostname\":\"demo.fasaccountingsoftware.in\",\"service\":\"http://localhost:5173\"},{\"hostname\":\"demo-api.fasaccountingsoftware.in\",\"service\":\"http://localhost:5002\"},{\"service\":\"http_status:404\"}],\"warp-routing\":{\"enabled\":false}}" version=4
+2026-06-03T07:00:14Z INF Registered tunnel connection connIndex=1 connection=37f4d03a-2bef-4be4-a0d5-6c78a21c5a35 event=0 ip=198.41.200.33 location=del06 protocol=quic
+2026-06-03T07:00:15Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=2 event=0 ip=198.41.200.23
+2026-06-03T07:00:15Z INF Registered tunnel connection connIndex=2 connection=579158e9-f231-4cb7-8704-1c854fb12663 event=0 ip=198.41.200.23 location=del04 protocol=quic
+2026-06-03T07:00:16Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=3 event=0 ip=198.41.192.27
+2026-06-03T07:00:17Z INF Registered tunnel connection connIndex=3 connection=bf9e1f5c-04ef-488f-bb8f-6b751a7f92f2 event=0 ip=198.41.192.27 location=del01 protocol=quic
+2026-06-03T07:02:39Z INF Initiating graceful shutdown due to signal terminated ...
+2026-06-03T07:02:39Z ERR failed to run the datagram handler error="context canceled" connIndex=0 event=0 ip=198.41.192.167
+2026-06-03T07:02:39Z ERR failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=0 event=0 ip=198.41.192.167
+2026-06-03T07:02:39Z ERR failed to run the datagram handler error="context canceled" connIndex=3 event=0 ip=198.41.192.27
+2026-06-03T07:02:39Z ERR failed to run the datagram handler error="context canceled" connIndex=2 event=0 ip=198.41.200.23
+2026-06-03T07:02:39Z ERR failed to run the datagram handler error="context canceled" connIndex=1 event=0 ip=198.41.200.33
+2026-06-03T07:02:39Z ERR Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=0 event=0 ip=198.41.192.167
+2026-06-03T07:02:39Z ERR failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=3 event=0 ip=198.41.192.27
+2026-06-03T07:02:39Z ERR failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=2 event=0 ip=198.41.200.23
+2026-06-03T07:02:39Z ERR failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=1 event=0 ip=198.41.200.33
+2026-06-03T07:02:39Z INF Retrying connection in up to 1s connIndex=0 event=0 ip=198.41.192.167
+2026-06-03T07:02:39Z ERR Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=3 event=0 ip=198.41.192.27
+2026-06-03T07:02:39Z ERR Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=2 event=0 ip=198.41.200.23
+2026-06-03T07:02:39Z ERR Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=1 event=0 ip=198.41.200.33
+2026-06-03T07:02:39Z ERR Connection terminated connIndex=0
+2026-06-03T07:02:39Z INF Retrying connection in up to 1s connIndex=3 event=0 ip=198.41.192.27
+2026-06-03T07:02:39Z INF Retrying connection in up to 1s connIndex=2 event=0 ip=198.41.200.23
+2026-06-03T07:02:39Z INF Retrying connection in up to 1s connIndex=1 event=0 ip=198.41.200.33
+2026-06-03T07:02:39Z ERR Connection terminated connIndex=3
+2026-06-03T07:02:39Z ERR Connection terminated connIndex=2
+2026-06-03T07:02:39Z ERR Connection terminated connIndex=1
+2026-06-03T07:02:39Z ERR no more connections active and exiting
+2026-06-03T07:02:39Z INF Tunnel server stopped
+2026-06-03T07:02:39Z ERR icmp router terminated error="context canceled"
+2026-06-03T07:02:39Z INF Metrics server stopped

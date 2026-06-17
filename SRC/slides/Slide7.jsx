@@ -5,9 +5,23 @@ import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { downloadExcelRows } from '../utils/excelExport';
 import { toInputDateString, toOracleDate, toDisplayDate } from '../utils/dateFormat';
 import { formatApiOrigin } from '../utils/apiLabel';
-import ReportHelpButton from '../components/ReportHelpButton';
+import { filterBrokerOsRawRowsByMinClosingAbs } from '../utils/brokerOsDisplay';
+import SessionInfoLine from '../components/SessionInfoLine';
+import SessionToolbarChrome from '../components/SessionToolbarChrome';
+import VoiceSearchButton from '../components/VoiceSearchButton';
+import { filterCodeNameCityRowsSmart, SEARCH_NO_MATCH, SEARCH_TYPE_HINT } from '../utils/masterSearchFilter';
+import { applyVoicePartyBrokerSearch } from '../utils/voiceSearchApply';
+import {
+  advanceReportFormOnEnter,
+  focusNextReportField,
+  handleReportDateEnter,
+} from '../utils/reportFormFocus';
 
 const DEFAULT_HISTORY_START_DATE = '2001-04-01';
+
+/** Default B_CODE range on BrokerOs. */
+const BROKER_OS_RANGE_START = 'B00001';
+const BROKER_OS_RANGE_END = 'B99999';
 
 function highlightMatch(text, q) {
   if (text == null) return null;
@@ -29,8 +43,8 @@ function highlightMatch(text, q) {
 export default function Slide7({ apiBase, onPrev, onReset, formData }) {
   const [brokers, setBrokers] = useState([]);
   const [parties, setParties] = useState([]);
-  const [brokStart, setBrokStart] = useState('B00001');
-  const [brokEnd, setBrokEnd] = useState('B99999');
+  const [brokStart, setBrokStart] = useState(BROKER_OS_RANGE_START);
+  const [brokEnd, setBrokEnd] = useState(BROKER_OS_RANGE_END);
   const [brokerSearch, setBrokerSearch] = useState('');
   const [brokerListHighlight, setBrokerListHighlight] = useState(0);
   const [selectedParty, setSelectedParty] = useState('');
@@ -43,10 +57,16 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
   const [loading, setLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [lookupError, setLookupError] = useState('');
+  const formRef = useRef(null);
   const dateStartRef = useRef(null);
   const partySearchRef = useRef(null);
   const brokerSearchRef = useRef(null);
   const [listHighlight, setListHighlight] = useState(0);
+  /** Dr/Cr column order: blank or ≠11.10 → Dr then Cr; 11.10 (creditors) → Cr then Dr. */
+  const [brokerOsSchedule, setBrokerOsSchedule] = useState('');
+  /** Bills with |final / closing balance| below this are omitted from the list (PDF, Excel, screen). */
+  const [brokerOsMinIgnore, setBrokerOsMinIgnore] = useState('');
+  const [whatsAppBusy, setWhatsAppBusy] = useState(false);
 
   const compCode = formData.comp_code ?? formData.COMP_CODE;
   const compUid = formData.comp_uid ?? formData.COMP_UID;
@@ -67,6 +87,16 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
     formData.COMP_S_DT,
     formData.COMP_E_DT,
   ]);
+
+  useEffect(() => {
+    const seed =
+      formData.broker_os_schedule ??
+      formData.BROKER_OS_SCHEDULE ??
+      formData.report_schedule ??
+      formData.REPORT_SCHEDULE ??
+      '';
+    setBrokerOsSchedule(String(seed ?? '').trim());
+  }, [compUid]);
 
   useEffect(() => {
     const load = async () => {
@@ -96,26 +126,21 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
     load();
   }, [apiBase, compCode, compUid]);
 
-  const filteredParties = useMemo(() => {
-    const q = partySearch.trim().toLowerCase();
-    if (!q) return parties.slice(0, 150);
-    return parties.filter((p) => {
-      const code = String(p.CODE ?? p.code ?? '').toLowerCase();
-      const name = String(p.NAME ?? p.name ?? '').toLowerCase();
-      const city = String(p.CITY ?? p.city ?? '').toLowerCase();
-      return code.includes(q) || name.includes(q) || city.includes(q);
-    });
-  }, [parties, partySearch]);
+  /** Reset default broker B_CODE range when company / year changes. */
+  useEffect(() => {
+    setBrokStart(BROKER_OS_RANGE_START);
+    setBrokEnd(BROKER_OS_RANGE_END);
+  }, [compCode, compUid]);
 
-  const filteredBrokers = useMemo(() => {
-    const q = brokerSearch.trim().toLowerCase();
-    if (!q) return brokers.slice(0, 150);
-    return brokers.filter((b) => {
-      const code = String(b.CODE ?? b.code ?? '').toLowerCase();
-      const name = String(b.NAME ?? b.name ?? '').toLowerCase();
-      return code.includes(q) || name.includes(q);
-    });
-  }, [brokers, brokerSearch]);
+  const filteredParties = useMemo(
+    () => filterCodeNameCityRowsSmart(parties, partySearch, 50),
+    [parties, partySearch]
+  );
+
+  const filteredBrokers = useMemo(
+    () => filterCodeNameCityRowsSmart(brokers, brokerSearch, 50),
+    [brokers, brokerSearch]
+  );
 
   useEffect(() => {
     setListHighlight(0);
@@ -157,6 +182,16 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
     focusDates();
   };
 
+  const applyBrokerVoiceSearch = (transcript) => {
+    applyVoicePartyBrokerSearch({
+      transcript,
+      rows: brokers,
+      setQuery: setBrokerSearch,
+      setHighlight: setBrokerListHighlight,
+      inputRef: brokerSearchRef,
+    });
+  };
+
   const selectedPartyRow = parties.find((p) => String(p.CODE ?? p.code) === String(selectedParty));
 
   const singleBrokerRow =
@@ -164,6 +199,26 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
     brokStart.trim() === brokEnd.trim()
       ? brokers.find((b) => String(b.CODE ?? b.code ?? '').trim() === brokStart.trim())
       : null;
+
+  /** VARCHAR2 B_CODE band sent to API (TRIM(BK_CODE) BETWEEN start AND end). */
+  const brokerRangeLabel = useMemo(() => {
+    const start = brokStart.trim();
+    const end = brokEnd.trim();
+    if (!start || !end) return '';
+    if (start === end) return start;
+    return `${start} – ${end}`;
+  }, [brokStart, brokEnd]);
+
+  const selectedBrokerName = String(singleBrokerRow?.NAME ?? singleBrokerRow?.name ?? '').trim();
+  /** Range + broker name when one broker is selected (for PDF, WhatsApp, and report header). */
+  const brokerRangeWithName = selectedBrokerName
+    ? `${brokerRangeLabel} — ${selectedBrokerName}`
+    : brokerRangeLabel;
+
+  const brokerOsFilteredReportData = useMemo(
+    () => filterBrokerOsRawRowsByMinClosingAbs(reportData, brokerOsMinIgnore),
+    [reportData, brokerOsMinIgnore],
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -193,11 +248,11 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
       const { data } = await axios.get(`${apiBase}/api/broker-outstanding`, {
         params,
         withCredentials: true,
-        timeout: 120000,
+        timeout: 600000,
       });
       const rows = Array.isArray(data) ? data : [];
       if (rows.length === 0) {
-        alert('No rows returned. Try All (A), widen broker range or dates, or check bills with BK_CODE and VR_TYPE SL/SE/PU.');
+        alert('No rows returned. Try All (A), widen broker B_CODE range or dates, or check bills with B_CODE and VR_TYPE S/SE/PU.');
       } else {
         setReportData(rows);
         setShowReport(true);
@@ -219,40 +274,100 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
     year: compYear,
     endDate: `${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`,
     payEndDate: toDisplayDate(payEndDate),
-    brokerRange: `${brokStart.trim()} – ${brokEnd.trim()}`,
-    brokerHead:
-      brokStart.trim() === brokEnd.trim()
-        ? `${brokStart.trim()} — ${(singleBrokerRow?.NAME ?? singleBrokerRow?.name ?? '').trim() || '—'}`
-        : `${brokStart.trim()}–${brokEnd.trim()}`,
+    brokerRange: brokerRangeWithName,
     partyLabel: selectedParty
       ? `${selectedParty} — ${selectedPartyRow?.NAME ?? ''}`
       : 'All parties (C/S)',
-    filterLabel: mco === 'O' ? 'Outstanding only (FINAL_BAL ≠ 0)' : 'All bills',
+    filterLabel: (() => {
+      const base = mco === 'O' ? 'Outstanding only (FINAL_BAL ≠ 0)' : 'All bills';
+      const n = parseFloat(String(brokerOsMinIgnore ?? '').replace(/,/g, '').trim());
+      if (Number.isFinite(n) && n > 0) {
+        return `${base}; hide bills with |final bal| < ${n}`;
+      }
+      return base;
+    })(),
+    schedule: brokerOsSchedule,
   };
 
-  const downloadPDF = () => generatePDF('broker-os', reportData, pdfMeta);
+  const downloadPDF = () => generatePDF('broker-os', brokerOsFilteredReportData, pdfMeta);
 
-  const shareWhatsApp = () => {
+  const shareWhatsApp = async () => {
+    const brokerHeadline = selectedBrokerName
+      ? `Broker: ${String(singleBrokerRow.CODE ?? singleBrokerRow.code ?? '').trim()} — ${selectedBrokerName}`
+      : `Brokers: ${brokerRangeLabel}`;
     const shareText = [
       `Broker-wise outstanding — ${compName}`,
-      `${compYear} | Brokers ${brokStart.trim()}–${brokEnd.trim()}`,
+      brokerHeadline,
+      compYear,
       pdfMeta.partyLabel,
       `Dates ${toDisplayDate(startDate)} – ${toDisplayDate(endDate)} | Pay to ${toDisplayDate(payEndDate)}`,
       mco === 'O' ? 'Filter: Outstanding' : 'Filter: All',
     ].join('\n');
-    return sharePdfWithWhatsApp('broker-os', reportData, pdfMeta, shareText);
+    setWhatsAppBusy(true);
+    try {
+      await sharePdfWithWhatsApp('broker-os', brokerOsFilteredReportData, pdfMeta, shareText);
+    } finally {
+      setWhatsAppBusy(false);
+    }
   };
 
   if (showReport && reportData.length > 0) {
+    const minIgnoreNum = parseFloat(String(brokerOsMinIgnore ?? '').replace(/,/g, '').trim());
+    const minIgnoreActive = Number.isFinite(minIgnoreNum) && minIgnoreNum > 0;
+
+    if (brokerOsFilteredReportData.length === 0) {
+      return (
+        <div className="slide slide-report slide-report--mobile-toolbar-row slide-report--broker-os">
+          <SessionInfoLine formData={formData} helpReportId="broker-os" />
+          <div className="report-toolbar">
+            <h2>Broker outstanding</h2>
+            <div className="toolbar-actions">
+              <button
+                type="button"
+                className="btn btn-toolbar-back"
+                aria-label="Back"
+                onClick={() => setShowReport(false)}
+              >
+                <span className="report-toolbar-back-full">← Back</span>
+                <span className="report-toolbar-back-short" aria-hidden="true">
+                  ←
+                </span>
+              </button>
+            </div>
+          </div>
+          <div className="report-info" role="status">
+            <p>
+              <strong>No bills to show.</strong>{' '}
+              {minIgnoreActive
+                ? `Every bill had |final balance| below your minimum (${minIgnoreNum}). Use ← Back, lower or clear “Minimum amount to ignore”, then Run again.`
+                : 'Try widening dates or broker range.'}
+            </p>
+          </div>
+          <div className="button-group">
+            <button type="button" className="btn btn-secondary" onClick={() => setShowReport(false)}>
+              ← Back
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="slide slide-report">
+      <div className="slide slide-report slide-report--mobile-toolbar-row slide-report--broker-os">
+        <SessionInfoLine formData={formData} helpReportId="broker-os" />
         <div className="report-toolbar">
           <h2>Broker outstanding</h2>
           <div className="toolbar-actions">
-            <ReportHelpButton reportId="broker-os" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setShowReport(false)}>
-              ← Back
+            <button
+              type="button"
+              className="btn btn-toolbar-back"
+              aria-label="Back"
+              onClick={() => setShowReport(false)}
+            >
+              <span className="report-toolbar-back-full">← Back</span>
+              <span className="report-toolbar-back-short" aria-hidden="true">
+                ←
+              </span>
             </button>
             <button
               type="button"
@@ -266,7 +381,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
               className="btn btn-excel"
               onClick={() => {
                 try {
-                  downloadExcelRows(reportData, 'BrokerOS', `${compName}_BrokerOutstanding`);
+                  downloadExcelRows(brokerOsFilteredReportData, 'BrokerOS', `${compName}_BrokerOutstanding`);
                 } catch (e) {
                   alert(String(e?.message || e));
                 }
@@ -277,46 +392,40 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
             <button
               type="button"
               className="btn btn-whatsapp"
+              disabled={whatsAppBusy}
               onClick={() => shareWhatsApp().catch((err) => alert(err?.message || String(err)))}
             >
-              💬 WhatsApp
+              {whatsAppBusy ? 'Preparing…' : '💬 WhatsApp'}
             </button>
           </div>
         </div>
 
         <div className="report-info">
           <p>
-            <strong>Broker</strong>{' '}
-            {brokStart.trim() === brokEnd.trim()
-              ? `${brokStart.trim()} — ${singleBrokerRow?.NAME ?? singleBrokerRow?.name ?? '—'}`
-              : `${brokStart.trim()}–${brokEnd.trim()}`}
+            <strong>Brokers</strong> {brokerRangeWithName}
             {selectedParty ? (
               <>
-                {' · '}
-                <strong>Party</strong> {selectedPartyRow?.NAME ?? selectedParty} ({selectedParty})
+                {' '}
+                · Party <strong>{selectedPartyRow?.NAME ?? selectedParty}</strong> ({selectedParty})
               </>
             ) : (
-              <>
-                {' · '}
-                <strong>Party</strong> All parties (C/S)
-              </>
+              <> · All parties (C/S)</>
             )}
-            {' · '}
-            <strong>Bills</strong> {toDisplayDate(startDate)}–{toDisplayDate(endDate)}
-            {' · '}
-            <strong>Payment to</strong> {toDisplayDate(payEndDate)}
-            {' · '}
-            <strong>Filter</strong> {mco === 'O' ? 'Outstanding only' : 'All bills'}
           </p>
           <p>
-            {compName} | FY {compYear}
-            <br />
-            Scroll sideways on a phone to see every column, including Detail.
+            Bills {toDisplayDate(startDate)} – {toDisplayDate(endDate)} · Payment cut-off {toDisplayDate(payEndDate)} ·{' '}
+            {mco === 'O' ? 'Outstanding only' : 'All'}
+            {minIgnoreActive ? (
+              <>
+                {' '}
+                · Hiding bills whose |final bal| is below <strong>{minIgnoreNum}</strong>
+              </>
+            ) : null}
           </p>
         </div>
 
         <div className="report-display">
-          <ReportTable data={reportData} type="broker-os" />
+          <ReportTable data={brokerOsFilteredReportData} type="broker-os" meta={{ schedule: brokerOsSchedule }} />
         </div>
 
         <div className="button-group">
@@ -328,18 +437,32 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
     );
   }
 
-  return (
-    <div className="slide slide-7">
-      <h2>Broker outstanding (BrokerOs)</h2>
+  const onFormFieldEnter = (e) => advanceReportFormOnEnter(e, formRef.current);
+  const onDateEnter = (e) => handleReportDateEnter(e, formRef.current);
 
-      <p className="company-info">
-        {compName} | FY {compYear}
-        <br />
-        <span className="compdet-date-hint">
-          Includes bills that have a BILLS line with <strong>BK_CODE</strong> in range and <strong>VR_TYPE</strong> in
-          SL, SE, or PU. Credits after the payment ending date are ignored in balances.
-        </span>
-      </p>
+  return (
+    <div className="slide slide-7 slide-7-broker-os">
+      <div className="broker-os-form-chrome">
+        <SessionInfoLine
+          formData={formData}
+          actions={
+          <>
+            <SessionToolbarChrome helpReportId="broker-os" helpCompanyName={compName} />
+            <button type="button" onClick={onPrev} className="btn btn-secondary btn-toolbar-back">
+              ← Back
+            </button>
+            <button
+              type="submit"
+              form="broker-os-form"
+              className="btn btn-primary btn-toolbar-run"
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : 'Run'}
+            </button>
+          </>
+          }
+        />
+      </div>
 
       {lookupError ? (
         <div className="form-api-error" role="alert">
@@ -347,27 +470,26 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
         </div>
       ) : null}
 
-      <form onSubmit={handleSubmit} className="report-form">
-        <div className="button-group button-group--form-top">
-          <button type="button" onClick={onPrev} className="btn btn-secondary">
-            ← Back
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Loading...' : 'Run'}
-          </button>
-        </div>
-
+      <form
+        id="broker-os-form"
+        ref={formRef}
+        onSubmit={handleSubmit}
+        className="report-form report-form--broker-os"
+        autoComplete="off"
+        onKeyDown={onFormFieldEnter}
+      >
         <div className="form-group account-search-group">
           <label htmlFor="bo-broker-search">Broker name or code (help — pick one broker)</label>
-          <input
-            id="bo-broker-search"
-            ref={brokerSearchRef}
-            type="search"
-            autoComplete="off"
-            placeholder="Search broker name or code… (↑↓ Enter)"
-            value={brokerSearch}
-            onChange={(e) => setBrokerSearch(e.target.value)}
-            onKeyDown={(e) => {
+          <div className="account-search-input-row">
+            <input
+              id="bo-broker-search"
+              ref={brokerSearchRef}
+              type="search"
+              autoComplete="off"
+              placeholder="Search broker name or code… (↑↓ Enter)"
+              value={brokerSearch}
+              onChange={(e) => setBrokerSearch(e.target.value)}
+              onKeyDown={(e) => {
               const max = Math.max(0, filteredBrokers.length - 1);
               if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -378,14 +500,24 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
                 setBrokerListHighlight((h) => Math.max(0, h - 1));
               } else if (e.key === 'Enter') {
                 const row = filteredBrokers[safeBrokerHi];
-                if (row) {
+                if (brokerSearch.trim() && row) {
                   e.preventDefault();
+                  e.stopPropagation();
                   selectBrokerRow(row);
+                  return;
                 }
+                e.preventDefault();
+                e.stopPropagation();
+                focusNextReportField(formRef.current, e.target);
               }
-            }}
-            className="form-input"
-          />
+              }}
+              className="form-input account-search-input-row__field"
+            />
+            <VoiceSearchButton
+              title="Speak broker name to search"
+              onTranscript={applyBrokerVoiceSearch}
+            />
+          </div>
           {singleBrokerRow ? (
             <p className="account-selected-hint">
               Single broker: <strong>{singleBrokerRow.NAME ?? singleBrokerRow.name ?? '—'}</strong> (
@@ -394,8 +526,8 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
                 type="button"
                 className="btn-text-clear"
                 onClick={() => {
-                  setBrokStart('B00001');
-                  setBrokEnd('B99999');
+                  setBrokStart(BROKER_OS_RANGE_START);
+                  setBrokEnd(BROKER_OS_RANGE_END);
                   setBrokerSearch('');
                   setBrokerListHighlight(0);
                   setTimeout(() => brokerSearchRef.current?.focus(), 0);
@@ -404,7 +536,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
                 All brokers
               </button>
             </p>
-          ) : (
+          ) : brokerSearch.trim() ? (
             <div className="account-search-results broker-search-results" role="listbox" aria-label="Brokers">
               <div className="account-search-header broker-search-header" aria-hidden="true">
                 <span>Code</span>
@@ -412,11 +544,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
               </div>
               {filteredBrokers.length === 0 ? (
                 <div className="account-search-empty">
-                  {lookupError
-                    ? 'Fix the API error above to load brokers.'
-                    : brokerSearch.trim()
-                      ? 'No brokers match.'
-                      : 'Type to search, or set starting / ending codes below for a range.'}
+                  {lookupError ? 'Fix the API error above to load brokers.' : SEARCH_NO_MATCH}
                 </div>
               ) : (
                 filteredBrokers.map((row, index) => {
@@ -441,42 +569,85 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
                 })
               )}
             </div>
+          ) : (
+            <p className="sale-bill-section__hint dc-party-search-hint">
+              {SEARCH_TYPE_HINT} Or set starting / ending broker codes below for a range.
+            </p>
           )}
         </div>
 
         <div className="form-row-broker">
           <div className="form-group">
-            <label htmlFor="brok-start">Starting broker code</label>
+            <label htmlFor="bo-b-code-start">Starting broker b_code (B_CODE)</label>
             <input
-              id="brok-start"
-              name="brok-start"
+              id="bo-b-code-start"
+              name="broker-os-b-code-start"
+              type="text"
               className="form-input"
               value={brokStart}
               onChange={(e) => setBrokStart(e.target.value)}
+              onKeyDown={onFormFieldEnter}
               autoComplete="off"
-              list="datalist-broker-codes"
+              spellCheck={false}
+              placeholder={BROKER_OS_RANGE_START}
             />
           </div>
           <div className="form-group">
-            <label htmlFor="brok-end">Ending broker code</label>
+            <label htmlFor="bo-b-code-end">Ending broker b_code (B_CODE)</label>
             <input
-              id="brok-end"
-              name="brok-end"
+              id="bo-b-code-end"
+              name="broker-os-b-code-end"
+              type="text"
               className="form-input"
               value={brokEnd}
               onChange={(e) => setBrokEnd(e.target.value)}
+              onKeyDown={onFormFieldEnter}
               autoComplete="off"
-              list="datalist-broker-codes"
+              spellCheck={false}
+              placeholder={BROKER_OS_RANGE_END}
             />
           </div>
         </div>
-        <datalist id="datalist-broker-codes">
-          {brokers.map((b) => (
-            <option key={String(b.CODE ?? b.code)} value={String(b.CODE ?? b.code)}>
-              {b.NAME ?? b.name}
-            </option>
-          ))}
-        </datalist>
+
+        <div className="form-row-broker form-row-broker--dates">
+          <div className="form-group">
+            <label htmlFor="bo-start">Bill start date</label>
+            <input
+              id="bo-start"
+              ref={dateStartRef}
+              type="date"
+              lang="en-GB"
+              className="form-input"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              onKeyDown={onDateEnter}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="bo-end">Bill end date</label>
+            <input
+              id="bo-end"
+              type="date"
+              lang="en-GB"
+              className="form-input"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              onKeyDown={onDateEnter}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="bo-pedt">Payment ending date</label>
+            <input
+              id="bo-pedt"
+              type="date"
+              lang="en-GB"
+              className="form-input"
+              value={payEndDate}
+              onChange={(e) => setPayEndDate(e.target.value)}
+              onKeyDown={onDateEnter}
+            />
+          </div>
+        </div>
 
         <div className="form-group account-search-group">
           <label htmlFor="bo-party-search">Specific customer / party (optional — leave empty for all C/S)</label>
@@ -500,10 +671,15 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
                 setListHighlight((h) => Math.max(0, h - 1));
               } else if (e.key === 'Enter') {
                 const row = filteredParties[safePartyHi];
-                if (row) {
+                if (!selectedParty && partySearch.trim() && row) {
                   e.preventDefault();
+                  e.stopPropagation();
                   selectPartyRow(row);
+                  return;
                 }
+                e.preventDefault();
+                e.stopPropagation();
+                focusNextReportField(formRef.current, e.target);
               }
             }}
             className="form-input"
@@ -525,7 +701,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
               </button>
             </p>
           ) : null}
-          {!selectedParty ? (
+          {!selectedParty && partySearch.trim() ? (
             <div className="account-search-results party-search-results" role="listbox" aria-label="Parties C/S">
               <div className="account-search-header party-search-header" aria-hidden="true">
                 <span>Code</span>
@@ -534,11 +710,7 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
               </div>
               {filteredParties.length === 0 ? (
                 <div className="account-search-empty">
-                  {lookupError
-                    ? 'Fix the API error above to load parties.'
-                    : partySearch.trim()
-                      ? 'No parties match.'
-                      : 'Optional: type to pick one party, or leave empty for all C/S accounts.'}
+                  {lookupError ? 'Fix the API error above to load parties.' : SEARCH_NO_MATCH}
                 </div>
               ) : (
                 filteredParties.map((row, index) => {
@@ -566,7 +738,29 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
                 })
               )}
             </div>
+          ) : !selectedParty ? (
+            <p className="sale-bill-section__hint dc-party-search-hint">
+              Optional: {SEARCH_TYPE_HINT} Leave blank to include all C/S accounts.
+            </p>
           ) : null}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="bo-schedule">Schedule no. (column order — optional)</label>
+          <input
+            id="bo-schedule"
+            name="broker-os-schedule"
+            type="text"
+            inputMode="decimal"
+            className="form-input"
+            style={{ maxWidth: '10rem' }}
+            value={brokerOsSchedule}
+            onChange={(e) => setBrokerOsSchedule(e.target.value)}
+            onKeyDown={onFormFieldEnter}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="e.g. 11.10"
+          />
         </div>
 
         <div className="form-group">
@@ -584,42 +778,21 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
         </div>
 
         <div className="form-group">
-          <label htmlFor="bo-start">Starting date (bill date range)</label>
+          <label htmlFor="bo-min-ignore">Minimum amount to ignore (optional)</label>
           <input
-            id="bo-start"
-            ref={dateStartRef}
-            type="date"
-            lang="en-GB"
+            id="bo-min-ignore"
+            name="broker-os-min-ignore"
+            type="text"
+            inputMode="decimal"
             className="form-input"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            style={{ maxWidth: '12rem' }}
+            value={brokerOsMinIgnore}
+            onChange={(e) => setBrokerOsMinIgnore(e.target.value)}
+            onKeyDown={onFormFieldEnter}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="e.g. 100"
           />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="bo-end">Ending date</label>
-          <input id="bo-end" type="date" lang="en-GB" className="form-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="bo-pedt">Payment ending date (credits after this date → 0 in report)</label>
-          <input
-            id="bo-pedt"
-            type="date"
-            lang="en-GB"
-            className="form-input"
-            value={payEndDate}
-            onChange={(e) => setPayEndDate(e.target.value)}
-          />
-        </div>
-
-        <div className="button-group">
-          <button type="button" className="btn btn-secondary" onClick={onPrev}>
-            ← Back
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? '⏳ Loading…' : 'Run'}
-          </button>
         </div>
       </form>
     </div>

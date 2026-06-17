@@ -1,7 +1,50 @@
-/** Helpers for broker outstanding: alpha party order within broker, party/broker/grand subtotals */
+import { rowFieldCI } from './rowFieldCI';
 
-function bkOf(row) {
-  return String(row.BK_CODE ?? row.bk_code ?? '').trim();
+/** Single broker-range token: plain number or strip leading non-digits (B26001 → 26001). */
+export function parseBrokerOsRangeForUi(raw) {
+  const s = String(raw ?? '').trim();
+  if (s === '') return null;
+  const direct = Number(s);
+  if (Number.isFinite(direct)) return direct;
+  const stripped = s.replace(/^[^0-9]+/, '');
+  if (stripped === '') return null;
+  const n = Number(stripped);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Helpers for broker outstanding: alpha party order within broker, party/broker/grand subtotals. */
+export function brokerOsBCodeOf(row) {
+  if (!row) return '';
+  const direct = row.BK_CODE ?? row.bk_code ?? row.B_CODE ?? row.b_code;
+  if (direct != null && direct !== '') return String(direct).trim();
+  const ci = rowFieldCI(row, 'BK_CODE') || rowFieldCI(row, 'B_CODE');
+  if (ci !== '') return ci;
+  for (const k of Object.keys(row)) {
+    const norm = String(k).replace(/_/g, '').toLowerCase();
+    if (norm === 'bcode' || norm === 'bkcode') {
+      const v = row[k];
+      if (v != null && v !== '') return String(v).trim();
+    }
+  }
+  return '';
+}
+
+/**
+ * Schedule 11.10 = creditors style: Cr column before Dr on broker outstanding.
+ * Any other value or blank: Dr before Cr (debtors / default).
+ */
+export function brokerOsCrFirstFromSchedule(raw) {
+  const s = String(raw ?? '').trim().replace(',', '.');
+  if (!s) return false;
+  const cleaned = s.replace(/[^\d.-]/g, '');
+  if (!cleaned) return false;
+  const n = parseFloat(cleaned);
+  if (!Number.isFinite(n)) return false;
+  return Math.round(n * 100 + 1e-6) === 1110;
+}
+
+function bCodeOf(row) {
+  return brokerOsBCodeOf(row);
 }
 function codeOf(row) {
   return String(row.CODE ?? row.code ?? '').trim();
@@ -44,11 +87,60 @@ function drFlag(row) {
   return parseFloat(row.DR_CR_FLAG ?? row.dr_cr_flag ?? 2) || 2;
 }
 
-/** Broker → party name (A–Z) → party code → bill / voucher order */
+/** Normalize bill date for grouping keys (matches server: TRUNC(BILL_DATE)). */
+function brokerOsBillDateKey(raw) {
+  if (raw == null || raw === '') return '';
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const t = new Date(raw).getTime();
+  if (Number.isNaN(t)) return s;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+function brokerOsBillGroupKey(row) {
+  if (!row) return '';
+  const comp = String(row.COMP_CODE ?? row.comp_code ?? '').trim();
+  const code = String(row.CODE ?? row.code ?? '').trim();
+  const billNo = String(row.BILL_NO ?? row.bill_no ?? '').trim();
+  const dk = brokerOsBillDateKey(row.BILL_DATE ?? row.bill_date);
+  return `${comp}|${code}|${billNo}|${dk}`;
+}
+
+/**
+ * Drop entire bills whose closing balance (FINAL_BAL on API rows — bill total / "final bal")
+ * has absolute value strictly below `minAmount` (e.g. min 100 hides balance 99).
+ * Blank, zero, or invalid min → no filtering.
+ */
+export function filterBrokerOsRawRowsByMinClosingAbs(rows, minAmountRaw) {
+  const list = Array.isArray(rows) ? rows : [];
+  const minAmount = parseFloat(String(minAmountRaw ?? '').replace(/,/g, '').trim());
+  if (!Number.isFinite(minAmount) || minAmount <= 0) return list;
+
+  const billFinalAbs = new Map();
+  for (const row of list) {
+    if (!row) continue;
+    const key = brokerOsBillGroupKey(row);
+    if (!key || billFinalAbs.has(key)) continue;
+    const fin = parseFloat(row.FINAL_BAL ?? row.final_bal ?? 0) || 0;
+    billFinalAbs.set(key, Math.abs(fin));
+  }
+
+  const excluded = new Set();
+  for (const [key, absFin] of billFinalAbs) {
+    if (absFin < minAmount) excluded.add(key);
+  }
+  if (excluded.size === 0) return list;
+
+  return list.filter((row) => !excluded.has(brokerOsBillGroupKey(row)));
+}
+
+/** Broker name (A–Z) → broker code (tie-break) → party name → party code → bill / voucher order */
 export function sortBrokerOsRawRows(rows) {
   const r = [...(rows || [])];
   r.sort((a, b) => {
-    const c1 = bkOf(a).localeCompare(bkOf(b));
+    const byBrokerName = brokerNameOf(a).localeCompare(brokerNameOf(b), 'en', { sensitivity: 'base', numeric: true });
+    if (byBrokerName !== 0) return byBrokerName;
+    const c1 = bCodeOf(a).localeCompare(bCodeOf(b), undefined, { numeric: true });
     if (c1 !== 0) return c1;
     const c2 = nameOf(a).localeCompare(nameOf(b), 'en', { sensitivity: 'base', numeric: true });
     if (c2 !== 0) return c2;
@@ -56,8 +148,8 @@ export function sortBrokerOsRawRows(rows) {
     if (c3 !== 0) return c3;
     const bd = ts(a.BILL_DATE ?? a.bill_date) - ts(b.BILL_DATE ?? b.bill_date);
     if (bd !== 0) return bd;
-    const bn = billNoOf(a).localeCompare(billNoOf(b), undefined, { numeric: true });
-    if (bn !== 0) return bn;
+    const byBillNo = billNoOf(a).localeCompare(billNoOf(b), undefined, { numeric: true });
+    if (byBillNo !== 0) return byBillNo;
     const bt = bTypeOf(a).localeCompare(bTypeOf(b));
     if (bt !== 0) return bt;
     const vd = ts(a.VR_DATE ?? a.vr_date) - ts(b.VR_DATE ?? b.vr_date);
@@ -70,7 +162,34 @@ export function sortBrokerOsRawRows(rows) {
 }
 
 /**
- * @returns {{ displayRows: Array<{kind:'broker-section-header',BK_CODE,BK_NAME}|{kind:'detail',row}|...>, grandDr: number, grandCr: number }}
+ * Split display rows into one block per broker: `{ header, rows }[]`.
+ * Header rows stay out of `rows` so the banner can render outside the horizontal scroll container (mobile Safari).
+ */
+export function segmentBrokerOsByHeader(displayRows) {
+  const rows = Array.isArray(displayRows) ? displayRows : [];
+  const segments = [];
+  let cur = null;
+  for (const item of rows) {
+    if (!item) continue;
+    if (item.kind === 'broker-header' || item.kind === 'broker-section-header') {
+      if (cur) segments.push(cur);
+      cur = { header: item, rows: [] };
+    } else if (cur) {
+      cur.rows.push(item);
+    }
+  }
+  if (cur) segments.push(cur);
+  return segments;
+}
+
+/**
+ * @returns {{ displayRows: Array<
+ *   | { kind: 'broker-section-header', BK_CODE: string, BK_NAME: string }
+ *   | { kind: 'detail', row }
+ *   | { kind: 'party-total', ... }
+ *   | { kind: 'bill-total', ... }
+ *   | { kind: 'broker-total', ... }
+ * >, grandDr: number, grandCr: number }}
  */
 export function buildBrokerOsDisplayRows(rawRows) {
   const sorted = sortBrokerOsRawRows(rawRows);
@@ -81,17 +200,17 @@ export function buildBrokerOsDisplayRows(rawRows) {
   let i = 0;
   const n = sorted.length;
   while (i < n) {
-    const bk = bkOf(sorted[i]);
-    const bkName = brokerNameOf(sorted[i]);
+    const bk = bCodeOf(sorted[i]);
+    const brokerName = brokerNameOf(sorted[i]);
     displayRows.push({
       kind: 'broker-section-header',
       BK_CODE: bk,
-      BK_NAME: bkName,
+      BK_NAME: brokerName,
     });
     let brokerDr = 0;
     let brokerCr = 0;
 
-    while (i < n && bkOf(sorted[i]) === bk) {
+    while (i < n && bCodeOf(sorted[i]) === bk) {
       const code = codeOf(sorted[i]);
       const name = nameOf(sorted[i]);
       let partyDr = 0;
@@ -104,7 +223,7 @@ export function buildBrokerOsDisplayRows(rawRows) {
       let billType = '';
       let hasBill = false;
 
-      while (i < n && bkOf(sorted[i]) === bk && codeOf(sorted[i]) === code) {
+      while (i < n && bCodeOf(sorted[i]) === bk && codeOf(sorted[i]) === code) {
         const row = sorted[i];
         const rowBillNo = billNoOf(row);
         const rowBillDate = row.BILL_DATE ?? row.bill_date ?? '';
@@ -176,7 +295,7 @@ export function buildBrokerOsDisplayRows(rawRows) {
     displayRows.push({
       kind: 'broker-total',
       BK_CODE: bk,
-      BK_NAME: bkName,
+      BK_NAME: brokerName,
       DR_AMT: brokerDr,
       CR_AMT: brokerCr,
       FINAL_BAL: brokerDr - brokerCr,

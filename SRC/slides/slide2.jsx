@@ -49,6 +49,13 @@ export default function Slide2({ years, formData, onPrev, onNext, flowHeaderActi
     [years, selectedUid]
   );
 
+  const selectYear = (y) => {
+    const uid = String(y.COMP_UID ?? y.comp_uid ?? '');
+    if (!uid) return;
+    setSelectedUid(uid);
+    onNext(y);
+  };
+
   const handleNext = () => {
     if (!yearObj) {
       alert('Please select a financial year first.');
@@ -78,49 +85,53 @@ export default function Slide2({ years, formData, onPrev, onNext, flowHeaderActi
         {!years?.length ? (
           <p className="windal-initial-company-line">No financial years available.</p>
         ) : (
-          <div className="windal-initial-year-table-wrap">
-            <table className="windal-initial-year-table">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th>Company</th>
-                  <th>Start Date</th>
-                  <th>End Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {years.map((y) => {
-                  const uid = String(y.COMP_UID ?? y.comp_uid ?? '');
-                  const isSelected = uid === String(selectedUid);
-                  const yearLabel = y.COMP_YEAR ?? y.comp_year ?? '';
-                  const companyLabel = y.COMP_NAME ?? y.comp_name ?? compName;
-                  const sDisp = formatLedgerDateDisplay(y.COMP_S_DT ?? y.comp_s_dt);
-                  const eDisp = formatLedgerDateDisplay(y.COMP_E_DT ?? y.comp_e_dt);
-                  return (
-                    <tr
-                      key={uid || yearLabel}
-                      className={isSelected ? 'is-selected' : ''}
-                      onClick={() => setSelectedUid(uid)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setSelectedUid(uid);
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      aria-selected={isSelected}
-                    >
-                      <td>{yearLabel}</td>
-                      <td>{companyLabel}</td>
-                      <td>{sDisp}</td>
-                      <td>{eDisp}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <p className="windal-initial-year-hint">Tap any year to select and continue.</p>
+            <div className="windal-initial-year-table-wrap">
+              <table className="windal-initial-year-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Company</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {years.map((y) => {
+                    const uid = String(y.COMP_UID ?? y.comp_uid ?? '');
+                    const isSelected = uid === String(selectedUid);
+                    const yearLabel = y.COMP_YEAR ?? y.comp_year ?? '';
+                    const companyLabel = y.COMP_NAME ?? y.comp_name ?? compName;
+                    const sDisp = formatLedgerDateDisplay(y.COMP_S_DT ?? y.comp_s_dt);
+                    const eDisp = formatLedgerDateDisplay(y.COMP_E_DT ?? y.comp_e_dt);
+                    return (
+                      <tr
+                        key={uid || yearLabel}
+                        className={isSelected ? 'is-selected' : ''}
+                        onClick={() => selectYear(y)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            selectYear(y);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-selected={isSelected}
+                        aria-label={`Select year ${yearLabel}`}
+                      >
+                        <td>{yearLabel}</td>
+                        <td>{companyLabel}</td>
+                        <td>{sDisp}</td>
+                        <td>{eDisp}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         <div className="windal-initial-btn-row">

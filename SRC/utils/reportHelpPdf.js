@@ -1,9 +1,10 @@
 import html2pdf from 'html2pdf.js';
 import { buildUserGuideHtml, getPdfReportIdsForApp } from '../data/reportHelpContent';
+import { getDefaultAppName } from './gfasBrand';
 
 export async function downloadUserGuidePdf({
   companyName = '',
-  appName = 'Windal Accounting',
+  appName = getDefaultAppName(),
   includeSalesEntry = true,
   includeStockLot = false,
 } = {}) {

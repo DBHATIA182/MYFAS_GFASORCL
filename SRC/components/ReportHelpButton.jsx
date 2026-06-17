@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getReportHelp } from '../data/reportHelpContent';
+import { getDefaultAppName } from '../utils/gfasBrand';
 
 export default function ReportHelpButton({
   reportId,
   viewKey = null,
   companyName = '',
-  appName = 'Windal Accounting',
+  appName = getDefaultAppName(),
   showFullGuidePdf = false,
   includeSalesEntry = true,
   includeStockLot = false,

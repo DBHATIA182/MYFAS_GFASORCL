@@ -41,6 +41,9 @@ export default function MasterPartyPickList({
   getOptionLabel,
   getOptionHint,
   getOptionCity,
+  getOptionGst,
+  getOptionPan,
+  getOptionTel,
   getFilterText,
   getOptionTitle,
   panelVariant,
@@ -49,6 +52,7 @@ export default function MasterPartyPickList({
   showAllWhenEmpty = false,
   searchBtnTabIndex,
   onAfterSelect,
+  onFilterChange,
 }) {
   const triggerLabel = getTriggerLabel ?? getLabel;
   const optionLabel = getOptionLabel ?? getLabel;
@@ -56,8 +60,13 @@ export default function MasterPartyPickList({
     ?? ((o) => {
       const hint = getOptionHint ? getOptionHint(o) : '';
       const city = getOptionCity ? getOptionCity(o) : '';
-      return `${optionLabel(o)} ${hint} ${city}`.trim();
+      const gst = getOptionGst ? getOptionGst(o) : '';
+      const pan = getOptionPan ? getOptionPan(o) : '';
+      const tel = getOptionTel ? getOptionTel(o) : '';
+      return `${optionLabel(o)} ${hint} ${city} ${gst} ${pan} ${tel} ${getValue(o)}`.trim();
     });
+
+  const isAccountHelp = panelVariant === 'accountHelp';
 
   const triggerRef = useRef(null);
   const searchBtnRef = useRef(null);
@@ -120,7 +129,8 @@ export default function MasterPartyPickList({
     const vv = visibleViewport();
     const mobile = window.matchMedia(MOBILE_MQ).matches;
     const minW =
-      panelVariant === 'voucherParty' ? 640
+      panelVariant === 'accountHelp' ? 720
+      : panelVariant === 'voucherParty' ? 640
       : panelVariant === 'stateName' ? 320
       : PANEL_MIN_W;
 
@@ -148,7 +158,9 @@ export default function MasterPartyPickList({
       showSearchIcon && searchBtnRef.current ? searchBtnRef.current : el;
     const r = anchorEl.getBoundingClientRect();
     const width = Math.min(
-      panelVariant === 'voucherParty' ? Math.max(minW, 640) : Math.max(r.width, minW),
+      panelVariant === 'accountHelp' ? Math.max(minW, 720)
+      : panelVariant === 'voucherParty' ? Math.max(minW, 640)
+      : Math.max(r.width, minW),
       vv.width - VIEWPORT_PAD * 2
     );
     const left = Math.min(
@@ -174,7 +186,10 @@ export default function MasterPartyPickList({
       top,
       left,
       width,
-      minWidth: panelVariant === 'voucherParty' ? Math.min(minW, width) : undefined,
+      minWidth:
+        panelVariant === 'accountHelp' || panelVariant === 'voucherParty'
+          ? Math.min(minW, width)
+          : undefined,
       height: maxHeight,
       maxHeight,
       bottom: 'auto',
@@ -248,6 +263,12 @@ export default function MasterPartyPickList({
   useEffect(() => {
     highlightRef.current = highlightIndex;
   }, [highlightIndex]);
+
+  useEffect(() => {
+    if (!onFilterChange || !open) return undefined;
+    onFilterChange(filter);
+    return undefined;
+  }, [filter, open, onFilterChange]);
 
   useEffect(() => {
     if (!open) {
@@ -448,7 +469,16 @@ export default function MasterPartyPickList({
                 onKeyDown={handleListKeyDown}
               />
             </div>
-            {panelVariant === 'voucherParty' && getOptionHint && getOptionCity ? (
+            {isAccountHelp && getOptionHint ? (
+              <div className="master-party-pick__cols-head master-party-pick__cols-head--account-help" aria-hidden="true">
+                <span>Name</span>
+                <span>City</span>
+                <span>GST No</span>
+                <span>PAN</span>
+                <span>Tel</span>
+                <span>Code</span>
+              </div>
+            ) : panelVariant === 'voucherParty' && getOptionHint && getOptionCity ? (
               <div className="master-party-pick__cols-head" aria-hidden="true">
                 <span className="master-party-pick__cols-head-code">Code</span>
                 <span className="master-party-pick__cols-head-name">Name</span>
@@ -479,8 +509,9 @@ export default function MasterPartyPickList({
                       aria-selected={String(value) === v}
                       className={[
                         'master-party-pick__opt',
-                        getOptionHint && getOptionCity ? 'master-party-pick__opt--triple' : '',
-                        getOptionHint && !getOptionCity ? 'master-party-pick__opt--dual' : '',
+                        isAccountHelp && getOptionHint ? 'master-party-pick__opt--account-help' : '',
+                        !isAccountHelp && getOptionHint && getOptionCity ? 'master-party-pick__opt--triple' : '',
+                        !isAccountHelp && getOptionHint && !getOptionCity ? 'master-party-pick__opt--dual' : '',
                         idx === highlightIndex ? 'is-highlighted' : '',
                         String(value) === v && idx !== highlightIndex ? 'is-saved' : '',
                       ]
@@ -494,7 +525,16 @@ export default function MasterPartyPickList({
                       }}
                       onClick={(e) => handleOptionActivate(v, e)}
                     >
-                      {getOptionHint && getOptionCity ? (
+                      {isAccountHelp && getOptionHint ? (
+                        <>
+                          <span className="master-party-pick__opt-name">{getOptionHint(o) || '—'}</span>
+                          <span className="master-party-pick__opt-city">{getOptionCity?.(o) || '—'}</span>
+                          <span className="master-party-pick__opt-gst">{getOptionGst?.(o) || '—'}</span>
+                          <span className="master-party-pick__opt-pan">{getOptionPan?.(o) || '—'}</span>
+                          <span className="master-party-pick__opt-tel">{getOptionTel?.(o) || '—'}</span>
+                          <span className="master-party-pick__opt-code">{v || '—'}</span>
+                        </>
+                      ) : getOptionHint && getOptionCity ? (
                         <>
                           <span className="master-party-pick__opt-code">{optionLabel(o)}</span>
                           <span className="master-party-pick__opt-name">{getOptionHint(o)}</span>
@@ -540,6 +580,10 @@ export default function MasterPartyPickList({
         onClick={handleTrigger}
         onFocus={handleTriggerFocus}
         onKeyDown={(e) => {
+          if (!open && e.key === 'Enter' && onKeyDown) {
+            onKeyDown(e);
+            if (e.defaultPrevented) return;
+          }
           if (showSearchIcon) {
             onKeyDown?.(e);
             return;

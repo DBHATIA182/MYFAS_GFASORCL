@@ -22,13 +22,14 @@ ingress:
   - hostname: <clientkey>.fasaccountingsoftware.in
     service: http://localhost:5173
   - hostname: <clientkey>-api.fasaccountingsoftware.in
-    service: http://localhost:5001
+    service: http://localhost:5002
   - service: http_status:404
 
 6) Start runtime (keep all 3 terminals open)
 Terminal A (API):
 cd <APP_ROOT>
-npm.cmd run server
+start-api.cmd
+(or: set PORT=5002&& node server.cjs)
 
 Terminal B (Frontend):
 cd <APP_ROOT>

@@ -1,0 +1,72 @@
+GFASORCL CLIENT PC — INSTALLATION STEPS
+========================================
+Project folder: GFASORCL\APPTEST (e.g. E:\GFASORCL\APPTEST on dev PC)
+
+PREREQUISITES (one time per PC)
+--------------------------------
+- Git for Windows (git --version)
+- Node.js LTS (node --version)
+- cloudflared (for tunnel)
+- Oracle Instant Client under ..\oracle_bridge\instantclient_23_0
+  (parent of APPTEST, e.g. E:\GFASORCL\oracle_bridge\instantclient_23_0)
+- tnsnames.ora in GFASORCL root (parent of APPTEST)
+
+FIRST-TIME / REFRESH INSTALL
+----------------------------
+1. Copy oracle_bridge and APPTEST under GFASORCL\
+   (If refreshing: rename old APPTEST first.)
+
+2. cd E:\GFASORCL\APPTEST   (your actual drive/path)
+
+3. Open PowerShell (Administrator for setup scripts later).
+
+4. Run setup on existing copy (optional if only refreshing from Git):
+   ..\setup-client.ps1 -ClientKey "your-client" -AutoInstallNode:$false -AutoInstallCloudflared:$false
+   (Use your real client key from connection.config.json.)
+
+5. Rename APPTEST to APPTEST_old
+   cd E:\GFASORCL
+   ren APPTEST APPTEST_old
+
+6. git clone <your-repo-url> APPTEST
+
+7. cd E:\GFASORCL\APPTEST
+
+   Copy local files from APPTEST_old (Git does not keep these):
+   - connection.config.json
+   - config.yml
+   - tunnel *.json (cloudflared credentials in app folder)
+
+   Install and build:
+   npm ci
+   npm run build
+
+8. setup-windal-autostart.cmd          (Run as Administrator)
+   Creates scheduled task: FAS-<clientName>-AppStack
+   Starts API + Vite + tunnel ~1 min after Windows sign-in.
+   Test: schtasks /Run /TN "FAS-<your-client>-AppStack"
+   Log: logs\autostart-bootstrap.log , logs\windal-stack.log
+
+9. setup-windal-git-update.cmd        (Run as Administrator)
+   Creates scheduled task: git_dal_update
+   Each run: STOP services -> git pull + npm ci + build -> RESTART
+   Log: logs\git-auto-update.log
+
+MANUAL UPDATE ANYTIME
+---------------------
+Update-APPTEST-From-Desktop.cmd
+  or
+powershell -ExecutionPolicy Bypass -File .\run-desktop-update.ps1 -AppRoot "E:\GFASORCL\APPTEST" -Branch main
+
+DEV PC — PUSH CHANGES
+---------------------
+cd E:\GFASORCL\APPTEST
+.\push-all-to-git.ps1 -CommitMessage "your message"
+
+RUN STACK (manual)
+------------------
+$env:PORT=5002; node server.cjs
+npm run dev -- --host 0.0.0.0 --port 5173
+cloudflared tunnel --config config.yml run
+
+Mobile: open the same company web URL as desktop (not localhost).

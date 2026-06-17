@@ -25,6 +25,9 @@
   After the normal stop, find anything listening on TCP port 5001 and stop it if the
   process is node.exe (frees the API port when a stray Node process was missed).
 
+.PARAMETER ReleasePorts
+  After the normal stop, stop node.exe listeners on these TCP ports (e.g. 5002 API, 5173 Vite).
+
 .EXAMPLE
   .\stop-apptest-services.ps1
 
@@ -40,6 +43,7 @@ param(
     [switch]$StopScheduledTasks,
     [switch]$StopWindowsServices,
     [switch]$ReleaseApiPort5001,
+    [int[]]$ReleasePorts = @(),
     [int]$WaitSeconds = 2
 )
 
@@ -68,6 +72,30 @@ $likeRoot = "*" + $AppRoot + "*"
 
 Log ""
 Log ("==> Stopping APPTEST processes for: {0}" -f $AppRoot) Cyan
+
+function Close-GfasorclServiceTerminals {
+    $titles = @("GFASORCL-API", "GFASORCL-Vite", "GFASORCL-Tunnel")
+    foreach ($title in $titles) {
+        try {
+            Get-CimInstance Win32_Process -Filter "Name = 'cmd.exe'" -ErrorAction SilentlyContinue |
+                Where-Object { $_.CommandLine -and $_.CommandLine -like "*$title*" } |
+                ForEach-Object {
+                    Safe-StopProcessById -ProcessId $_.ProcessId -Label ("cmd.exe ({0})" -f $title)
+                }
+        } catch {
+            Log ("Could not close terminal {0}: {1}" -f $title, $_.Exception.Message) Yellow
+        }
+    }
+    Get-Process cmd -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowTitle -like "GFASORCL-*" } |
+        ForEach-Object {
+            Safe-StopProcessById -ProcessId $_.Id -Label ("cmd window: {0}" -f $_.MainWindowTitle)
+        }
+}
+
+Log ""
+Log "==> Closing GFASORCL service terminal windows..." Cyan
+Close-GfasorclServiceTerminals
 
 # 1) Stop Node processes tied to this app folder (API + Vite).
 $nodeCandidates = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
@@ -102,28 +130,40 @@ if ($cloudCandidates) {
     Log "No cloudflared.exe process found for this app." DarkYellow
 }
 
-# 2b) Optional: free API port when a Node listener was not matched by path (EADDRINUSE on 5001).
-if ($ReleaseApiPort5001) {
+function Stop-NodeListenersOnPort([int]$Port) {
     Log ""
-    Log "==> Checking TCP port 5001 (API)..." Cyan
+    Log ("==> Checking TCP port {0}..." -f $Port) Cyan
     try {
-        $rawPids = Get-NetTCPConnection -LocalPort 5001 -State Listen -ErrorAction SilentlyContinue |
+        $rawPids = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
             ForEach-Object { $_.OwningProcess }
         $pids = @($rawPids | Sort-Object -Unique | Where-Object { $_ -and $_ -gt 4 })
         if ($pids.Count -eq 0) {
-            Log "No LISTEN process found on port 5001." DarkYellow
+            Log ("No LISTEN process found on port {0}." -f $Port) DarkYellow
+            return
         }
         foreach ($procId in $pids) {
             $wp = Get-CimInstance Win32_Process -Filter "ProcessId = $procId" -ErrorAction SilentlyContinue
             if (-not $wp) { continue }
             if ($wp.Name -ne "node.exe") {
-                Log ("Port 5001: PID {0} is {1} - not stopped automatically. Close it manually if needed." -f $procId, $wp.Name) Yellow
+                Log ("Port {0}: PID {1} is {2} - not stopped automatically." -f $Port, $procId, $wp.Name) Yellow
                 continue
             }
-            Safe-StopProcessById -ProcessId $procId -Label "node.exe (listener on :5001)"
+            Safe-StopProcessById -ProcessId $procId -Label ("node.exe (listener on :{0})" -f $Port)
         }
     } catch {
-        Log ("Port check failed: {0}" -f $_.Exception.Message) Yellow
+        Log ("Port {0} check failed: {1}" -f $Port, $_.Exception.Message) Yellow
+    }
+}
+
+# 2b) Optional: free API port when a Node listener was not matched by path (EADDRINUSE on 5001).
+if ($ReleaseApiPort5001) {
+    Log ""
+    Stop-NodeListenersOnPort -Port 5001
+}
+
+foreach ($port in @($ReleasePorts | Sort-Object -Unique)) {
+    if ($port -gt 0) {
+        Stop-NodeListenersOnPort -Port $port
     }
 }
 

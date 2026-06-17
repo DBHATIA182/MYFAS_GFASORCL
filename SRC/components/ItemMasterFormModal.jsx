@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
+import { focusNextOnEnter } from '../utils/enterKeyNextField';
 import MasterPartyPickList from './MasterPartyPickList';
 import MasterPartyCreateModal, { PartyAddButton } from './MasterPartyCreateModal';
 
@@ -357,37 +358,12 @@ export default function ItemMasterFormModal({
     }
   };
 
-  const handleFormEnterAsTab = useCallback((e) => {
-    if (e.key !== 'Enter') return;
-    if (e.ctrlKey || e.altKey || e.metaKey) return;
-    const target = e.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (target.tagName === 'TEXTAREA') return;
-    if (target.tagName === 'BUTTON') return;
-
-    const formEl = formRef.current;
-    if (!formEl) return;
-
-    const focusables = Array.from(
-      formEl.querySelectorAll('input, select, textarea, button, [tabindex]:not([tabindex="-1"])')
-    ).filter((el) => {
-      if (!(el instanceof HTMLElement)) return false;
-      if (el.hasAttribute('disabled')) return false;
-      if (el.getAttribute('aria-hidden') === 'true') return false;
-      if (el.getAttribute('type') === 'hidden') return false;
-      if (el.tabIndex < 0) return false;
-      if (el.offsetParent === null && el !== document.activeElement) return false;
-      return true;
-    });
-
-    const idx = focusables.indexOf(target);
-    if (idx < 0) return;
-    const next = focusables[idx + 1];
-    if (!next) return;
-
-    e.preventDefault();
-    next.focus();
-  }, []);
+  const handleFormEnterAsTab = useCallback(
+    (e) => {
+      focusNextOnEnter(e, formRef, { submitOnLast: true });
+    },
+    []
+  );
 
   if (!open) return null;
 
@@ -410,7 +386,7 @@ export default function ItemMasterFormModal({
               ×
             </button>
           </div>
-          <form ref={formRef} className="item-master-modal__body" onSubmit={handleSave} onKeyDown={handleFormEnterAsTab}>
+          <form ref={formRef} className="item-master-modal__body" onSubmit={handleSave} onKeyDownCapture={handleFormEnterAsTab}>
             {loading ? <p className="master-party-modal__loading item-master-modal__loading">Loading…</p> : null}
             {err ? <p className="deploy-update-msg deploy-update-msg--err item-master-modal__err">{err}</p> : null}
             {!loading && !blocked ? (

@@ -3,6 +3,9 @@ import axios from 'axios';
 import ItemMasterFormModal from '../components/ItemMasterFormModal';
 import SessionInfoLine from '../components/SessionInfoLine';
 import { downloadExcelRows } from '../utils/excelExport';
+import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
+import { useDebouncedMasterSearch } from '../utils/useDebouncedMasterSearch';
+import { MasterScreenToolbar } from '../components/GfasToolbar';
 
 const reqOpts = { withCredentials: true, timeout: 120000 };
 
@@ -61,23 +64,33 @@ export default function Slide27ItemMaster({ apiBase, formData, userName, onPrev,
   const [editRow, setEditRow] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadList = useCallback(async () => {
-    if (!compCode || compUid == null) return;
-    setListLoading(true);
-    setErr('');
-    try {
-      const params = { comp_code: compCode, comp_uid: compUid };
-      const q = String(searchQ).trim();
-      if (q) params.q = q;
-      const { data } = await axios.get(`${apiBase}/api/item-master-list`, { params, ...reqOpts });
-      setRows(Array.isArray(data) ? data.map(mapItemRow) : []);
-    } catch (e) {
-      setErr(e?.response?.data?.error || e.message || 'Load failed');
-      setRows([]);
-    } finally {
-      setListLoading(false);
-    }
-  }, [apiBase, compCode, compUid, searchQ]);
+  const onSearch = useCallback(
+    async (q, { isStale }) => {
+      if (!compCode || compUid == null) return;
+      setListLoading(true);
+      setErr('');
+      try {
+        const params = { comp_code: compCode, comp_uid: compUid };
+        const trimmed = String(q ?? '').trim();
+        if (trimmed) params.q = trimmed;
+        const { data } = await axios.get(`${apiBase}/api/item-master-list`, { params, ...reqOpts });
+        if (isStale()) return;
+        setRows(Array.isArray(data) ? data.map(mapItemRow) : []);
+      } catch (e) {
+        if (isStale()) return;
+        setErr(e?.response?.data?.error || e.message || 'Load failed');
+        setRows([]);
+      } finally {
+        if (!isStale()) setListLoading(false);
+      }
+    },
+    [apiBase, compCode, compUid]
+  );
+
+  const { executeSearch, refreshList } = useDebouncedMasterSearch({
+    enabled: !loading && !!perms?.canOpen,
+    onSearch,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -100,11 +113,6 @@ export default function Slide27ItemMaster({ apiBase, formData, userName, onPrev,
       cancelled = true;
     };
   }, [apiBase, compUid, userName]);
-
-  useEffect(() => {
-    if (loading || !perms?.canOpen) return;
-    void loadList();
-  }, [loading, perms?.canOpen, loadList]);
 
   const selectedRow = useMemo(
     () => rows.find((r) => String(r.ITEM_CODE) === String(selectedCode)) || null,
@@ -138,7 +146,7 @@ export default function Slide27ItemMaster({ apiBase, formData, userName, onPrev,
         ...reqOpts,
       });
       setSelectedCode('');
-      await loadList();
+      refreshList();
     } catch (e) {
       const msg = e?.response?.data?.error || e.message || 'Delete failed';
       setErr(msg);
@@ -148,28 +156,12 @@ export default function Slide27ItemMaster({ apiBase, formData, userName, onPrev,
     }
   };
 
-  const handleRefresh = () => void loadList();
+  const handleRefresh = () => refreshList();
 
-  const handleList = async () => {
-    if (!compCode || compUid == null) return;
+  const handleList = () => {
     setSearchQ('');
     setSelectedCode('');
-    setListLoading(true);
-    setErr('');
-    try {
-      const { data } = await axios.get(
-        `${apiBase}/api/item-master-list`,
-        { params: { comp_code: compCode, comp_uid: compUid }, ...reqOpts }
-      );
-      setRows(Array.isArray(data) ? data.map(mapItemRow) : []);
-    } catch (e) {
-      const msg = e?.response?.data?.error || e.message || 'List failed';
-      setErr(msg);
-      setRows([]);
-      alert(msg);
-    } finally {
-      setListLoading(false);
-    }
+    executeSearch('', { immediate: true });
   };
 
   const handleExcel = () => {
@@ -193,20 +185,50 @@ export default function Slide27ItemMaster({ apiBase, formData, userName, onPrev,
     downloadExcelRows(exportRows, 'ItemMaster', `${compName}_ItemMaster`);
   };
 
+  const buildPdfMeta = () => {
+    const compName = String(formData?.comp_name ?? formData?.COMP_NAME ?? 'Company').trim() || 'Company';
+    const fy = String(formData?.comp_year ?? formData?.COMP_YEAR ?? '').trim() || '—';
+    const q = String(searchQ).trim();
+    return {
+      companyName: compName,
+      year: fy,
+      reportTitle: 'Item Master List',
+      period: q ? `Search: ${q}` : 'All items',
+      endDate: q ? `Search: ${q}` : 'All items',
+    };
+  };
+
+  const buildPdfRows = () =>
+    rows.map((r) => ({
+      ITEM_CODE: r.ITEM_CODE || '',
+      ITEM_NAME: r.ITEM_NAME || '',
+      CAT: r.CAT || '',
+      CAT_CODE: r.CAT_CODE || '',
+      HSN_CODE: r.HSN_CODE || '',
+      TAX_PER: r.TAX_PER ?? '',
+      S_CODE: r.S_CODE || '',
+      P_CODE: r.P_CODE || '',
+      AMT_CAL: r.AMT_CAL || '',
+    }));
+
+  const handlePdf = () => {
+    if (!rows.length) {
+      alert('No rows to export.');
+      return;
+    }
+    generatePDF('item-master', buildPdfRows(), buildPdfMeta()).catch((e) => alert(String(e?.message || e)));
+  };
+
   const handleWhatsApp = () => {
     if (!rows.length) {
       alert('No rows to share.');
       return;
     }
     const compName = String(formData?.comp_name ?? formData?.COMP_NAME ?? 'Company').trim() || 'Company';
-    const preview = rows
-      .slice(0, 12)
-      .map((r) => `[${r.ITEM_CODE}] ${r.ITEM_NAME || ''}`)
-      .join('\n');
-    const more = rows.length > 12 ? `\n... and ${rows.length - 12} more items` : '';
-    const text = `${compName}\nItem Master List\nRows: ${rows.length}\n\n${preview}${more}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const shareText = [compName, 'Item Master List', `Rows: ${rows.length}`].join('\n');
+    sharePdfWithWhatsApp('item-master', buildPdfRows(), buildPdfMeta(), shareText).catch((e) =>
+      alert(String(e?.message || e))
+    );
   };
 
   if (loading) {
@@ -237,77 +259,65 @@ export default function Slide27ItemMaster({ apiBase, formData, userName, onPrev,
 
   return (
     <div className="slide slide-27-item-master account-master-screen item-master-screen">
+      <div className="account-master-screen__chrome">
       <div className="account-master-screen__head">
         <div className="account-master-screen__title-row">
           <h2 className="sale-bill-page__title">Item Master</h2>
         </div>
         <SessionInfoLine formData={formData} userName={userName} helpReportId="item-master" />
-        <div className="account-master-screen__toolbar">
-          <button type="button" className="btn btn-secondary" onClick={onPrev}>
-            ← Back
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={onReset}>
-            Home
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={handleRefresh} disabled={listLoading}>
-            {listLoading ? 'Loading…' : 'Refresh'}
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={() => void handleList()} disabled={listLoading}>
-            List
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={handleExcel} disabled={!rows.length || listLoading}>
-            Excel
-          </button>
-          <button type="button" className="btn btn-whatsapp" onClick={handleWhatsApp} disabled={!rows.length || listLoading}>
-            WhatsApp
-          </button>
-          {perms?.canAdd ? (
-            <button type="button" className="btn btn-primary" onClick={() => setAddOpen(true)}>
-              Add
-            </button>
-          ) : null}
-          {perms?.canEdit ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!selectedRow}
-              onClick={() => setEditRow(selectedRow)}
-            >
-              Edit
-            </button>
-          ) : null}
-          {perms?.canDelete ? (
-            <button
-              type="button"
-              className="btn btn-danger"
-              disabled={!selectedRow || deleting}
-              onClick={() => void handleDelete()}
-            >
-              {deleting ? 'Deleting…' : 'Delete'}
-            </button>
-          ) : null}
-        </div>
+        <MasterScreenToolbar
+          onPrev={onPrev}
+          onReset={onReset}
+          onRefresh={handleRefresh}
+          onList={handleList}
+          onExcel={handleExcel}
+          onPdf={handlePdf}
+          onWhatsApp={handleWhatsApp}
+          perms={perms}
+          onAdd={() => setAddOpen(true)}
+          onEdit={() => setEditRow(selectedRow)}
+          onDelete={() => void handleDelete()}
+          listLoading={listLoading}
+          hasRows={rows.length > 0}
+          selectedRow={selectedRow}
+          deleting={deleting}
+          listDisabled={listLoading}
+        />
       </div>
 
-      {err ? <p className="deploy-update-msg deploy-update-msg--err">{err}</p> : null}
+      </div>
+
+      {err ? <p className="deploy-update-msg deploy-update-msg--err account-master-screen__err">{err}</p> : null}
 
       <div className="account-master-screen__filters">
         <label className="sale-bill-field account-master-filter account-master-filter--search">
           <span className="sale-bill-field__label">Search</span>
           <input
-            className="form-input"
+            className="form-input account-master-search-input"
+            type="search"
             value={searchQ}
-            placeholder="Item code, name, or HSN…"
-            onChange={(e) => setSearchQ(e.target.value)}
+            placeholder="Item code or name (e.g. DAL ARHAR)…"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            onChange={(e) => {
+              const v = String(e.target.value ?? '').toUpperCase();
+              setSearchQ(v);
+              executeSearch(v);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                void loadList();
+                executeSearch(searchQ, { immediate: true });
               }
             }}
           />
         </label>
-        <button type="button" className="btn btn-secondary account-master-filter-btn" onClick={() => void loadList()}>
+        <button
+          type="button"
+          className="btn btn-secondary account-master-filter-btn"
+          onClick={() => executeSearch(searchQ, { immediate: true })}
+        >
           Find
         </button>
       </div>
@@ -386,7 +396,7 @@ export default function Slide27ItemMaster({ apiBase, formData, userName, onPrev,
         userName={userName}
         onCreated={() => {
           setAddOpen(false);
-          void loadList();
+          refreshList();
         }}
       />
 
@@ -401,7 +411,7 @@ export default function Slide27ItemMaster({ apiBase, formData, userName, onPrev,
         editRow={editRow}
         onUpdated={() => {
           setEditRow(null);
-          void loadList();
+          refreshList();
         }}
       />
     </div>

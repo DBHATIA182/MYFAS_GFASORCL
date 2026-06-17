@@ -468,6 +468,17 @@
   transform: translateY(0);
 }
 
+.windal-dash__tile--frozen {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+}
+
+.windal-dash__tile--frozen:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 .windal-dash__tile-icon {
   width: 48px;
   height: 48px;

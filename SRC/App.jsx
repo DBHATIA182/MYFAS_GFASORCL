@@ -1,29 +1,97 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import axios from 'axios';
 import LoginSlide from './slides/LoginSlide';
 import Slide1 from './slides/Slide1';
 import Slide2 from './slides/slide2';
 import Slide3 from './slides/Slide3';
-import Slide4 from './slides/Slide4';
-import Slide5 from './slides/Slide5';
-import Slide6 from './slides/Slide6';
-import Slide7 from './slides/Slide7';
-import Slide8 from './slides/Slide8';
-import Slide9 from './slides/Slide9';
-import Slide10 from './slides/Slide10';
-import Slide11 from './slides/Slide11';
-import Slide12 from './slides/Slide12';
-import Slide13 from './slides/Slide13';
-import Slide14 from './slides/Slide14';
-import Slide15 from './slides/Slide15';
-import Slide16 from './slides/Slide16';
-import Slide17TradingAc from './slides/Slide17TradingAc';
-import Slide18PlProfitLoss from './slides/Slide18PlProfitLoss';
-import Slide19BalanceSheet from './slides/Slide19BalanceSheet';
-import Slide33SaleGraph from './slides/Slide33SaleGraph';
-import Slide34OverdueCustomers from './slides/Slide34OverdueCustomers';
+const Slide4 = lazy(() => import('./slides/Slide4'));
+const Slide5 = lazy(() => import('./slides/Slide5'));
+const Slide6 = lazy(() => import('./slides/Slide6'));
+const Slide7 = lazy(() => import('./slides/Slide7'));
+const Slide8 = lazy(() => import('./slides/Slide8'));
+const Slide9 = lazy(() => import('./slides/Slide9'));
+const Slide10 = lazy(() => import('./slides/Slide10'));
+const Slide11 = lazy(() => import('./slides/Slide11'));
+const Slide12 = lazy(() => import('./slides/Slide12'));
+const Slide13 = lazy(() => import('./slides/Slide13'));
+const Slide14 = lazy(() => import('./slides/Slide14'));
+const Slide15 = lazy(() => import('./slides/Slide15'));
+const Slide16 = lazy(() => import('./slides/Slide16'));
+const Slide17TradingAc = lazy(() => import('./slides/Slide17TradingAc'));
+const Slide18PlProfitLoss = lazy(() => import('./slides/Slide18PlProfitLoss'));
+const Slide19BalanceSheet = lazy(() => import('./slides/Slide19BalanceSheet'));
+const Slide33SaleGraph = lazy(() => import('./slides/Slide33SaleGraph'));
+const Slide34OverdueCustomers = lazy(() => import('./slides/Slide34OverdueCustomers'));
+const Slide21StateWiseSales = lazy(() => import('./slides/Slide21StateWiseSales'));
+const Slide22StateWisePurchase = lazy(() => import('./slides/Slide22StateWisePurchase'));
 import Slide26AccountMaster from './slides/Slide26AccountMaster';
 import Slide27ItemMaster from './slides/Slide27ItemMaster';
+import Slide28MasterPlaceholder from './slides/Slide28MasterPlaceholder';
+import Slide29ScheduleMaster from './slides/Slide29ScheduleMaster';
+import Slide30CatMastMaster from './slides/Slide30CatMastMaster';
+import Slide31ItemGrpMaster from './slides/Slide31ItemGrpMaster';
+import Slide32UserMaster from './slides/Slide32UserMaster';
+import Slide33BikriExpMaster from './slides/Slide33BikriExpMaster';
+import Slide35UserPassword from './slides/Slide35UserPassword';
+import Slide37GodownRentMaster from './slides/Slide37GodownRentMaster';
+import Slide38GodownMaster from './slides/Slide38GodownMaster';
+import Slide39CostCentreMaster from './slides/Slide39CostCentreMaster';
+import Slide40CustomerInterest from './slides/Slide40CustomerInterest';
+import Slide41HolidayMaster from './slides/Slide41HolidayMaster';
+import Slide42DaneMaster from './slides/Slide42DaneMaster';
+import Slide43MarkaMaster from './slides/Slide43MarkaMaster';
+import Slide44PurchaseExpMaster from './slides/Slide44PurchaseExpMaster';
+import Slide45SaleBillCondition from './slides/Slide45SaleBillCondition';
+import Slide46LocationBType from './slides/Slide46LocationBType';
+import Slide47DetailMaster from './slides/Slide47DetailMaster';
+import Slide48GstStateMaster from './slides/Slide48GstStateMaster';
+import Slide49UtilitiesPlaceholder from './slides/Slide49UtilitiesPlaceholder';
+import Slide50NewYearBooks from './slides/Slide50NewYearBooks';
+import Slide51PrimaryKey from './slides/Slide51PrimaryKey';
+import Slide52SetFunction from './slides/Slide52SetFunction';
+import Slide53TakajaQuery from './slides/Slide53TakajaQuery';
+import Slide54OpeningBillsDetail from './slides/Slide54OpeningBillsDetail';
+import Slide55InterestTransfer from './slides/Slide55InterestTransfer';
+import Slide56CompleteLedger from './slides/Slide56CompleteLedger';
+import Slide57SquareUpAccounts from './slides/Slide57SquareUpAccounts';
+import Slide58TrialDifference from './slides/Slide58TrialDifference';
+import Slide59AccountMerge from './slides/Slide59AccountMerge';
+import Slide60BikriNoMerge from './slides/Slide60BikriNoMerge';
+import Slide61BikriLotMerge from './slides/Slide61BikriLotMerge';
+import Slide62ShortageTransfer from './slides/Slide62ShortageTransfer';
+import Slide63UnusedAccountList from './slides/Slide63UnusedAccountList';
+import Slide64UnusedCostCentreCodes from './slides/Slide64UnusedCostCentreCodes';
+import Slide65UnusedGodownCodes from './slides/Slide65UnusedGodownCodes';
+import Slide66MissingCodes from './slides/Slide66MissingCodes';
+import Slide67BrokFind from './slides/Slide67BrokFind';
+import Slide68DaneFind from './slides/Slide68DaneFind';
+import Slide69StockTransfer from './slides/Slide69StockTransfer';
+import Slide70SaleTransfer from './slides/Slide70SaleTransfer';
+import Slide71VoucherTransfer from './slides/Slide71VoucherTransfer';
+import Slide72PurchaseTransfer from './slides/Slide72PurchaseTransfer';
+import Slide73UpdateSaleInvNo from './slides/Slide73UpdateSaleInvNo';
+import Slide74UpdatePanWithGstIn from './slides/Slide74UpdatePanWithGstIn';
+import Slide75UserReport from './slides/Slide75UserReport';
+import Slide76AuditTrailReport from './slides/Slide76AuditTrailReport';
+import Slide77CompanyDetailEdit from './slides/Slide77CompanyDetailEdit';
+import Slide78GstProfileSetting from './slides/Slide78GstProfileSetting';
+import Slide79Updation from './slides/Slide79Updation';
+import DesktopOnlyUtilityGate from './components/DesktopOnlyUtilityGate';
+import MasterSlideErrorBoundary from './components/MasterSlideErrorBoundary';
+
+function SlideRouteFallback() {
+  return <p className="loading-msg">Loading screen…</p>;
+}
+import { resolveMasterSlideNo, MASTER_PLACEHOLDER_SLIDE } from './data/masterModuleConfig';
+import {
+  findUtilitiesModuleItem,
+  isUtilityDesktopOnlyBlocked,
+  resolveUtilitiesSlideNo,
+  utilityDesktopOnlyMessage,
+  UTILITIES_PLACEHOLDER_SLIDE,
+} from './data/utilitiesModuleConfig';
+
+const MASTER_SLIDE_NOS = new Set([26, 27, 28, 29, 30, 31, 32, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, MASTER_PLACEHOLDER_SLIDE]);
 import { AppSessionContext } from './components/AppSessionContext';
 import { IconSettings, IconVoice } from './components/ToolbarIcons';
 import { exitApp, performExitWindow } from './utils/exitApp';
@@ -32,7 +100,21 @@ import './App.css';
 import './styles/fasFlowTheme.css';
 import './styles/windalInitialFlow.css';
 import './styles/windalDashboard.css';
-import { getWindalDocumentTitle } from './utils/windalBrand';
+import './styles/gfasToolbar.css';
+import './styles/stateWiseSales.css';
+import './styles/scheduleMasterScreen.css';
+import { getGfasDocumentTitle } from './utils/gfasBrand';
+import {
+  formatApiBaseForDisplay,
+  getClientKeyFromHost,
+  buildRemoteApiBase,
+  isFasWebAppHost,
+  isPrivateLanHost,
+  resolveApiBase,
+  apiUrl,
+  saveApiBaseOverride,
+  readApiBaseOverride,
+} from './utils/resolveApiBase';
 
 // Local: Vite dev uses '' so /api/* is proxied to port 5002 (see vite.config.js). Run `npm run server` in another terminal.
 // Vite preview / static file open on localhost still calls :5002 directly.
@@ -134,31 +216,15 @@ const configuredClientName = (() => {
   return v === 'auto' ? '' : v;
 })();
 const APP_DISPLAY_NAME = String(connectionConfig.product?.displayName || '').trim() || 'GRAINFAS Accounting';
-const APP_DOCUMENT_TITLE = getWindalDocumentTitle(connectionConfig.product?.displayTitle);
-
-function getClientKeyFromHost(host, domain) {
-  if (!host || !domain) return null;
-  const suffix = `.${domain}`;
-  if (!host.endsWith(suffix)) return null;
-  const subdomain = host.slice(0, -suffix.length);
-  if (!subdomain) return null;
-  return subdomain.split('.')[0] || null;
-}
+const APP_DOCUMENT_TITLE = getGfasDocumentTitle(connectionConfig.product?.displayTitle);
 
 function normalizeClientKey(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function buildApiBase(clientKey) {
-  if (!clientKey) return '';
-  if (connectionConfig.apiBase) return connectionConfig.apiBase;
-  const fromConfig = knownClients[clientKey]?.apiBase;
-  if (fromConfig) return fromConfig;
-  return `https://${clientKey}${apiSubdomainSuffix}.${rootDomain}`;
-}
-
 const hostClientKey = getClientKeyFromHost(hostName, rootDomain);
-const remoteApiBase = buildApiBase(hostClientKey) || buildApiBase(configuredClientName);
+const remoteApiBase =
+  buildRemoteApiBase(hostClientKey, connectionConfig) || buildRemoteApiBase(configuredClientName, connectionConfig);
 
 /** Shown on sign-in loading screen (e.g. maruti.fasaccountingsoftware.in). */
 function getConnectingClientLabel() {
@@ -172,39 +238,35 @@ function getConnectingClientLabel() {
   return '';
 }
 
-const API_BASE = import.meta.env.DEV
-  ? ''
-  : isLocalHost
-    ? connectionConfig.local?.apiBase || 'http://localhost:5002'
-    : remoteApiBase;
+const API_BASE = resolveApiBase({
+  isDev: import.meta.env.DEV,
+  hostname: hostName,
+  remoteApiBase,
+});
 const TOTAL_STEPS = 20;
 const VIEW_MODE_STORAGE_KEY = 'gfas_view_mode';
+/** Per-browser-origin session (localhost vs demo.fasaccountingsoftware.in are separate). */
 const AUTH_STORAGE_KEY = 'gfas_auth_state_v1';
-/** Restore sign-in after tab reload (mobile often reloads when memory is tight, e.g. after PDF + WhatsApp). */
-const AUTH_MAX_AGE_MS = 45 * 24 * 60 * 60 * 1000;
 
-function readPersistedAuth() {
-  try {
-    const raw = safeStorageGet(AUTH_STORAGE_KEY);
-    if (!raw) return { authenticated: false, userName: '' };
-    const o = JSON.parse(raw);
-    if (!o || typeof o !== 'object' || o.authenticated !== true) return { authenticated: false, userName: '' };
-    const at = Number(o.at) || 0;
-    if (at && Date.now() - at > AUTH_MAX_AGE_MS) return { authenticated: false, userName: '' };
-    const userName = String(o.userName || '').trim();
-    return { authenticated: true, userName };
-  } catch {
-    return { authenticated: false, userName: '' };
-  }
-}
-
+const GFAS_DEV_STACK_MARK = 'GFASORCL-5002';
 if (import.meta.env.DEV && API_BASE === '') {
-  console.info('API → Vite proxy → http://localhost:5002 — start backend: npm run server');
+  console.info(
+    `[${GFAS_DEV_STACK_MARK}] API → Vite proxy → http://localhost:5002 — start backend: start-api.cmd or npm run server:win`,
+  );
+  console.info(
+    `[${GFAS_DEV_STACK_MARK}] If the line above says port 5001, this tab has old JS — hard refresh (Ctrl+F5) or restart npm run dev.`,
+  );
 }
-if (!import.meta.env.DEV && !isLocalHost && !API_BASE) {
+if (import.meta.env.DEV && API_BASE && isPrivateLanHost(hostName)) {
+  console.info(`API → LAN direct ${API_BASE} (mobile/Wi‑Fi) — ensure node server listens on 0.0.0.0:${API_BASE.split(':').pop()}`);
+}
+if (isFasWebAppHost(hostName) && !import.meta.env.DEV && API_BASE) {
+  console.info(`GFASORCL cloud: UI at ${hostName} → API ${API_BASE}`);
+}
+if (!import.meta.env.DEV && !isLocalHost && !isPrivateLanHost(hostName) && !API_BASE) {
   console.warn('No remote API base resolved. Check connection.config.json clientName/domain.');
 }
-console.log('Current API Base:', API_BASE || '(same origin /api proxy)');
+console.log('GFASORCL API:', formatApiBaseForDisplay(API_BASE) === 'Same page (/api proxy)' ? API_BASE || '(proxy)' : API_BASE);
 
 function App() {
   const renderMinimalHeaderActions = () => (
@@ -214,7 +276,6 @@ function App() {
   );
 
   const [detectedClientKey, setDetectedClientKey] = useState('');
-  const initialAuth = readPersistedAuth();
   const [clientGuardChecked, setClientGuardChecked] = useState(false);
   const [clientGuardMismatch, setClientGuardMismatch] = useState(null);
   const [viewMode, setViewMode] = useState(() => {
@@ -222,7 +283,8 @@ function App() {
     return saved === 'desktop' || saved === 'mobile' ? saved : null;
   }); // 'desktop' | 'mobile'
   const [showViewSettings, setShowViewSettings] = useState(false);
-  const [authenticated, setAuthenticated] = useState(initialAuth.authenticated);
+  const [apiOverrideDraft, setApiOverrideDraft] = useState(() => readApiBaseOverride());
+  const [authenticated, setAuthenticated] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(1);
   const [companies, setCompanies] = useState([]);
   const [years, setYears] = useState([]);
@@ -238,29 +300,22 @@ function App() {
   });
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
-  const [loginUserName, setLoginUserName] = useState(initialAuth.userName);
+  const [loginUserName, setLoginUserName] = useState('');
+
+  /* Always open on login (do not skip to company from saved session). */
+  useEffect(() => {
+    safeStorageRemove(AUTH_STORAGE_KEY);
+    setAuthenticated(false);
+    setLoginUserName('');
+    setCompanies([]);
+    setYears([]);
+    setCurrentSlide(1);
+  }, []);
 
   useEffect(() => {
     if (typeof document !== 'undefined' && APP_DOCUMENT_TITLE) {
       document.title = APP_DOCUMENT_TITLE;
     }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const base = API_BASE || '';
-        const response = await axios.get(`${base}/api/client-identity`, { timeout: 8000 });
-        const detected = normalizeClientKey(response?.data?.clientKey);
-        if (!cancelled && detected) setDetectedClientKey(detected);
-      } catch {
-        /* Best-effort label detection; ignore when API is not yet reachable. */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   const connectingClientDisplay = detectedClientKey && rootDomain
@@ -280,8 +335,10 @@ function App() {
     (async () => {
       try {
         const base = API_BASE || '';
-        const response = await axios.get(`${base}/api/client-identity`, { timeout: 10000 });
+        const response = await axios.get(`${base}/api/client-identity`, { timeout: 4000 });
         const actualClient = normalizeClientKey(response?.data?.clientKey);
+        const detected = normalizeClientKey(response?.data?.clientKey);
+        if (!cancelled && detected) setDetectedClientKey(detected);
         if (!cancelled && actualClient && actualClient !== expectedClient) {
           setAuthenticated(false);
           setLoginUserName('');
@@ -326,10 +383,15 @@ function App() {
   const [deployFinished, setDeployFinished] = useState(false);
   const [deployFailed, setDeployFailed] = useState(false);
 
+  const fetchDeployStatus = () => {
+    const base = API_BASE || '';
+    return axios.get(`${base}/api/deploy-update/status`, { validateStatus: () => true });
+  };
+
   const syncDeployStatus = async () => {
     try {
-      const base = API_BASE || '';
-      const r = await axios.get(`${base}/api/deploy-update/status`);
+      const r = await fetchDeployStatus();
+      if (r.status >= 400) return;
       if (!r.data?.enabled) return;
       setDeployUpdateEnabled(true);
       setDeployUpdateRequiresKey(r.data?.requiresDeployKey !== false);
@@ -344,13 +406,14 @@ function App() {
     }
   };
 
+  /* Defer deploy-update check until after login (faster login screen on demo/tunnel). */
   useEffect(() => {
+    if (!authenticated) return;
     let cancelled = false;
     (async () => {
       try {
-        const base = API_BASE || '';
-        const r = await axios.get(`${base}/api/deploy-update/status`);
-        if (!cancelled && r.data?.enabled) {
+        const r = await fetchDeployStatus();
+        if (!cancelled && r.status < 400 && r.data?.enabled) {
           setDeployUpdateEnabled(true);
           setDeployUpdateRequiresKey(r.data?.requiresDeployKey !== false);
           setDeployUpdateServerBusy(r.data?.busy === true);
@@ -367,7 +430,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authenticated]);
 
   useEffect(() => {
     if (!showDeployUpdateModal) return;
@@ -452,8 +515,9 @@ function App() {
     const fetchCompanies = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_BASE}/api/companies`, {
+        const response = await axios.get(apiUrl(API_BASE, '/api/companies'), {
           params: loginUserName ? { user_name: loginUserName } : undefined,
+          withCredentials: true,
         });
         console.log('Company list received:', response.data);
         setCompanies(response.data || []);
@@ -470,14 +534,7 @@ function App() {
     const u = String(payload?.userName ?? payload?.user_name ?? '').trim().toUpperCase();
     setLoginUserName(u);
     setAuthenticated(true);
-    safeStorageSet(
-      AUTH_STORAGE_KEY,
-      JSON.stringify({
-        authenticated: true,
-        userName: u,
-        at: Date.now(),
-      })
-    );
+    setCurrentSlide(1);
   };
 
   const handleSlide1Next = async (data) => {
@@ -493,8 +550,9 @@ function App() {
 
       try {
         setLoading(true);
-        const response = await axios.get(`${API_BASE}/api/years`, {
-          params: { comp_code: selectedCode }
+        const response = await axios.get(apiUrl(API_BASE, '/api/years'), {
+          params: { comp_code: selectedCode },
+          withCredentials: true,
         });
         setYears(response.data || []);
         setCurrentSlide(2);
@@ -523,10 +581,68 @@ function App() {
   setCurrentSlide(3);
 };
 
+  /** Master screen to render. Placeholder (28) uses reportType; explicit slides keep their number. */
+  const activeMasterSlide = useMemo(() => {
+    if (!MASTER_SLIDE_NOS.has(currentSlide)) return null;
+    if (currentSlide !== MASTER_PLACEHOLDER_SLIDE) return currentSlide;
+    const fromReport = resolveMasterSlideNo(String(formData?.reportType ?? '').trim().toLowerCase());
+    return fromReport ?? currentSlide;
+  }, [currentSlide, formData?.reportType]);
+
+  useEffect(() => {
+    if (currentSlide !== MASTER_PLACEHOLDER_SLIDE) return;
+    const target = resolveMasterSlideNo(String(formData?.reportType ?? '').trim().toLowerCase());
+    if (target != null && target !== MASTER_PLACEHOLDER_SLIDE && target !== currentSlide) {
+      setCurrentSlide(target);
+    }
+  }, [currentSlide, formData?.reportType]);
+
+  useEffect(() => {
+    if (currentSlide !== UTILITIES_PLACEHOLDER_SLIDE) return;
+    const target = resolveUtilitiesSlideNo(String(formData?.reportType ?? '').trim().toLowerCase());
+    if (target != null && target !== UTILITIES_PLACEHOLDER_SLIDE && target !== currentSlide) {
+      setCurrentSlide(target);
+    }
+  }, [currentSlide, formData?.reportType]);
+
+  const handleNewYearCreated = async (yearRow) => {
+    const code = formData.comp_code ?? formData.COMP_CODE;
+    try {
+      const response = await axios.get(apiUrl(API_BASE, '/api/years'), {
+        params: { comp_code: code },
+        withCredentials: true,
+      });
+      setYears(response.data || []);
+    } catch (_) {
+      /* years list refresh is best-effort */
+    }
+    const uid = yearRow?.COMP_UID ?? yearRow?.comp_uid;
+    const yr = yearRow?.COMP_YEAR ?? yearRow?.comp_year;
+    const sDt = yearRow?.COMP_S_DT ?? yearRow?.comp_s_dt;
+    const eDt = yearRow?.COMP_E_DT ?? yearRow?.comp_e_dt;
+    if (
+      window.confirm(
+        `New year ${yr} prepared (comp_uid ${uid}).\n\nSwitch to this financial year now?`
+      )
+    ) {
+      setFormData((prev) => ({
+        ...prev,
+        comp_uid: uid,
+        comp_year: yr,
+        comp_s_dt: sDt,
+        comp_e_dt: eDt,
+      }));
+    } else {
+      alert('New year books prepared. Use Change Year in Utilities to open the new financial year.');
+    }
+    setCurrentSlide(3);
+  };
+
   const handleSlide3Next = (data) => {
     setFormData(prev => ({ ...prev, ...data }));
     const reportType = String(data?.reportType ?? '').trim().toLowerCase();
     if (reportType === 'ledger' || reportType === 'ledger-interest') setCurrentSlide(5);
+    else if (reportType === 'complete-ledger') setCurrentSlide(56);
     else if (reportType === 'bill-ledger' || reportType === 'customer-ledger' || reportType === 'supplier-ledger') setCurrentSlide(6);
     else if (reportType === 'broker-os') setCurrentSlide(7);
     else if (reportType === 'sale-list') setCurrentSlide(8);
@@ -539,14 +655,45 @@ function App() {
     else if (reportType === 'gstr1') setCurrentSlide(15);
     else if (reportType === 'hsn-sales') setCurrentSlide(16);
     else if (reportType === 'hsn-purchase') setCurrentSlide(17);
+    else if (reportType === 'state-wise-sales') setCurrentSlide(21);
+    else if (reportType === 'state-wise-purchase') setCurrentSlide(22);
     else if (reportType === 'trading-ac') setCurrentSlide(18);
     else if (reportType === 'pl-profit-loss') setCurrentSlide(19);
     else if (reportType === 'balance-sheet') setCurrentSlide(20);
     else if (reportType === 'sale-chart' || reportType === 'sale-graph') setCurrentSlide(33);
     else if (reportType === 'overdue-customers') setCurrentSlide(34);
-    else if (reportType === 'account-master') setCurrentSlide(26);
-    else if (reportType === 'item-master') setCurrentSlide(27);
-    else setCurrentSlide(4);
+    else if (reportType === 'user-master') setCurrentSlide(32);
+    else {
+      const utilItem = findUtilitiesModuleItem(reportType);
+      if (utilItem) {
+        if (utilItem.logout) {
+          setAuthenticated(false);
+          setLoginUserName('');
+          setCompanies([]);
+          setYears([]);
+          safeStorageRemove(AUTH_STORAGE_KEY);
+          setCurrentSlide(utilItem.navSlide || 1);
+          return;
+        }
+        if (utilItem.navSlide) {
+          setCurrentSlide(utilItem.navSlide);
+          return;
+        }
+        if (utilItem.slide) {
+          if (isUtilityDesktopOnlyBlocked(utilItem)) {
+            alert(utilityDesktopOnlyMessage(utilItem));
+            return;
+          }
+          setCurrentSlide(utilItem.slide);
+          return;
+        }
+        setCurrentSlide(UTILITIES_PLACEHOLDER_SLIDE);
+        return;
+      }
+      const masterSlide = resolveMasterSlideNo(reportType);
+      if (masterSlide != null) setCurrentSlide(masterSlide);
+      else setCurrentSlide(4);
+    }
   };
 
   const openCustomerLedgerFromOverdue = (payload) => {
@@ -577,6 +724,70 @@ function App() {
       return;
     }
     setCurrentSlide(3);
+  };
+
+  const openAccountMasterFromTrialDiff = (payload) => {
+    setFormData((prev) => ({
+      ...prev,
+      reportType: 'account-master',
+      accountMasterDrilldown: {
+        code: String(payload?.code ?? '').trim(),
+        autoEdit: payload?.autoEdit !== false,
+        returnSlide: 58,
+        returnTab: String(payload?.tab ?? 'missing_schedule'),
+        at: Date.now(),
+      },
+    }));
+    setCurrentSlide(26);
+  };
+
+  const backFromAccountMaster = () => {
+    const d = formData.accountMasterDrilldown;
+    if (d?.returnSlide === 58) {
+      setFormData((prev) => {
+        const { accountMasterDrilldown, ...rest } = prev;
+        return {
+          ...rest,
+          reportType: 'trial-difference',
+          trialDifferenceReturnTab: accountMasterDrilldown?.returnTab || 'missing_schedule',
+        };
+      });
+      setCurrentSlide(58);
+      return;
+    }
+    setCurrentSlide(3);
+  };
+
+  const openLedgerFromTrialDiff = (payload) => {
+    setFormData((prev) => ({
+      ...prev,
+      reportType: 'ledger',
+      ledgerDrilldown: {
+        code: String(payload?.code ?? '').trim(),
+        autoRun: true,
+        returnSlide: 58,
+        returnTab: String(payload?.tab ?? 'missing_code_in_master'),
+        at: Date.now(),
+      },
+    }));
+    setCurrentSlide(5);
+  };
+
+  const backFromLedger = () => {
+    const d = formData.ledgerDrilldown;
+    if (d?.returnSlide === 58) {
+      setFormData((prev) => {
+        const { ledgerDrilldown, ...rest } = prev;
+        return {
+          ...rest,
+          reportType: 'trial-difference',
+          trialDifferenceReturnTab: ledgerDrilldown?.returnTab || 'missing_code_in_master',
+        };
+      });
+      setCurrentSlide(58);
+      return;
+    }
+    handlePrev();
   };
 
   const openSaleListFromChart = (payload) => {
@@ -614,6 +825,9 @@ function App() {
     setYears([]);
   };
 
+  /** Master screens: Home = reports menu (not company/year). */
+  const handleResetToMenu = () => setCurrentSlide(3);
+
   const handleVoiceCommand = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (typeof SR !== 'function') {
@@ -643,14 +857,32 @@ function App() {
           alert(`Please select company and financial year before opening ${title}.`);
           return true;
         }
+        const utilItem = findUtilitiesModuleItem(reportType);
+        if (utilItem?.logout) {
+          setAuthenticated(false);
+          setLoginUserName('');
+          setCompanies([]);
+          setYears([]);
+          safeStorageRemove(AUTH_STORAGE_KEY);
+          setFormData((prev) => ({ ...prev, reportType }));
+          setCurrentSlide(utilItem.navSlide || 1);
+          return true;
+        }
+        if (isUtilityDesktopOnlyBlocked(utilItem)) {
+          alert(utilityDesktopOnlyMessage(utilItem));
+          return true;
+        }
+        const utilitySlide = resolveUtilitiesSlideNo(reportType);
+        const masterSlide = resolveMasterSlideNo(reportType);
         setFormData((prev) => ({ ...prev, reportType }));
-        setCurrentSlide(slideNo);
+        setCurrentSlide(utilitySlide ?? masterSlide ?? slideNo);
         return true;
       };
 
       const voiceCommands = [
         { phrases: ['open trial balance', 'trial balance'], reportType: 'trial-balance', slideNo: 4, title: 'Trial Balance' },
         { phrases: ['open ledger with interest', 'ledger with interest'], reportType: 'ledger-interest', slideNo: 5, title: 'Ledger With Interest' },
+        { phrases: ['open complete ledger', 'complete ledger'], reportType: 'complete-ledger', slideNo: 56, title: 'Complete Ledger' },
         { phrases: ['open ledger', 'ledger'], reportType: 'ledger', slideNo: 5, title: 'Ledger' },
         { phrases: ['open customer ledger', 'customer ledger'], reportType: 'customer-ledger', slideNo: 6, title: 'Customer Ledger' },
         { phrases: ['open supplier ledger', 'supplier ledger'], reportType: 'supplier-ledger', slideNo: 6, title: 'Supplier Ledger' },
@@ -664,6 +896,8 @@ function App() {
         { phrases: ['open gstr1', 'gstr1', 'open gstr 1', 'gstr 1'], reportType: 'gstr1', slideNo: 15, title: 'GSTR1' },
         { phrases: ['open hsn sales', 'hsn sales', 'open hsn sale', 'hsn sale'], reportType: 'hsn-sales', slideNo: 16, title: 'HSN Sales' },
         { phrases: ['open hsn purchase', 'hsn purchase', 'open hsn purchases', 'hsn purchases'], reportType: 'hsn-purchase', slideNo: 17, title: 'HSN Purchase' },
+        { phrases: ['open state wise sales', 'state wise sales', 'state sales', 'open state sales'], reportType: 'state-wise-sales', slideNo: 21, title: 'State Wise Sales' },
+        { phrases: ['open state wise purchase', 'state wise purchase', 'state purchase', 'open state purchase'], reportType: 'state-wise-purchase', slideNo: 22, title: 'State Wise Purchase' },
         { phrases: ['open trading account', 'trading account', 'open trading a c', 'trading a c'], reportType: 'trading-ac', slideNo: 18, title: 'Trading Account' },
         { phrases: ['open p and l', 'p and l', 'open profit and loss', 'profit and loss', 'open p l', 'p l'], reportType: 'pl-profit-loss', slideNo: 19, title: 'P&L' },
         { phrases: ['open balance sheet', 'balance sheet'], reportType: 'balance-sheet', slideNo: 20, title: 'Balance Sheet' },
@@ -671,6 +905,18 @@ function App() {
         { phrases: ['open overdue customers', 'overdue customers', 'overdue customer'], reportType: 'overdue-customers', slideNo: 34, title: 'Overdue Customers' },
         { phrases: ['open account master', 'account master', 'open a c master', 'a c master', 'ac master'], reportType: 'account-master', slideNo: 26, title: 'A/c Master' },
         { phrases: ['open item master', 'item master'], reportType: 'item-master', slideNo: 27, title: 'Item Master' },
+        { phrases: ['open schedule master', 'schedule master'], reportType: 'schedule-master', slideNo: 29, title: 'Schedule Master' },
+        { phrases: ['open item category master', 'item category master', 'category master', 'cat mast', 'catmast'], reportType: 'item-category-master', slideNo: 30, title: 'Item Category Master' },
+        { phrases: ['open item group master', 'item group master', 'item group', 'do form cat'], reportType: 'item-group-master', slideNo: 31, title: 'Item Group Master' },
+        { phrases: ['open user master', 'user master', 'do form user'], reportType: 'user-master', slideNo: 32, title: 'User Master' },
+        { phrases: ['open user password', 'user password', 'change password', 'do form password'], reportType: 'user-password', slideNo: 35, title: 'User Password' },
+        { phrases: ['open godown master', 'godown master'], reportType: 'godown-master', slideNo: 28, title: 'Godown Master' },
+        { phrases: ['open master module', 'master module'], reportType: 'account-master', slideNo: 3, title: 'Master' },
+        { phrases: ['open utilities', 'utilities module', 'open utilities module'], reportType: 'change-year', slideNo: 3, title: 'Utilities' },
+        { phrases: ['change year', 'open change year'], reportType: 'change-year', slideNo: 2, title: 'Change Year' },
+        { phrases: ['change company', 'open change company'], reportType: 'change-company', slideNo: 1, title: 'Change Company' },
+        { phrases: ['change user', 'open change user'], reportType: 'change-user', slideNo: 1, title: 'Change User' },
+        { phrases: ['new year books', 'open new year books', 'prepare new year', 'prepare new year books'], reportType: 'new-year-books', slideNo: 50, title: 'New Year Books' },
       ];
 
       for (const cmd of voiceCommands) {
@@ -684,12 +930,28 @@ function App() {
     recognition.start();
   };
 
+  const applyApiOverride = () => {
+    saveApiBaseOverride(apiOverrideDraft);
+    setShowViewSettings(false);
+    window.location.reload();
+  };
+
+  const clearApiOverride = () => {
+    saveApiBaseOverride('');
+    setApiOverrideDraft('');
+    setShowViewSettings(false);
+    window.location.reload();
+  };
+
   const renderViewSettings = () => (
     <div className="view-settings">
       <button
         type="button"
         className="toolbar-icon-btn toolbar-icon-btn--settings view-settings-btn"
-        onClick={() => setShowViewSettings((prev) => !prev)}
+        onClick={() => {
+          setShowViewSettings((prev) => !prev);
+          if (!showViewSettings) setApiOverrideDraft(readApiBaseOverride());
+        }}
         title="Settings"
         aria-label="Settings"
       >
@@ -697,6 +959,28 @@ function App() {
       </button>
       {showViewSettings ? (
         <div className="view-settings-menu">
+          <p className="view-settings-menu__hint">
+            API: {formatApiBaseForDisplay(API_BASE)}
+          </p>
+          <label className="view-settings-menu__label" htmlFor="gfas-api-override">
+            API server (optional)
+          </label>
+          <input
+            id="gfas-api-override"
+            type="url"
+            className="view-settings-menu__input"
+            placeholder="http://192.168.1.10:5002"
+            value={apiOverrideDraft}
+            onChange={(e) => setApiOverrideDraft(e.target.value)}
+          />
+          <button type="button" className="view-settings-option view-settings-menu__apply" onClick={applyApiOverride}>
+            Save API &amp; reload
+          </button>
+          {readApiBaseOverride() ? (
+            <button type="button" className="view-settings-option" onClick={clearApiOverride}>
+              Clear API override
+            </button>
+          ) : null}
           <button
             type="button"
             className={`view-settings-option${viewMode === 'desktop' ? ' is-active' : ''}`}
@@ -711,7 +995,6 @@ function App() {
           >
             Mobile View
           </button>
-          {/* Update button removed from Settings. */}
         </div>
       ) : null}
     </div>
@@ -943,6 +1226,203 @@ function App() {
 
       <AppSessionContext.Provider value={{ formData, userName: loginUserName, headerActions: flowHeaderActions }}>
       <main className="app-main">
+        {MASTER_SLIDE_NOS.has(currentSlide) ? (
+          <MasterSlideErrorBoundary
+            onMenu={handleResetToMenu}
+            key={`master-${activeMasterSlide}-${formData?.reportType ?? ''}`}
+          >
+            {activeMasterSlide === 26 && (
+              <Slide26AccountMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={backFromAccountMaster}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 27 && (
+              <Slide27ItemMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 28 && (
+              <Slide28MasterPlaceholder
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 29 && (
+              <Slide29ScheduleMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 30 && (
+              <Slide30CatMastMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 31 && (
+              <Slide31ItemGrpMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 32 && (
+              <Slide32UserMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 36 && (
+              <Slide33BikriExpMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 35 && (
+              <Slide35UserPassword
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 37 && (
+              <Slide37GodownRentMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 38 && (
+              <Slide38GodownMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 39 && (
+              <Slide39CostCentreMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 40 && (
+              <Slide40CustomerInterest
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 41 && (
+              <Slide41HolidayMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 42 && (
+              <Slide42DaneMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 43 && (
+              <Slide43MarkaMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 44 && (
+              <Slide44PurchaseExpMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 45 && (
+              <Slide45SaleBillCondition
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 46 && (
+              <Slide46LocationBType
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 47 && (
+              <Slide47DetailMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+            {activeMasterSlide === 48 && (
+              <Slide48GstStateMaster
+                apiBase={API_BASE}
+                formData={formData}
+                userName={loginUserName}
+                onPrev={() => setCurrentSlide(3)}
+                onReset={handleResetToMenu}
+              />
+            )}
+          </MasterSlideErrorBoundary>
+        ) : (
+        <Suspense fallback={<SlideRouteFallback />}>
         {currentSlide === 1 && (
           <Slide1
             companies={companies}
@@ -965,7 +1445,7 @@ function App() {
           <Slide3 formData={formData} onPrev={handlePrev} onNext={handleSlide3Next} onExit={handleExitApp} />
         )}
         {currentSlide === 4 && <Slide4 apiBase={API_BASE} formData={formData} onPrev={handlePrev} onReset={handleReset} />}
-        {currentSlide === 5 && <Slide5 apiBase={API_BASE} formData={formData} onPrev={handlePrev} onReset={handleReset} />}
+        {currentSlide === 5 && <Slide5 apiBase={API_BASE} formData={formData} onPrev={backFromLedger} onReset={handleReset} />}
         {currentSlide === 6 && (
           <Slide6 apiBase={API_BASE} formData={formData} onPrev={backFromCustomerLedger} onReset={handleReset} />
         )}
@@ -1002,6 +1482,22 @@ function App() {
         {currentSlide === 17 && (
           <Slide16 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} reportMode="purchase" />
         )}
+        {currentSlide === 21 && (
+          <Slide21StateWiseSales
+            apiBase={API_BASE}
+            formData={formData}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+          />
+        )}
+        {currentSlide === 22 && (
+          <Slide22StateWisePurchase
+            apiBase={API_BASE}
+            formData={formData}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+          />
+        )}
         {currentSlide === 18 && (
           <Slide17TradingAc apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
@@ -1029,23 +1525,404 @@ function App() {
             onOpenCustomerLedger={openCustomerLedgerFromOverdue}
           />
         )}
-        {currentSlide === 26 && (
-          <Slide26AccountMaster
-            apiBase={API_BASE}
+        {currentSlide === UTILITIES_PLACEHOLDER_SLIDE && (
+          <Slide49UtilitiesPlaceholder
             formData={formData}
             userName={loginUserName}
             onPrev={() => setCurrentSlide(3)}
-            onReset={handleReset}
+            onReset={handleResetToMenu}
           />
         )}
-        {currentSlide === 27 && (
-          <Slide27ItemMaster
+        {currentSlide === 50 && (
+          <Slide50NewYearBooks
             apiBase={API_BASE}
             formData={formData}
             userName={loginUserName}
             onPrev={() => setCurrentSlide(3)}
-            onReset={handleReset}
+            onReset={handleResetToMenu}
+            onYearCreated={handleNewYearCreated}
           />
+        )}
+        {currentSlide === 51 && (
+          <Slide51PrimaryKey
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleResetToMenu}
+          />
+        )}
+        {currentSlide === 52 && (
+          <Slide52SetFunction
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleResetToMenu}
+          />
+        )}
+        {currentSlide === 53 && (
+          <Slide53TakajaQuery
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleResetToMenu}
+          />
+        )}
+        {currentSlide === 54 && (
+          <DesktopOnlyUtilityGate
+            utilityId="opening-bills-detail"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide54OpeningBillsDetail
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+              onReset={handleResetToMenu}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 55 && (
+          <DesktopOnlyUtilityGate
+            utilityId="interest-transfer"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide55InterestTransfer
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+              onReset={handleResetToMenu}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 56 && (
+          <Slide56CompleteLedger
+            apiBase={API_BASE}
+            formData={formData}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleResetToMenu}
+          />
+        )}
+        {currentSlide === 57 && (
+          <DesktopOnlyUtilityGate
+            utilityId="square-up-accounts"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide57SquareUpAccounts
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 58 && (
+          <Slide58TrialDifference
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onOpenAccountMaster={(code, tab) => openAccountMasterFromTrialDiff({ code, tab })}
+            onOpenLedger={(code, tab) => openLedgerFromTrialDiff({ code, tab })}
+          />
+        )}
+        {currentSlide === 59 && (
+          <DesktopOnlyUtilityGate
+            utilityId="merging-of-accounts"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide59AccountMerge
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 60 && (
+          <DesktopOnlyUtilityGate
+            utilityId="bikri-no-merging"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide60BikriNoMerge
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 61 && (
+          <DesktopOnlyUtilityGate
+            utilityId="bikri-no-trf-to-lot"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide61BikriLotMerge
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 62 && (
+          <DesktopOnlyUtilityGate
+            utilityId="shortage-transfer"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide62ShortageTransfer
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 63 && (
+          <DesktopOnlyUtilityGate
+            utilityId="unused-account-list"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide63UnusedAccountList
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 64 && (
+          <DesktopOnlyUtilityGate
+            utilityId="unused-cost-centre-codes"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide64UnusedCostCentreCodes
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 65 && (
+          <DesktopOnlyUtilityGate
+            utilityId="unused-godown-codes"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide65UnusedGodownCodes
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 66 && (
+          <DesktopOnlyUtilityGate
+            utilityId="missing-codes"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide66MissingCodes
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 67 && (
+          <DesktopOnlyUtilityGate
+            utilityId="brok-find"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide67BrokFind
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 68 && (
+          <DesktopOnlyUtilityGate
+            utilityId="dane-find"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide68DaneFind
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 69 && (
+          <DesktopOnlyUtilityGate
+            utilityId="stock-transfer"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide69StockTransfer
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 70 && (
+          <DesktopOnlyUtilityGate
+            utilityId="sale-transfer"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide70SaleTransfer
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 71 && (
+          <DesktopOnlyUtilityGate
+            utilityId="voucher-transfer"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide71VoucherTransfer
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 72 && (
+          <DesktopOnlyUtilityGate
+            utilityId="purchase-transfer"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide72PurchaseTransfer
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 73 && (
+          <DesktopOnlyUtilityGate
+            utilityId="update-sale-inv-no"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide73UpdateSaleInvNo
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 74 && (
+          <DesktopOnlyUtilityGate
+            utilityId="update-pan-with-gstin"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide74UpdatePanWithGstIn
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 75 && (
+          <Slide75UserReport
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          />
+        )}
+        {currentSlide === 76 && (
+          <Slide76AuditTrailReport
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          />
+        )}
+        {currentSlide === 77 && (
+          <Slide77CompanyDetailEdit
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          />
+        )}
+        {currentSlide === 78 && (
+          <Slide78GstProfileSetting
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          />
+        )}
+        {currentSlide === 79 && (
+          <DesktopOnlyUtilityGate
+            utilityId="updation"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide79Updation
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        </Suspense>
         )}
       </main>
       </AppSessionContext.Provider>

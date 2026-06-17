@@ -1,0 +1,208 @@
+/**
+ * GFASORCL compact toolbar — 28px height, single line, icon + label (recommended layout).
+ * Applies to master screens, report toolbars, and any .gfas-toolbar container.
+ * State Wise Sales/Purchase (slide-21/22) use WINDAL layout — see stateWiseSales.css.
+ */
+
+.gfas-toolbar,
+.account-master-screen__toolbar,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar .toolbar-actions,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions,
+.dc-list-results__toolbar,
+.dc-print-results__toolbar,
+.overdue-toolbar__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 28px;
+  max-height: 28px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.gfas-toolbar-divider {
+  flex: 0 0 1px;
+  align-self: stretch;
+  width: 1px;
+  min-width: 1px;
+  margin: 0 0.15rem;
+  background: #cbd5e1;
+  pointer-events: none;
+}
+
+.gfas-toolbar-btn,
+.gfas-toolbar .btn,
+.account-master-screen__toolbar .btn,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar .toolbar-actions .btn,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions .btn,
+.dc-list-results__toolbar .btn,
+.dc-print-results__toolbar .btn,
+.overdue-toolbar__actions .btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  padding: 0 0.42rem !important;
+  margin: 0;
+  border-radius: 5px !important;
+  font-size: 0.68rem !important;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  min-width: 0 !important;
+  max-width: none;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+}
+
+.gfas-toolbar-btn--icon-only {
+  padding: 0 0.38rem;
+  min-width: 28px;
+}
+
+.gfas-toolbar-btn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.gfas-toolbar-btn__icon svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.gfas-toolbar-btn__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.gfas-toolbar-btn--secondary,
+.gfas-toolbar .btn-secondary,
+.account-master-screen__toolbar .btn-secondary,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions .btn-secondary,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions .btn-toolbar-back {
+  background: #edf2f7 !important;
+  color: #2d3748 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.gfas-toolbar-btn--primary,
+.gfas-toolbar .btn-primary,
+.account-master-screen__toolbar .btn-primary {
+  background: #4c51bf !important;
+  color: #fff !important;
+  border-color: #434190 !important;
+}
+
+.gfas-toolbar-btn--danger,
+.gfas-toolbar .btn-danger,
+.account-master-screen__toolbar .btn-danger {
+  background: #e53e3e !important;
+  color: #fff !important;
+  border-color: #c53030 !important;
+}
+
+.gfas-toolbar-btn--export,
+.gfas-toolbar .btn-export,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions .btn-export {
+  background: #2b6cb0 !important;
+  color: #fff !important;
+  border-color: #2c5282 !important;
+}
+
+.gfas-toolbar-btn--excel,
+.gfas-toolbar .btn-excel,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions .btn-excel {
+  background: #217346 !important;
+  color: #fff !important;
+  border-color: #1a5c38 !important;
+}
+
+.gfas-toolbar-btn--whatsapp,
+.gfas-toolbar .btn-whatsapp,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions .btn-whatsapp {
+  background: #25d366 !important;
+  color: #fff !important;
+  border-color: #1da851 !important;
+}
+
+.gfas-toolbar-btn:disabled,
+.gfas-toolbar .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar h2 {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 1rem;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar .toolbar-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar .btn-report-help {
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  padding: 0 0.42rem !important;
+  font-size: 0.68rem !important;
+}
+
+.app--mobile .gfas-toolbar,
+.app--mobile .account-master-screen__toolbar,
+.app--mobile .slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar .toolbar-actions,
+.app--mobile .slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: 28px;
+  padding-bottom: 0;
+  gap: 0.2rem;
+}
+
+.app--mobile .gfas-toolbar-btn,
+.app--mobile .account-master-screen__toolbar .btn,
+.app--mobile .slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar .toolbar-actions .btn {
+  flex: 0 0 auto;
+  min-width: 0;
+  font-size: 0.68rem;
+  padding: 0 0.4rem;
+}
+
+/* Legacy account-master toolbar overrides — unified with gfas-toolbar */
+.account-master-screen__toolbar {
+  flex-wrap: nowrap;
+  gap: 0.2rem;
+  max-height: 28px;
+}

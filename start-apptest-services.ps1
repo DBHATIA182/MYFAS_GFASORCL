@@ -40,7 +40,7 @@ if (-not (Test-Path -LiteralPath $CloudflaredConfig)) {
 $cloudflaredExe = Resolve-CloudflaredPath
 
 $nodePathSuffix = "`$env:Path += ';' + [Environment]::GetEnvironmentVariable('ProgramFiles') + '\nodejs;' + [Environment]::GetEnvironmentVariable('LOCALAPPDATA') + '\Programs\nodejs'"
-$serverCommand = "Set-Location -LiteralPath '$AppRoot'; $nodePathSuffix; npm.cmd run server"
+$serverCommand = "Set-Location -LiteralPath '$AppRoot'; $nodePathSuffix; `$env:PORT='5002'; npm.cmd run server"
 $frontendCommand = "Set-Location -LiteralPath '$AppRoot'; $nodePathSuffix; npm.cmd run dev -- --host 0.0.0.0 --port 5173"
 $tunnelCommand = "Set-Location -LiteralPath '$AppRoot'; & '$cloudflaredExe' tunnel --config '$CloudflaredConfig' run"
 

@@ -823,6 +823,11 @@ body,
   color: #fff;
 }
 
+.slide-3.fas-flow-host .report-bucket[data-category='gst-reports'] .report-bucket-head__index {
+  background: linear-gradient(135deg, #db2777, #ec4899);
+  color: #fff;
+}
+
 .slide-3.fas-flow-host .report-bucket[data-category='sales-module'] .report-bucket-head__index {
   background: linear-gradient(135deg, #7c3aed, #9f67fa);
   color: #fff;
@@ -1327,7 +1332,9 @@ body,
   max-width: 100%;
 }
 
-.app--fas-flow .slide.slide-8 > .report-form {
+.app--fas-flow .slide.slide-8 > .report-form,
+.app--fas-flow .slide.slide-report.slide-21-state-wise > .report-form,
+.app--fas-flow .slide.slide-report.slide-22-state-wise-purchase > .report-form {
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
@@ -1340,7 +1347,9 @@ body,
 
 .app--fas-flow .slide.slide-8 .form-group,
 .app--fas-flow .slide.slide-8 .account-search-group,
-.app--fas-flow .slide.slide-8 .account-search-results {
+.app--fas-flow .slide.slide-8 .account-search-results,
+.app--fas-flow .slide.slide-report.slide-21-state-wise .form-group,
+.app--fas-flow .slide.slide-report.slide-22-state-wise-purchase .form-group {
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;

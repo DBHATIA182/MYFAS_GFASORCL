@@ -2,9 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import connectionConfig from '../connection.config.json';
 import App from './App';
+import { getDefaultAppName } from './utils/gfasBrand';
 
-const FATAL_APP_TITLE =
-  String(connectionConfig.product?.displayName || '').trim() || 'Windal Accounting';
+const FATAL_APP_TITLE = getDefaultAppName();
 
 function renderFatalStartupMessage(errorLike) {
   try {

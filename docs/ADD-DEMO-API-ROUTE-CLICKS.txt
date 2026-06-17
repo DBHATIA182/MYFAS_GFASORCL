@@ -1,0 +1,53 @@
+GFASORCL — Add /api route in Cloudflare (NO DRAGGING)
+======================================================
+
+The diagram and table rows are NOT draggable. That is normal.
+
+Use the blue "+ Add route" button (top right of Routes page).
+
+STEP BY STEP
+------------
+1. Zero Trust / Cloudflare → Networks → Tunnels → demo → tab "Routes"
+
+2. Click "+ Add route" (or "Add a published application route")
+
+3. Fill in:
+   - Subdomain / Public hostname:  demo.fasaccountingsoftware.in
+   - Path:                        /api
+     (If there is a Path field; some screens say "Path" or "URL path".
+      Use /api or /api/* — both are OK.)
+   - Type:                        HTTP (or Published application)
+   - URL / Service:               http://127.0.0.1:5002
+   - Do NOT use localhost — use 127.0.0.1
+
+4. Save route
+
+5. You should now have FOUR routes (order in the table does not need dragging):
+   - demo.fasaccountingsoftware.in + path /api     → 127.0.0.1:5002   (NEW)
+   - demo.fasaccountingsoftware.in (no path)     → 127.0.0.1:5173
+   - demo-api.fasaccountingsoftware.in           → 127.0.0.1:5002
+   - api.fasaccountingsoftware.in                → 127.0.0.1:5002
+
+   Cloudflare matches the most specific rule (path /api) before the general demo host.
+
+6. On the dev PC run:  start services batch file.bat
+   (Only ONE cloudflared window.)
+
+7. Test in browser:
+   https://demo.fasaccountingsoftware.in/api/health
+   Must show: {"ok":true,"port":5002}
+
+IF THERE IS NO "PATH" FIELD IN THE FORM
+---------------------------------------
+Use the script instead (sets path via API):
+   push-demo-tunnel-routes.cmd
+   Account ID: b6f4f1f1eea2d505d0ca89665a6c1589
+   API token:  (Tunnel Edit permission)
+
+YOUR CURRENT SCREEN (3 routes only)
+-----------------------------------
+Right now ALL traffic for demo.fasaccountingsoftware.in goes to port 5173,
+including /api/health — that causes HTTP 500.
+
+demo-api and api hostnames are separate; the login page uses the SAME host
+(demo.fasaccountingsoftware.in), so you still need the /api path route above.

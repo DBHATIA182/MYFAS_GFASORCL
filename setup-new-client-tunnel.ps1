@@ -178,7 +178,7 @@ ingress:
   - hostname: $appHost
     service: http://localhost:5173
   - hostname: $apiHost
-    service: http://localhost:5001
+    service: http://localhost:5002
   - service: http_status:404
 "@
 $configContent | Set-Content -Path $configPath -Encoding UTF8

@@ -7,7 +7,10 @@ import { generatePDF, sharePdfWithWhatsApp, buildLedgerStatementPdfMetadata } fr
 import { downloadExcelRows } from '../utils/excelExport';
 import { toInputDateString, toOracleDate, toDisplayDate, formatCurBal, getCurBal } from '../utils/dateFormat';
 import { formatLedgerVoucherApiError } from '../utils/apiLabel';
-import ReportHelpButton from '../components/ReportHelpButton';
+import SessionInfoLine from '../components/SessionInfoLine';
+import VoiceSearchButton from '../components/VoiceSearchButton';
+import { filterAccountRowsSmart, SEARCH_NO_MATCH, SEARCH_TYPE_HINT } from '../utils/masterSearchFilter';
+import { applyVoiceAccountSearch } from '../utils/voiceSearchApply';
 
 function highlightMatch(text, q) {
   if (text == null) return null;
@@ -107,17 +110,10 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
     };
   }, [apiBase, formData.comp_code, formData.COMP_CODE, formData.comp_uid, formData.COMP_UID]);
 
-  const filteredAccounts = useMemo(() => {
-    const q = accountSearch.trim().toLowerCase();
-    if (!q) return accounts.slice(0, 120);
-    return accounts.filter((a) => {
-      const code = String(a.CODE ?? '').toLowerCase();
-      const name = String(a.NAME ?? '').toLowerCase();
-      const city = String(a.CITY ?? '').toLowerCase();
-      const bal = String(getCurBal(a) ?? '').toLowerCase();
-      return code.includes(q) || name.includes(q) || city.includes(q) || bal.includes(q);
-    });
-  }, [accounts, accountSearch]);
+  const filteredAccounts = useMemo(
+    () => filterAccountRowsSmart(accounts, accountSearch, getCurBal, 50),
+    [accounts, accountSearch]
+  );
 
   useEffect(() => {
     setListHighlight(0);
@@ -142,59 +138,95 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
     focusStartDate();
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedAccount) {
+  const applyAccountVoiceSearch = (transcript) => {
+    applyVoiceAccountSearch({
+      transcript,
+      rows: accounts,
+      getCurBal,
+      setQuery: setAccountSearch,
+      setHighlight: setListHighlight,
+      clearSelection: () => setSelectedAccount(''),
+      inputRef: accountSearchInputRef,
+    });
+  };
+
+  const runLedgerQuery = async (overrides = {}) => {
+    const accountCode =
+      overrides.code !== undefined ? String(overrides.code || '').trim() : String(selectedAccount).trim();
+    if (!accountCode) {
       alert('Please select an account');
-      return;
+      return false;
     }
-    if (!startDate || !endDate) {
+    const sDate = toOracleDate(overrides.startDate ?? startDate);
+    const eDate = toOracleDate(overrides.endDate ?? endDate);
+    if (!sDate || !eDate) {
       alert('Please select both start and end dates');
-      return;
+      return false;
     }
-    if (isLedgerInterest && !interestCalcDate) {
+    const intDate = overrides.interestCalcDate ?? interestCalcDate;
+    if (isLedgerInterest && !intDate) {
       alert('Please select interest calculation date');
-      return;
+      return false;
     }
 
     setLoading(true);
     try {
-      const sDate = toOracleDate(startDate);
-      const eDate = toOracleDate(endDate);
-
       const params = {
         comp_code: formData.comp_code || formData.COMP_CODE,
-        code: String(selectedAccount).trim(),
+        code: accountCode,
         s_date: sDate,
         e_date: eDate,
         comp_uid: formData.comp_uid || formData.COMP_UID,
-        voucher_wise_total: voucherWiseTotal,
+        voucher_wise_total: overrides.voucherWiseTotal ?? voucherWiseTotal,
       };
       if (isLedgerInterest) {
-        params.int_date = toOracleDate(interestCalcDate);
-        params.int_rate = String(interestRate).trim() || '0';
-        params.grace_dr_days = String(graceDrDays).trim() || '0';
-        params.grace_cr_days = String(graceCrDays).trim() || '0';
+        params.int_date = toOracleDate(intDate);
+        params.int_rate = String(overrides.interestRate ?? interestRate).trim() || '0';
+        params.grace_dr_days = String(overrides.graceDrDays ?? graceDrDays).trim() || '0';
+        params.grace_cr_days = String(overrides.graceCrDays ?? graceCrDays).trim() || '0';
       }
 
       const response = await axios.get(`${apiBase}${isLedgerInterest ? '/api/ledger-interest' : '/api/ledger'}`, {
         params,
         withCredentials: true,
-        timeout: 30000
+        timeout: 30000,
       });
-      
+
       if (response.data && response.data.length > 0) {
         setReportData(response.data);
         setShowReport(true);
-      } else {
-        alert('No transactions found for this account');
+        return true;
       }
+      alert('No transactions found for this account');
+      return false;
     } catch (error) {
       alert('Error: ' + (error.response?.data?.error || error.message));
+      return false;
     } finally {
       setLoading(false);
     }
   };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await runLedgerQuery();
+  };
+
+  const ledgerDrillRanRef = useRef('');
+
+  useEffect(() => {
+    const d = formData.ledgerDrilldown;
+    if (!d?.autoRun || !d.code || isLedgerInterest) return;
+    if (!startDate || !endDate) return;
+    const runKey = String(d.at ?? d.code);
+    if (ledgerDrillRanRef.current === runKey) return;
+    ledgerDrillRanRef.current = runKey;
+
+    const code = String(d.code).trim();
+    setSelectedAccount(code);
+    setAccountSearch('');
+    void runLedgerQuery({ code });
+  }, [formData.ledgerDrilldown, isLedgerInterest, startDate, endDate]);
 
   /**
    * Sale bill: SALE.TYPE = LEDGER.VR_TYPE, SALE.BILL_NO = LEDGER.VR_NO, SALE.B_TYPE = LEDGER.TYPE, date = VR_DATE.
@@ -217,11 +249,15 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
       return;
     }
     const bTypeFromLedger = ledgerLineType != null && String(ledgerLineType).trim() !== '' ? String(ledgerLineType).trim() : ' ';
+    const ptypeNum =
+      typeof vrType === 'number' ? vrType : parseInt(String(vrType ?? '').trim(), 10);
     setBillPrintParams({
       type: saleType,
+      ...(Number.isFinite(ptypeNum) && ptypeNum >= 1 && ptypeNum <= 9 ? { oracleTypeNum: ptypeNum } : {}),
       billNo: String(billNo).trim(),
       bType: bTypeFromLedger,
       oracleDt,
+      compYear: String(formData.comp_year ?? formData.COMP_YEAR ?? '').trim(),
       label: `Sale bill — sale.type=${saleType} · bill_no=${String(billNo)} · b_type=${bTypeFromLedger.trim() || ' '} · ${toDisplayDate(ymd)}`,
     });
     setBillPrintOpen(true);
@@ -323,10 +359,10 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
     if (voucherRows != null) {
       return (
         <div className="slide slide-report">
+          <SessionInfoLine formData={formData} helpReportId={isLedgerInterest ? 'ledger-interest' : 'ledger'} />
           <div className="report-toolbar">
             <h2>Voucher entries</h2>
             <div className="toolbar-actions">
-            <ReportHelpButton reportId={isLedgerInterest ? 'ledger-interest' : 'ledger'} />
             
               <button type="button" className="btn btn-toolbar-back" onClick={() => setVoucherRows(null)}>
                 ← Back to ledger
@@ -378,10 +414,10 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
 
     return (
       <div className="slide slide-report">
+        <SessionInfoLine formData={formData} helpReportId={isLedgerInterest ? 'ledger-interest' : 'ledger'} />
         <div className="report-toolbar">
           <h2>{isLedgerInterest ? 'Ledger With Interest' : 'Ledger Report'}</h2>
           <div className="toolbar-actions">
-            <ReportHelpButton reportId={isLedgerInterest ? 'ledger-interest' : 'ledger'} />
             
             <button type="button" className="btn btn-toolbar-back" onClick={closeReport}>
               ← Back
@@ -451,13 +487,12 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
     <div className="slide slide-5">
       <h2>{isLedgerInterest ? 'Ledger With Interest Parameters' : 'Ledger Report Parameters'}</h2>
       
-      <p className="company-info">
-        {formData.comp_name} | {formData.comp_year}
+      <SessionInfoLine formData={formData} helpReportId={isLedgerInterest ? 'ledger-interest' : 'ledger'}>
         <br />
         <span className="compdet-date-hint">
           Dates below are comp_s_dt / comp_e_dt for this year (FY may span two calendar years).
         </span>
-      </p>
+      </SessionInfoLine>
 
       <form onSubmit={handleSubmit} className="report-form">
         <div className="button-group button-group--form-top">
@@ -470,15 +505,16 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
         </div>
         <div className="form-group account-search-group">
           <label htmlFor="account-search">Search account:</label>
-          <input
-            id="account-search"
-            ref={accountSearchInputRef}
-            type="search"
-            autoComplete="off"
-            placeholder="Type code, name, or city… (↑↓ Enter)"
-            value={accountSearch}
-            onChange={(e) => setAccountSearch(e.target.value)}
-            onKeyDown={(e) => {
+          <div className="account-search-input-row">
+            <input
+              id="account-search"
+              ref={accountSearchInputRef}
+              type="search"
+              autoComplete="off"
+              placeholder="Type code, name, or city… (↑↓ Enter)"
+              value={accountSearch}
+              onChange={(e) => setAccountSearch(e.target.value)}
+              onKeyDown={(e) => {
               if (selectedAccount) return;
               const max = Math.max(0, filteredAccounts.length - 1);
               if (e.key === 'ArrowDown') {
@@ -495,9 +531,15 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
                   selectAccount(acc);
                 }
               }
-            }}
-            className="form-input"
-          />
+              }}
+              className="form-input account-search-input-row__field"
+            />
+            <VoiceSearchButton
+              disabled={!!selectedAccount}
+              title="Speak party name to search"
+              onTranscript={applyAccountVoiceSearch}
+            />
+          </div>
           {selectedAccount ? (
             <p className="account-selected-hint">
               Selected: <strong>{accounts.find((a) => String(a.CODE) === String(selectedAccount))?.NAME ?? '—'}</strong>
@@ -516,7 +558,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
               </button>
             </p>
           ) : null}
-          {!selectedAccount ? (
+          {!selectedAccount && accountSearch.trim() ? (
             <div className="account-search-results" role="listbox" aria-label="Matching accounts">
               <div className="account-search-header" aria-hidden="true">
                 <span>Code</span>
@@ -525,7 +567,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
                 <span className="account-search-bal-h">Bal</span>
               </div>
               {filteredAccounts.length === 0 ? (
-                <div className="account-search-empty">No accounts match your search.</div>
+                <div className="account-search-empty">{SEARCH_NO_MATCH}</div>
               ) : (
                 filteredAccounts.map((account, index) => {
                   const bal = getCurBal(account);
@@ -545,7 +587,12 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
                       aria-selected={rowHi}
                       className={`account-search-row${String(selectedAccount) === String(account.CODE) ? ' is-active' : ''}${rowHi ? ' is-highlight' : ''}`}
                       onMouseEnter={() => setListHighlight(index)}
-                      onClick={() => selectAccount(account)}
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        selectAccount(account);
+                      }}
                     >
                       <span className="account-search-code">{highlightMatch(account.CODE, accountSearch)}</span>
                       <span className="account-search-name" title={account.NAME}>
@@ -565,6 +612,8 @@ export default function Slide5({ apiBase, onPrev, onReset, formData }) {
                 })
               )}
             </div>
+          ) : !selectedAccount ? (
+            <p className="sale-bill-section__hint dc-party-search-hint">{SEARCH_TYPE_HINT}</p>
           ) : null}
         </div>
 
