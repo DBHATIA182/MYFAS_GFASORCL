@@ -129,6 +129,91 @@ body {
   min-width: 0; /* flex: allow inner horizontal scroll instead of growing past viewport */
 }
 
+/* Trial balance + ledger report hosts — full viewport (not 800px card) */
+.slide.fas-tb-host {
+  max-width: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  align-self: stretch !important;
+  flex: 1 1 auto !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box;
+}
+
+.app-main--ledger-full-bleed {
+  align-items: stretch !important;
+  justify-content: stretch !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.app--ledger-full-bleed {
+  background: var(--fas-surface, #eef2f7) !important;
+}
+
+.app-main--ledger-full-bleed > .slide.fas-tb-host {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+.app-main--ledger-full-bleed .fas-tb-flow {
+  width: 100% !important;
+  max-width: none !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  border-radius: 0 !important;
+}
+
+.app-main:has(> .slide-5.fas-tb-host),
+.app-main:has(> .slide-4.fas-tb-host) {
+  align-items: stretch !important;
+  justify-content: stretch !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.app-main:has(> .slide-5.fas-tb-host) > .slide-5.fas-tb-host,
+.app-main:has(> .slide-4.fas-tb-host) > .slide-4.fas-tb-host {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  align-self: stretch !important;
+  height: 100% !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.app-main:has(> .slide-5.fas-tb-host) .fas-tb-flow,
+.app-main:has(> .slide-4.fas-tb-host) .fas-tb-flow {
+  width: 100% !important;
+  max-width: none !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
 .slide-3 {
   max-width: 920px;
   width: 100%;
@@ -1688,12 +1773,62 @@ body {
   color: #2c7a7b;
 }
 
+.report-table--ledger .ledger-cl-balance-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.report-table--ledger .ledger-cl-balance-tag {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.report-table--ledger .ledger-cl-balance-tag--dr {
+  background: rgba(254, 226, 226, 0.85);
+  color: #b91c1c;
+}
+
+.report-table--ledger .ledger-cl-balance-tag--cr {
+  background: rgba(220, 252, 231, 0.85);
+  color: #15803d;
+}
+
+.report-table--ledger .ledger-cl-balance--negative .ledger-cl-balance-amt {
+  color: #c53030 !important;
+}
+
+.report-table--ledger .ledger-cl-balance:not(.ledger-cl-balance--negative) .ledger-cl-balance-amt {
+  color: #2c7a7b;
+}
+
 .report-table--ledger .ledger-cl-balance--negative {
   color: #c53030 !important;
 }
 
 .report-table--ledger tr.ledger-grand-total .ledger-cl-balance-total {
   color: #fff !important;
+}
+
+.report-table--ledger tr.ledger-grand-total .ledger-cl-balance-amt,
+.report-table--ledger tr.ledger-grand-total .ledger-cl-balance-amt--total {
+  color: #fff !important;
+}
+
+.report-table--ledger tr.ledger-grand-total .ledger-cl-balance-tag--dr {
+  background: rgba(254, 202, 202, 0.35);
+  color: #fecaca;
+}
+
+.report-table--ledger tr.ledger-grand-total .ledger-cl-balance-tag--cr {
+  background: rgba(187, 247, 208, 0.35);
+  color: #bbf7d0;
 }
 
 .report-table--ledger tr.ledger-grand-total .ledger-cl-balance-total--negative {

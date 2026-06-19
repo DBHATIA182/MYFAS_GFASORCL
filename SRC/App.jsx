@@ -103,6 +103,11 @@ import './styles/windalDashboard.css';
 import './styles/gfasToolbar.css';
 import './styles/stateWiseSales.css';
 import './styles/scheduleMasterScreen.css';
+import './styles/ledgerMobile.css';
+import './styles/trialBalanceMobile.css';
+import './styles/trialBalanceDesktop.css';
+import './styles/ledgerDesktop.css';
+import './styles/ledgerFullBleed.css';
 import { getGfasDocumentTitle } from './utils/gfasBrand';
 import {
   formatApiBaseForDisplay,
@@ -639,10 +644,17 @@ function App() {
   };
 
   const handleSlide3Next = (data) => {
-    setFormData(prev => ({ ...prev, ...data }));
     const reportType = String(data?.reportType ?? '').trim().toLowerCase();
-    if (reportType === 'ledger' || reportType === 'ledger-interest') setCurrentSlide(5);
-    else if (reportType === 'complete-ledger') setCurrentSlide(56);
+    if (reportType === 'ledger' || reportType === 'ledger-interest') {
+      setFormData((prev) => {
+        const { ledgerDrilldown, ...rest } = prev;
+        return { ...rest, ...data, ledgerReturnSlide: 3 };
+      });
+      setCurrentSlide(5);
+      return;
+    }
+    setFormData((prev) => ({ ...prev, ...data }));
+    if (reportType === 'complete-ledger') setCurrentSlide(56);
     else if (reportType === 'bill-ledger' || reportType === 'customer-ledger' || reportType === 'supplier-ledger') setCurrentSlide(6);
     else if (reportType === 'broker-os') setCurrentSlide(7);
     else if (reportType === 'sale-list') setCurrentSlide(8);
@@ -759,25 +771,29 @@ function App() {
   };
 
   const openLedgerFromTrialDiff = (payload) => {
-    setFormData((prev) => ({
-      ...prev,
-      reportType: 'ledger',
-      ledgerDrilldown: {
-        code: String(payload?.code ?? '').trim(),
-        autoRun: true,
-        returnSlide: 58,
-        returnTab: String(payload?.tab ?? 'missing_code_in_master'),
-        at: Date.now(),
-      },
-    }));
+    setFormData((prev) => {
+      const { ledgerReturnSlide, ...rest } = prev;
+      return {
+        ...rest,
+        reportType: 'ledger',
+        ledgerDrilldown: {
+          code: String(payload?.code ?? '').trim(),
+          autoRun: true,
+          returnSlide: 58,
+          returnTab: String(payload?.tab ?? 'missing_code_in_master'),
+          at: Date.now(),
+        },
+      };
+    });
     setCurrentSlide(5);
   };
 
   const backFromLedger = () => {
     const d = formData.ledgerDrilldown;
-    if (d?.returnSlide === 58) {
+    const returnSlide = d?.returnSlide ?? formData.ledgerReturnSlide ?? 3;
+    if (returnSlide === 58) {
       setFormData((prev) => {
-        const { ledgerDrilldown, ...rest } = prev;
+        const { ledgerDrilldown, ledgerReturnSlide, ...rest } = prev;
         return {
           ...rest,
           reportType: 'trial-difference',
@@ -787,7 +803,14 @@ function App() {
       setCurrentSlide(58);
       return;
     }
-    handlePrev();
+    setFormData((prev) => {
+      const { ledgerDrilldown, ledgerReturnSlide, ...rest } = prev;
+      if (returnSlide === 4) {
+        return { ...rest, reportType: 'trial-balance' };
+      }
+      return rest;
+    });
+    setCurrentSlide(returnSlide);
   };
 
   const openSaleListFromChart = (payload) => {
@@ -874,8 +897,16 @@ function App() {
         }
         const utilitySlide = resolveUtilitiesSlideNo(reportType);
         const masterSlide = resolveMasterSlideNo(reportType);
-        setFormData((prev) => ({ ...prev, reportType }));
-        setCurrentSlide(utilitySlide ?? masterSlide ?? slideNo);
+        const targetSlide = utilitySlide ?? masterSlide ?? slideNo;
+        setFormData((prev) => {
+          const { ledgerDrilldown, ...rest } = prev;
+          const next = { ...rest, reportType };
+          if (reportType === 'ledger' || reportType === 'ledger-interest') {
+            next.ledgerReturnSlide = currentSlide;
+          }
+          return next;
+        });
+        setCurrentSlide(targetSlide);
         return true;
       };
 
@@ -1140,7 +1171,8 @@ function App() {
   const useWindalDashboard = authenticated && currentSlide === 3;
   /** All report screens after the menu (not login/company/year/dashboard). */
   const useFasFlowFullScreen = authenticated && currentSlide > 3;
-  const appClassName = `app ${viewMode === 'desktop' ? 'app--desktop' : 'app--mobile'}${hideAppHeaderChrome ? ' app--no-header' : ''}${useWindalInitial ? ' app--windal-initial' : ''}${useWindalDashboard ? ' app--windal-dashboard' : ''}${useFasFlowFullScreen ? ' app--fas-flow' : ''}`;
+  const useLedgerFullBleed = authenticated && (currentSlide === 4 || currentSlide === 5);
+  const appClassName = `app ${viewMode === 'desktop' ? 'app--desktop' : 'app--mobile'}${hideAppHeaderChrome ? ' app--no-header' : ''}${useWindalInitial ? ' app--windal-initial' : ''}${useWindalDashboard ? ' app--windal-dashboard' : ''}${useFasFlowFullScreen ? ' app--fas-flow' : ''}${useLedgerFullBleed ? ' app--ledger-full-bleed' : ''}`;
 
   if (!clientGuardChecked) {
     return (
@@ -1225,7 +1257,7 @@ function App() {
       ) : null}
 
       <AppSessionContext.Provider value={{ formData, userName: loginUserName, headerActions: flowHeaderActions }}>
-      <main className="app-main">
+      <main className={`app-main${useLedgerFullBleed ? ' app-main--ledger-full-bleed' : ''}`}>
         {MASTER_SLIDE_NOS.has(currentSlide) ? (
           <MasterSlideErrorBoundary
             onMenu={handleResetToMenu}
@@ -1444,8 +1476,12 @@ function App() {
         {currentSlide === 3 && (
           <Slide3 formData={formData} onPrev={handlePrev} onNext={handleSlide3Next} onExit={handleExitApp} />
         )}
-        {currentSlide === 4 && <Slide4 apiBase={API_BASE} formData={formData} onPrev={handlePrev} onReset={handleReset} />}
-        {currentSlide === 5 && <Slide5 apiBase={API_BASE} formData={formData} onPrev={backFromLedger} onReset={handleReset} />}
+        {currentSlide === 4 && (
+          <Slide4 apiBase={API_BASE} formData={formData} viewMode={viewMode} onPrev={handlePrev} onReset={handleReset} />
+        )}
+        {currentSlide === 5 && (
+          <Slide5 apiBase={API_BASE} formData={formData} viewMode={viewMode} onPrev={backFromLedger} onReset={handleReset} />
+        )}
         {currentSlide === 6 && (
           <Slide6 apiBase={API_BASE} formData={formData} onPrev={backFromCustomerLedger} onReset={handleReset} />
         )}

@@ -7,6 +7,7 @@ import { buildSaleListDisplayRows, saleListMeas } from './saleListDisplay';
 import { rupeesToWords } from './rupeesInWords';
 import { rowFieldCI, rowFieldAny } from './rowFieldCI';
 import { ageingCurBalDisplay } from './ageingDisplay';
+import { buildLedgerJsPdfBlob, assertLedgerPdfBlob } from './ledgerJsPdf';
 
 function safeFilenamePart(name) {
   return String(name || 'report').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
@@ -4300,6 +4301,11 @@ function getPdfOptions(metadata, reportType) {
             }
       : { scale: 2, useCORS: true };
 
+  const pagebreak =
+    reportType === 'complete-ledger'
+      ? { mode: ['css', 'legacy'], before: '.complete-ledger-pdf-section--break' }
+      : { mode: ['css', 'legacy'] };
+
   return {
     margin:
       reportType === 'sale-bill' || reportType === 'purchase-bill'
@@ -4310,10 +4316,7 @@ function getPdfOptions(metadata, reportType) {
     filename,
     image: { type: 'jpeg', quality: reportType === 'complete-ledger' ? 0.92 : 0.98 },
     html2canvas,
-    pagebreak:
-      reportType === 'complete-ledger'
-        ? { mode: ['css', 'legacy'], before: '.complete-ledger-pdf-section--break' }
-        : undefined,
+    pagebreak,
     jsPDF: {
       orientation:
         reportType === 'complete-ledger' ||
@@ -4346,13 +4349,23 @@ function getPdfOptions(metadata, reportType) {
  * @returns {Promise<{ blob: Blob, filename: string }>}
  */
 export async function getPdfBlob(reportType, data, metadata) {
-  const htmlContent = buildReportHtml(reportType, data, metadata);
   const options = getPdfOptions(metadata, reportType);
 
   if (reportType === 'complete-ledger') {
     return getCompleteLedgerPdfBlob(data, metadata);
   }
 
+  if (reportType === 'ledger') {
+    try {
+      const blob = buildLedgerJsPdfBlob(data, metadata);
+      assertLedgerPdfBlob(blob);
+      return { blob, filename: options.filename };
+    } catch (err) {
+      console.warn('Ledger jsPDF failed, falling back to html2pdf:', err);
+    }
+  }
+
+  const htmlContent = buildReportHtml(reportType, data, metadata);
   const blob = await html2pdf().set(options).from(htmlContent).outputPdf('blob');
   return { blob, filename: options.filename };
 }

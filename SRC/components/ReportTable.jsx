@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import TrialBalanceDesktopTable from './TrialBalanceDesktopTable';
 import { formatLedgerDateDisplay } from '../utils/dateFormat';
 import { buildBrokerOsDisplayRows } from '../utils/brokerOsDisplay';
 import { buildSaleListDisplayRows, saleListMeas } from '../utils/saleListDisplay';
@@ -29,8 +30,8 @@ export default function ReportTable({
   saleListSortMode = 'date',
   billLedgerInterest = false,
   billLedgerKind = 'customer',
+  filterActive = false,
 }) {
-  const [trialSelectedKey, setTrialSelectedKey] = useState(null);
   const [ledgerSelectedKey, setLedgerSelectedKey] = useState(null);
   const [ageingListSelectedKey, setAgeingListSelectedKey] = useState(null);
   const [ageingDrillSelectedKey, setAgeingDrillSelectedKey] = useState(null);
@@ -90,10 +91,6 @@ export default function ReportTable({
   }, [type, data]);
 
   useEffect(() => {
-    if (type === 'trial-balance') setTrialSelectedKey(null);
-  }, [type, data]);
-
-  useEffect(() => {
     if (type === 'ledger' || type === 'ledger-interest') setLedgerSelectedKey(null);
   }, [type, data]);
 
@@ -124,136 +121,51 @@ export default function ReportTable({
     return Math.max(0, Math.trunc(num)).toLocaleString('en-IN');
   };
 
+  const renderLedgerClBalance = (val, { total = false } = {}) => {
+    const num = parseFloat(val) || 0;
+    const abs = fmtAlways(Math.abs(num));
+    const tag = num < 0 ? 'Cr' : 'Dr';
+    const tagClass = num < 0 ? 'ledger-cl-balance-tag--cr' : 'ledger-cl-balance-tag--dr';
+    const amtClass = total ? 'ledger-cl-balance-amt ledger-cl-balance-amt--total' : 'ledger-cl-balance-amt';
+    const tagEl =
+      num === 0 ? null : (
+        <span className={`ledger-cl-balance-tag ${tagClass}${total ? ' ledger-cl-balance-tag--total' : ''}`}>{tag}</span>
+      );
+    return (
+      <span className="ledger-cl-balance-cell">
+        <span className={amtClass}>{abs}</span>
+        {tagEl}
+      </span>
+    );
+  };
+
   const clampText = (value, maxLen = 25) => {
     const s = String(value ?? '');
     if (s.length <= maxLen) return s;
     return `${s.slice(0, Math.max(0, maxLen - 1))}…`;
   };
 
-  // --- TRIAL BALANCE VIEW (full grid + grand total; scrolls horizontally on small screens) ---
+  // --- TRIAL BALANCE VIEW (grouped schedules, expand/collapse, filters) ---
   if (type === 'trial-balance') {
-    let gDr = 0;
-    let gCr = 0;
-    let gCdr = 0;
-    let gCcr = 0;
-    data.forEach((row) => {
-      gDr += parseFloat(row.DR_AMT ?? row.dr_amt ?? 0) || 0;
-      gCr += parseFloat(row.CR_AMT ?? row.cr_amt ?? 0) || 0;
-      gCdr += parseFloat(row.CLOSING_DR ?? row.closing_dr ?? 0) || 0;
-      gCcr += parseFloat(row.CLOSING_CR ?? row.closing_cr ?? 0) || 0;
-    });
-
-    return (
-      <div className="table-responsive table-responsive--trial">
-        <table className="report-table report-table--trial">
-          <thead>
-            <tr>
-              <th scope="col">Sch</th>
-              <th scope="col">Account</th>
-              <th scope="col">Code</th>
-              <th scope="col">City</th>
-              <th scope="col" className="text-right">
-                Clos. Dr
-              </th>
-              <th scope="col" className="text-right">
-                Clos. Cr
-              </th>
-              <th scope="col" className="text-right">
-                Dr amt
-              </th>
-              <th scope="col" className="text-right">
-                Cr amt
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row, idx) => {
-              const codeVal = row.CODE ?? row.code;
-              const nameVal = row.NAME ?? row.name;
-              const cityVal = row.CITY ?? row.city;
-              const schVal = row.SCHEDULE ?? row.schedule ?? row.SCH_NO ?? row.sch_no;
-
-              const cdr = parseFloat(row.CLOSING_DR ?? row.closing_dr ?? 0) || 0;
-              const ccr = parseFloat(row.CLOSING_CR ?? row.closing_cr ?? 0) || 0;
-              const drAmt = parseFloat(row.DR_AMT ?? row.dr_amt ?? 0) || 0;
-              const crAmt = parseFloat(row.CR_AMT ?? row.cr_amt ?? 0) || 0;
-
-              const isTotal =
-                codeVal == null ||
-                codeVal === '' ||
-                (nameVal && String(nameVal).toUpperCase().includes('TOTAL'));
-              const nameUpper = String(nameVal ?? '').toUpperCase();
-              const isGrandTotal = nameUpper.includes('GRAND TOTAL');
-              const isScheduleTotal = isTotal && !isGrandTotal;
-              const rowClassName = isGrandTotal
-                ? 'trial-grand-total'
-                : isScheduleTotal
-                  ? 'trial-schedule-total-row'
-                  : isTotal
-                    ? 'trial-subtotal-row'
-                    : 'clickable-row';
-              const trialRowKey = `trial-row-${idx}`;
-              const isTrialSelected = trialSelectedKey === trialRowKey;
-
-              return (
-                <tr
-                  key={idx}
-                  className={[rowClassName, isTrialSelected ? 'trial-row-selected' : ''].filter(Boolean).join(' ')}
-                  onClick={() => {
-                    setTrialSelectedKey(trialRowKey);
-                    if (!isTotal && onLedgerClick) onLedgerClick(codeVal, nameVal);
-                  }}
-                >
-                  <td className="trial-sch">{schVal != null && schVal !== '' ? schVal : '—'}</td>
-                  <td className="trial-name">
-                    <span className="name-text">{nameVal}</span>
-                  </td>
-                  <td className="trial-code">{codeVal != null && codeVal !== '' ? codeVal : '—'}</td>
-                  <td className="trial-city">
-                    {isScheduleTotal ? '—' : cityVal != null && cityVal !== '' ? cityVal : '—'}
-                  </td>
-                  <td className={`text-right ${cdr > 0 ? 'dr-amt' : ''}`}>{cdr > 0 ? fmt(cdr) : '—'}</td>
-                  <td className={`text-right ${ccr > 0 ? 'cr-amt' : ''}`}>{ccr > 0 ? fmt(ccr) : '—'}</td>
-                  <td className={`text-right ${drAmt > 0 ? 'dr-amt' : ''}`}>{drAmt > 0 ? fmt(drAmt) : '—'}</td>
-                  <td className={`text-right ${crAmt > 0 ? 'cr-amt' : ''}`}>{crAmt > 0 ? fmt(crAmt) : '—'}</td>
-                </tr>
-              );
-            })}
-            <tr
-              className={[
-                'trial-grand-total',
-                'trial-grand-total-footer',
-                trialSelectedKey === 'trial-grand-footer' ? 'trial-row-selected' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              onClick={() => setTrialSelectedKey('trial-grand-footer')}
-            >
-              <td colSpan={4}>
-                <strong>GRAND TOTAL</strong>
-              </td>
-              <td className="text-right">
-                <strong>{fmtAlways(gCdr)}</strong>
-              </td>
-              <td className="text-right">
-                <strong>{fmtAlways(gCcr)}</strong>
-              </td>
-              <td className="text-right">
-                <strong>{fmtAlways(gDr)}</strong>
-              </td>
-              <td className="text-right">
-                <strong>{fmtAlways(gCr)}</strong>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    );
+    return <TrialBalanceDesktopTable data={data} onLedgerClick={onLedgerClick} />;
   }
 
   // --- LEDGER VIEW ---
   if (type === 'ledger' || type === 'ledger-interest') {
     const showInterestCols = type === 'ledger-interest';
+    const txnRows = data.filter(
+      (row) =>
+        String(row.VR_TYPE ?? row.vr_type ?? '')
+          .trim()
+          .toUpperCase() !== 'OP'
+    );
+    if (filterActive && txnRows.length === 0) {
+      return (
+        <p className="no-data fas-ledger-filter-empty">
+          No transactions match your filter. Try another date, voucher no., detail, or amount.
+        </p>
+      );
+    }
     let sumDr = 0;
     let sumCr = 0;
     let sumDays = 0;
@@ -292,7 +204,7 @@ export default function ReportTable({
               <th className="ledger-detail col-ledger-detail-narrow">Detail</th>
               <th className="text-right col-ledger-amt">Dr.Amount</th>
               <th className="text-right col-ledger-amt">Cr.Amount</th>
-              <th className="text-right col-ledger-amt">Cl.Balance</th>
+              <th className="text-right col-ledger-amt col-ledger-cl-bal">Cl.Balance</th>
               {showInterestCols ? <th className="text-right col-ledger-amt col-ledger-days">Days</th> : null}
               {showInterestCols ? <th className="text-right col-ledger-amt col-ledger-int">Dr.Int</th> : null}
               {showInterestCols ? <th className="text-right col-ledger-amt col-ledger-int">Cr.Int</th> : null}
@@ -356,16 +268,16 @@ export default function ReportTable({
                     {lineType != null && lineType !== '' ? String(lineType) : '—'}
                   </td>
                   <td className="ledger-detail col-ledger-detail-narrow" title={String(row.DETAIL ?? row.detail ?? '')}>
-                    {row.DETAIL ?? row.detail}
+                    {clampText(row.DETAIL ?? row.detail, 36)}
                   </td>
                   <td className="text-right dr-amt col-ledger-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
                   <td className="text-right cr-amt col-ledger-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
                   <td
-                    className={`text-right col-ledger-amt ledger-cl-balance${
+                    className={`text-right col-ledger-amt col-ledger-cl-bal ledger-cl-balance${
                       clBalNum < 0 ? ' ledger-cl-balance--negative' : ''
                     }`}
                   >
-                    {fmt(clBal)}
+                    {renderLedgerClBalance(clBal)}
                   </td>
                   {showInterestCols ? (
                     <td className="text-right col-ledger-amt col-ledger-days">
@@ -408,11 +320,11 @@ export default function ReportTable({
                 <strong>{fmt(sumCr)}</strong>
               </td>
               <td
-                className={`text-right col-ledger-amt ledger-cl-balance-total${
+                className={`text-right col-ledger-amt col-ledger-cl-bal ledger-cl-balance-total${
                   closingNeg ? ' ledger-cl-balance-total--negative' : ''
                 }`}
               >
-                <strong>{fmt(closingBal)}</strong>
+                <strong>{renderLedgerClBalance(closingBal, { total: true })}</strong>
               </td>
               {showInterestCols ? (
                 <td className="text-right col-ledger-amt col-ledger-days">

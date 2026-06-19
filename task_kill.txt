@@ -1,2 +1,2 @@
 netstat -ano | findstr :5001
-taskkill /IM node.exe /F
+taskkill /IM node.exe /F \GFAS
