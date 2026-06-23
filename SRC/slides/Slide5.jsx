@@ -294,9 +294,13 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
     ledgerDrillRanRef.current = runKey;
 
     const code = String(d.code).trim();
+    const drillStart = d.startDate ? toInputDateString(d.startDate) || String(d.startDate) : startDate;
+    const drillEnd = d.endDate ? toInputDateString(d.endDate) || String(d.endDate) : endDate;
+    if (d.startDate) setStartDate(drillStart);
+    if (d.endDate) setEndDate(drillEnd);
     setSelectedAccount(code);
     setAccountSearch('');
-    void runLedgerQuery({ code });
+    void runLedgerQuery({ code, startDate: drillStart, endDate: drillEnd });
   }, [formData.ledgerDrilldown, isLedgerInterest, startDate, endDate]);
 
   /**

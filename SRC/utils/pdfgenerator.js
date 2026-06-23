@@ -1,6 +1,7 @@
 import html2pdf from 'html2pdf.js';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { mergePdfBlobs, yieldToMain } from './mergePdfBlobs';
 import { formatLedgerDateDisplay } from './dateFormat';
 import { buildBrokerOsDisplayRows } from './brokerOsDisplay';
 import { buildSaleListDisplayRows, saleListMeas } from './saleListDisplay';
@@ -8,6 +9,7 @@ import { rupeesToWords } from './rupeesInWords';
 import { rowFieldCI, rowFieldAny } from './rowFieldCI';
 import { ageingCurBalDisplay } from './ageingDisplay';
 import { buildLedgerJsPdfBlob, assertLedgerPdfBlob } from './ledgerJsPdf';
+import { sortTrialBalanceRows, trialBalanceRowKind, trialBalanceRowLabel, findTrialGrandRow } from './trialBalanceSort';
 
 function safeFilenamePart(name) {
   return String(name || 'report').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
@@ -608,6 +610,148 @@ function buildTrialBalanceReportHtml(data, metadata) {
         <br />
         Computer-generated report — no signature required.
       </div>
+    </div>
+  `;
+}
+
+/** Trial balance summary — annexure totals only */
+function buildTrialBalanceSummaryReportHtml(data, metadata) {
+  const company = escHtml(metadata.companyName);
+  const year = escHtml(metadata.year);
+  const asOf = escHtml(metadata.endDate);
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+  let bodyRows = '';
+  sortTrialBalanceRows(data || [])
+    .filter((row) => trialBalanceRowKind(row) === 1 || trialBalanceRowKind(row) === 2)
+    .forEach((row) => {
+      const kind = trialBalanceRowKind(row);
+      const isGrand = kind === 2;
+      const nameVal = trialBalanceRowLabel(row);
+      const schVal = row.SCHEDULE ?? row.schedule ?? '';
+      const wrap = (amt) => (isGrand ? `<strong>${formatAmtPdf(amt)}</strong>` : formatAmtPdf(amt));
+      bodyRows += `
+            <tr class="${isGrand ? 'report-grand-total' : 'subtotal-row'}">
+              <td class="col-sch">${escHtml(schVal)}</td>
+              <td class="col-name">${isGrand ? `<strong>${escHtml(nameVal)}</strong>` : escHtml(nameVal)}</td>
+              <td class="amount">${wrap(row.CLOSING_DR ?? row.closing_dr)}</td>
+              <td class="amount">${wrap(row.CLOSING_CR ?? row.closing_cr)}</td>
+              <td class="amount">${wrap(row.DR_AMT ?? row.dr_amt)}</td>
+              <td class="amount">${wrap(row.CR_AMT ?? row.cr_amt)}</td>
+            </tr>`;
+    });
+
+  return `
+    <div class="report-doc">
+      <style>${PDF_REPORT_STYLES}</style>
+      <div class="report-topbar">
+        <div class="kicker">ACCOUNTING REPORT</div>
+        <h1>TRIAL BALANCE SUMMARY</h1>
+        <div class="company">${company}</div>
+        <table class="report-grid">
+          <tr><td class="lbl">Financial year</td><td class="val">${year}</td><td class="lbl">As-of date</td><td class="val">${asOf}</td></tr>
+        </table>
+        <div class="report-period"><strong>Generated:</strong> ${generated}</div>
+      </div>
+      <table class="table-report table-report--trial-pdf">
+        <thead>
+          <tr>
+            <th>Annexure</th>
+            <th>Schedule name</th>
+            <th class="amount">Cl.Dr.Amt</th>
+            <th class="amount">Cl.Cr.Amt</th>
+            <th class="amount">Tot.Dr.Amt</th>
+            <th class="amount">Tot.Cr.Amt</th>
+          </tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+/** Trial balance date wise — opening / transactions / closing */
+function buildTrialDateWiseReportHtml(data, metadata) {
+  const company = escHtml(metadata.companyName);
+  const year = escHtml(metadata.year);
+  const period = escHtml(metadata.endDate || metadata.periodLabel);
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+  const num = (row, u, l) => parseFloat(row[u] ?? row[l] ?? 0) || 0;
+  let bodyRows = '';
+
+  sortTrialBalanceRows(data || [])
+    .filter((row) => trialBalanceRowKind(row) !== 2)
+    .forEach((row) => {
+      const kind = trialBalanceRowKind(row);
+      const isTotal = kind >= 1;
+      const nameVal = trialBalanceRowLabel(row);
+      const wrap = (v) => (isTotal ? `<strong>${formatAmtPdf(v)}</strong>` : formatAmtPdf(v));
+      bodyRows += `
+            <tr class="${kind === 1 ? 'subtotal-row' : ''}">
+              <td>${isTotal ? '' : escHtml(row.CODE ?? row.code ?? '')}</td>
+              <td class="col-name">${isTotal ? `<strong>${escHtml(nameVal)}</strong>` : escHtml(nameVal)}</td>
+              <td>${isTotal ? '' : escHtml(row.CITY ?? row.city ?? '')}</td>
+              <td>${isTotal ? '' : escHtml(row.PAN ?? row.pan ?? '')}</td>
+              <td class="amount">${wrap(num(row, 'OP_DR', 'op_dr'))}</td>
+              <td class="amount">${wrap(num(row, 'OP_CR', 'op_cr'))}</td>
+              <td class="amount">${wrap(num(row, 'TRN_DR', 'trn_dr'))}</td>
+              <td class="amount">${wrap(num(row, 'TRN_CR', 'trn_cr'))}</td>
+              <td class="amount">${wrap(num(row, 'CL_DR', 'cl_dr'))}</td>
+              <td class="amount">${wrap(num(row, 'CL_CR', 'cl_cr'))}</td>
+            </tr>`;
+    });
+
+  const grand = findTrialGrandRow(data);
+  if (grand) {
+    bodyRows += `
+            <tr class="report-grand-total">
+              <td colspan="4"><strong>GRAND TOTAL</strong></td>
+              <td class="amount"><strong>${formatAmtPdf(num(grand, 'OP_DR', 'op_dr'))}</strong></td>
+              <td class="amount"><strong>${formatAmtPdf(num(grand, 'OP_CR', 'op_cr'))}</strong></td>
+              <td class="amount"><strong>${formatAmtPdf(num(grand, 'TRN_DR', 'trn_dr'))}</strong></td>
+              <td class="amount"><strong>${formatAmtPdf(num(grand, 'TRN_CR', 'trn_cr'))}</strong></td>
+              <td class="amount"><strong>${formatAmtPdf(num(grand, 'CL_DR', 'cl_dr'))}</strong></td>
+              <td class="amount"><strong>${formatAmtPdf(num(grand, 'CL_CR', 'cl_cr'))}</strong></td>
+            </tr>`;
+  }
+
+  return `
+    <div class="report-doc report-doc--trial-date-wise">
+      <style>${PDF_REPORT_STYLES}
+        .table-report--trial-date-wise { font-size: 7px; }
+        .table-report--trial-date-wise th { font-size: 6.5px; padding: 3px 2px; }
+        .table-report--trial-date-wise td { padding: 2px 2px; }
+      </style>
+      <div class="report-topbar">
+        <div class="kicker">ACCOUNTING REPORT</div>
+        <h1>TRIAL BALANCE DATE WISE</h1>
+        <div class="company">${company}</div>
+        <table class="report-grid">
+          <tr><td class="lbl">Financial year</td><td class="val">${year}</td><td class="lbl">Period</td><td class="val">${period}</td></tr>
+        </table>
+        <div class="report-period"><strong>Generated:</strong> ${generated}</div>
+      </div>
+      <table class="table-report table-report--trial-date-wise">
+        <thead>
+          <tr>
+            <th rowspan="2">Code</th>
+            <th rowspan="2">Name</th>
+            <th rowspan="2">City</th>
+            <th rowspan="2">Pan</th>
+            <th colspan="2" class="amount">Opening Balance</th>
+            <th colspan="2" class="amount">Transactions</th>
+            <th colspan="2" class="amount">Closing Balance</th>
+          </tr>
+          <tr>
+            <th class="amount">Debit</th>
+            <th class="amount">Credit</th>
+            <th class="amount">Debit</th>
+            <th class="amount">Credit</th>
+            <th class="amount">Debit</th>
+            <th class="amount">Credit</th>
+          </tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
     </div>
   `;
 }
@@ -3643,6 +3787,269 @@ function buildDetailMastMasterReportHtml(data, metadata = {}) {
   `;
 }
 
+function buildLoanerListReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Loaner List');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+  const schedule = escHtml(metadata.scheduleLabel || 'All schedules');
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td class="col-code">${escHtml(r?.CODE ?? '')}</td>
+        <td class="col-name">${escHtml(r?.NAME ?? '')}</td>
+        <td class="col-pan">${escHtml(r?.PAN ?? '')}</td>
+        <td class="amount">${formatAmtPdf(r?.OP)}</td>
+        <td class="amount">${formatAmtPdf(r?.CR_AMT)}</td>
+        <td class="amount">${formatAmtPdf(r?.CR_INT)}</td>
+        <td class="amount">${formatAmtPdf(r?.TOT_CR)}</td>
+        <td class="amount">${formatAmtPdf(r?.DR_AMT)}</td>
+        <td class="amount">${formatAmtPdf(r?.DR_TDS)}</td>
+        <td class="amount">${formatAmtPdf(r?.TOT_DR)}</td>
+        <td class="amount">${formatAmtPdf(r?.CL_BAL)}</td>
+        <td class="col-city">${escHtml(r?.CITY ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.OP += Number(r?.OP ?? 0);
+      acc.CR_AMT += Number(r?.CR_AMT ?? 0);
+      acc.CR_INT += Number(r?.CR_INT ?? 0);
+      acc.TOT_CR += Number(r?.TOT_CR ?? 0);
+      acc.DR_AMT += Number(r?.DR_AMT ?? 0);
+      acc.DR_TDS += Number(r?.DR_TDS ?? 0);
+      acc.TOT_DR += Number(r?.TOT_DR ?? 0);
+      acc.CL_BAL += Number(r?.CL_BAL ?? 0);
+      return acc;
+    },
+    { OP: 0, CR_AMT: 0, CR_INT: 0, TOT_CR: 0, DR_AMT: 0, DR_TDS: 0, TOT_DR: 0, CL_BAL: 0 }
+  );
+
+  const totalRow = rows.length
+    ? `<tr class="report-grand-total">
+        <td colspan="3" class="lbl-total">TOTAL</td>
+        <td class="amount">${formatAmtPdf(totals.OP)}</td>
+        <td class="amount">${formatAmtPdf(totals.CR_AMT)}</td>
+        <td class="amount">${formatAmtPdf(totals.CR_INT)}</td>
+        <td class="amount">${formatAmtPdf(totals.TOT_CR)}</td>
+        <td class="amount">${formatAmtPdf(totals.DR_AMT)}</td>
+        <td class="amount">${formatAmtPdf(totals.DR_TDS)}</td>
+        <td class="amount">${formatAmtPdf(totals.TOT_DR)}</td>
+        <td class="amount">${formatAmtPdf(totals.CL_BAL)}</td>
+        <td></td>
+      </tr>`
+    : '';
+
+  return `
+    <div class="report-doc loaner-pdf-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .loaner-pdf-doc { padding: 4px 6px 10px; }
+        .loaner-pdf-doc .report-topbar { margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid; }
+        .loaner-pdf-doc table.table-report { table-layout: fixed; width: 100%; font-size: 7.5px; }
+        .loaner-pdf-doc table.table-report col.col-code { width: 7%; }
+        .loaner-pdf-doc table.table-report col.col-name { width: 16%; }
+        .loaner-pdf-doc table.table-report col.col-pan { width: 9%; }
+        .loaner-pdf-doc table.table-report col.col-amt { width: 8%; }
+        .loaner-pdf-doc table.table-report col.col-city { width: 8%; }
+        .loaner-pdf-doc table.table-report td.col-name,
+        .loaner-pdf-doc table.table-report td.col-city {
+          white-space: normal;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+        .loaner-pdf-doc table.table-report td.col-code,
+        .loaner-pdf-doc table.table-report td.col-pan {
+          white-space: nowrap;
+          font-size: 7px;
+        }
+        .loaner-pdf-doc table.table-report td.amount {
+          font-size: 7px;
+          padding-left: 2px;
+          padding-right: 2px;
+        }
+        .loaner-pdf-doc table.table-report thead th {
+          font-size: 6.5px;
+          padding: 5px 2px;
+          line-height: 1.2;
+          white-space: normal;
+          word-wrap: break-word;
+        }
+      </style>
+      <div class="report-topbar">
+        <div class="kicker">INCOME TAX REPORT</div>
+        <h1>${title.toUpperCase()}</h1>
+        <div class="company">${company}</div>
+        <table class="report-grid">
+          <tr>
+            <td class="lbl">Financial year</td>
+            <td class="val">${fy}</td>
+            <td class="lbl">Period</td>
+            <td class="val">${period}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Schedule</td>
+            <td class="val">${schedule}</td>
+            <td class="lbl">Rows</td>
+            <td class="val">${rows.length}</td>
+          </tr>
+        </table>
+        <div class="report-period"><strong>Generated:</strong> ${generated}</div>
+      </div>
+
+      <table class="table-report">
+        <colgroup>
+          <col class="col-code" />
+          <col class="col-name" />
+          <col class="col-pan" />
+          <col class="col-amt" />
+          <col class="col-amt" />
+          <col class="col-amt" />
+          <col class="col-amt" />
+          <col class="col-amt" />
+          <col class="col-amt" />
+          <col class="col-amt" />
+          <col class="col-amt" />
+          <col class="col-city" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Name</th>
+            <th>PAN</th>
+            <th class="amount">Opening</th>
+            <th class="amount">Credit</th>
+            <th class="amount">Cr.Int</th>
+            <th class="amount">Tot.Cr</th>
+            <th class="amount">Debit</th>
+            <th class="amount">TDS</th>
+            <th class="amount">Tot.Dr</th>
+            <th class="amount">Closing</th>
+            <th>City</th>
+          </tr>
+        </thead>
+        <tbody>${body || '<tr><td colspan="12">No rows</td></tr>'}${totalRow}</tbody>
+      </table>
+
+      <div class="report-foot">Loaner accounts (code starts with L). VFP LOANLST / reports/loanlst.frx.</div>
+    </div>
+  `;
+}
+
+function buildIncomeTaxReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Income Tax Report');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+
+  const columns =
+    Array.isArray(metadata.columns) && metadata.columns.length
+      ? metadata.columns
+      : rows.length
+        ? Object.keys(rows[0])
+            .filter((k) => !String(k).startsWith('_'))
+            .map((key) => ({
+              key,
+              label: key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+              type: /amt|amount|bal|weight|wgt|qty|qnty|rate|tot|op|dr|cr|tds|int|sale|pur|exp|comm|brok|net|apr|may|june|july|august|sep|october|nov|dec|jan|feb|mar/i.test(
+                key
+              )
+                ? 'num'
+                : 'text',
+            }))
+        : [];
+
+  const colgroup = columns
+    .map(() => `<col style="width:${Math.max(5, Math.floor(100 / Math.max(columns.length, 1)))}%" />`)
+    .join('');
+
+  const head = columns
+    .map((c) => `<th class="${c.type === 'num' ? 'amount' : ''}">${escHtml(c.label || c.key)}</th>`)
+    .join('');
+
+  const tableRows = Array.isArray(metadata.tableRows) && metadata.tableRows.length ? metadata.tableRows : null;
+  const dataRows = tableRows ? tableRows.filter((r) => r._type !== 'group') : rows;
+
+  const renderDataCells = (r) =>
+    columns
+      .map((c) => {
+        if (c.type === 'partyBlock') {
+          const name = escHtml(String(r[c.key] ?? r[c.key?.toLowerCase?.()] ?? '').trim());
+          const subs = (c.subKeys || [])
+            .map((k) => String(r[k] ?? r[k?.toLowerCase?.()] ?? '').trim())
+            .filter(Boolean)
+            .map((line) => `<div class="itax-party-sub">${escHtml(line)}</div>`)
+            .join('');
+          const inner = `${name ? `<div class="itax-party-name">${name}</div>` : ''}${subs}`;
+          return `<td class="itax-party-cell">${inner}</td>`;
+        }
+        const raw = r[c.key] ?? r[c.key?.toLowerCase?.()];
+        const val = c.type === 'num' ? formatAmtPdf(raw) : escHtml(raw ?? '');
+        return `<td class="${c.type === 'num' ? 'amount' : ''}">${val}</td>`;
+      })
+      .join('');
+
+  const body = (tableRows || rows)
+    .map((r) => {
+      if (r._type === 'group') {
+        return `<tr class="itax-schedule-group"><td colspan="${columns.length}">${escHtml(r.label || '')}</td></tr>`;
+      }
+      return `<tr>${renderDataCells(r)}</tr>`;
+    })
+    .join('');
+
+  const totals = {};
+  columns.forEach((c) => {
+    if (c.type !== 'num') return;
+    totals[c.key] = dataRows.reduce((s, r) => s + Number(r[c.key] ?? r[c.key?.toLowerCase?.()] ?? 0), 0);
+  });
+  const firstNumIdx = columns.findIndex((c) => c.type === 'num');
+  const totalRow =
+    dataRows.length && firstNumIdx >= 0
+      ? `<tr class="report-grand-total"><td colspan="${firstNumIdx}" class="lbl-total">TOTAL</td>${columns
+          .slice(firstNumIdx)
+          .map((c) =>
+            c.type === 'num'
+              ? `<td class="amount">${formatAmtPdf(totals[c.key])}</td>`
+              : '<td></td>'
+          )
+          .join('')}</tr>`
+      : '';
+
+  return `
+    <div class="report-doc itax-pdf-doc">
+      <style>${PDF_REPORT_STYLES}
+        .itax-pdf-doc .itax-party-cell { white-space: normal; font-size: 9px; vertical-align: top; }
+        .itax-pdf-doc .itax-party-name { font-weight: 700; }
+        .itax-pdf-doc .itax-party-sub { color: #444; font-size: 8px; line-height: 1.25; }
+        .itax-pdf-doc .itax-schedule-group td { background: #e8eef5; font-weight: 700; padding: 4px 6px; border-top: 2px solid #9ca3af; }
+      </style>
+      <div class="report-topbar">
+        <div class="kicker">INCOME TAX REPORT</div>
+        <h1>${title.toUpperCase()}</h1>
+        <div class="company">${company}</div>
+        <table class="report-grid">
+          <tr><td class="lbl">Financial year</td><td class="val">${fy}</td><td class="lbl">Period</td><td class="val">${period}</td></tr>
+        </table>
+        <div class="report-period"><strong>Generated:</strong> ${generated} &nbsp;|&nbsp; <strong>Rows:</strong> ${rows.length}</div>
+      </div>
+      <table class="table-report">
+        <colgroup>${colgroup}</colgroup>
+        <thead><tr>${head}</tr></thead>
+        <tbody>${body || `<tr><td colspan="${columns.length || 1}">No rows</td></tr>`}${totalRow}</tbody>
+      </table>
+      <div class="report-foot">Computer-generated income tax report.</div>
+    </div>
+  `;
+}
+
 function buildGstStateMasterReportHtml(data, metadata = {}) {
   const rows = Array.isArray(data) ? data : [];
   const company = escHtml(metadata.companyName || 'Company');
@@ -4205,7 +4612,12 @@ export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'detail-mast-master') return buildDetailMastMasterReportHtml(data, metadata);
   if (reportType === 'opdet-report') return buildOpdetReportHtml(data, metadata);
   if (reportType === 'gst-state-master') return buildGstStateMasterReportHtml(data, metadata);
+  if (reportType === 'loaner-list') return buildLoanerListReportHtml(data, metadata);
+  if (reportType === 'income-tax-report') return buildIncomeTaxReportHtml(data, metadata);
   if (reportType === 'godown-master') return buildGodownMasterReportHtml(data, metadata);
+  if (reportType === 'trial-balance') return buildTrialBalanceReportHtml(data, metadata);
+  if (reportType === 'trial-balance-summary') return buildTrialBalanceSummaryReportHtml(data, metadata);
+  if (reportType === 'trial-date-wise') return buildTrialDateWiseReportHtml(data, metadata);
   return buildTrialBalanceReportHtml(data, metadata);
 }
 
@@ -4270,14 +4682,14 @@ function getPdfOptions(metadata, reportType) {
               reportType === 'loc-btype-master' ||
               reportType === 'detail-mast-master' ||
               reportType === 'opdet-report' ||
-              reportType === 'gst-state-master'
+              reportType === 'gst-state-master' ||
+              reportType === 'loaner-list' ||
+              reportType === 'income-tax-report'
             ? {
-                // Large master lists can produce blank PDF pages at high canvas scales.
                 scale: 1,
                 useCORS: true,
                 logging: false,
-                windowWidth:
-                  reportType === 'item-master' ? 2000 : reportType === 'opdet-report' ? 2200 : 1800,
+                windowWidth: 2800,
                 scrollX: 0,
                 scrollY: 0,
               }
@@ -4296,6 +4708,16 @@ function getPdfOptions(metadata, reportType) {
               useCORS: true,
               logging: false,
               windowWidth: 2200,
+              scrollX: 0,
+              scrollY: 0,
+            }
+        : reportType === 'trial-balance-summary' ||
+            reportType === 'trial-date-wise'
+          ? {
+              scale: 1,
+              useCORS: true,
+              logging: false,
+              windowWidth: reportType === 'trial-date-wise' ? 1400 : 1200,
               scrollX: 0,
               scrollY: 0,
             }
@@ -4336,6 +4758,8 @@ function getPdfOptions(metadata, reportType) {
           reportType === 'detail-mast-master' ||
           reportType === 'gst-state-master'
           ? 'portrait'
+          : reportType === 'loaner-list' || reportType === 'income-tax-report'
+            ? 'landscape'
           : reportType === 'opdet-report'
             ? 'landscape'
           : 'landscape',
@@ -4343,6 +4767,36 @@ function getPdfOptions(metadata, reportType) {
       format: 'a4',
     },
   };
+}
+
+/** Combine pre-built report HTML fragments into one PDF (e.g. multiple sale bills). */
+export async function getCombinedReportPdfBlob(reportType, htmlFragments, metadata = {}) {
+  const fragments = (htmlFragments || []).filter(Boolean);
+  if (!fragments.length) throw new Error('No report content to export.');
+  const options = getPdfOptions(metadata, reportType);
+  if (metadata.combinedFilename) options.filename = metadata.combinedFilename;
+  const onProgress = metadata.onProgress;
+
+  if (fragments.length === 1) {
+    const blob = await html2pdf().set(options).from(fragments[0]).outputPdf('blob');
+    return { blob, filename: options.filename };
+  }
+
+  const partBlobs = [];
+  for (let i = 0; i < fragments.length; i++) {
+    onProgress?.(i + 1, fragments.length);
+    await yieldToMain();
+    const blob = await html2pdf().set(options).from(fragments[i]).outputPdf('blob');
+    partBlobs.push(blob);
+  }
+  onProgress?.(fragments.length, fragments.length);
+  const blob = await mergePdfBlobs(partBlobs);
+  return { blob, filename: options.filename };
+}
+
+export async function downloadCombinedReportPdf(reportType, htmlFragments, metadata = {}) {
+  const { blob, filename } = await getCombinedReportPdfBlob(reportType, htmlFragments, metadata);
+  downloadBlob(blob, filename);
 }
 
 /**
@@ -4460,12 +4914,23 @@ export const generatePDF = async (reportType, data, metadata) => {
  * - If mobile sharing is not available or fails: downloads the PDF and opens wa.me (with phone when known)
  *   and explains attaching from Downloads / Files (URLs cannot attach files by themselves).
  */
-export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText) {
-  const { blob, filename } = await getPdfBlob(reportType, data, metadata);
+export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText, options = {}) {
+  let blob;
+  let filename;
+  if (options.prebuiltBlob && options.prebuiltFilename) {
+    blob = options.prebuiltBlob;
+    filename = options.prebuiltFilename;
+  } else {
+    ({ blob, filename } = await getPdfBlob(reportType, data, metadata));
+  }
   const file = new File([blob], filename, { type: 'application/pdf', lastModified: Date.now() });
   const reportLabel =
     reportType === 'trial-balance'
       ? 'Trial Balance'
+      : reportType === 'trial-balance-summary'
+        ? 'Trial Balance Summary'
+        : reportType === 'trial-date-wise'
+          ? 'Trial Balance Date Wise'
       : reportType === 'trading-account'
         ? 'Trading A/C'
         : reportType === 'profit-loss'
@@ -4500,6 +4965,8 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
                       ? 'Detail Master'
                     : reportType === 'gst-state-master'
                       ? 'GST State Master'
+                    : reportType === 'loaner-list'
+                      ? 'Loaner List'
                     : reportType === 'godown-master'
                       ? 'Godown Master'
           : reportType === 'sale-list'

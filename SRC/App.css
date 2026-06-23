@@ -1502,6 +1502,19 @@ body {
   border-collapse: collapse;
 }
 
+.report-table--trial-date-wise {
+  min-width: 980px;
+}
+
+.table-responsive--trial-date-wise {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.report-table--trial-summary .trial-schedule-total-row {
+  cursor: pointer;
+}
+
 .report-table--trial thead th {
   background: #1e293b;
   color: #fff;
@@ -4354,13 +4367,19 @@ mark.search-highlight {
 }
 
 /*
- * Lead column widths: <colgroup> + inline width + --sl-col-* on <table> (ReportTable.jsx).
- * Do not set width: max-content !important here ??? it overrides the inline sum width and
- * lets the browser redistribute columns, recreating huge gaps after Tp / InvNo / Bt / Party.
+ * GFASORCL sale list: 27 columns — <colgroup> + inline width + --sl-col-* on <table> (ReportTable.jsx).
+ * Do not set min-width: 0 on the table; fixed layout needs the full pixel sum or columns overlap.
  */
+.table-responsive--sale-list > .report-table.report-table--sale-list {
+  width: var(--sl-table-width, 2104px) !important;
+  min-width: var(--sl-table-width, 2104px) !important;
+  max-width: none !important;
+}
+
 .report-table.report-table--sale-list {
-  min-width: 0 !important;
-  max-width: none;
+  width: var(--sl-table-width, 2104px) !important;
+  min-width: var(--sl-table-width, 2104px) !important;
+  max-width: none !important;
   font-size: 0.68rem;
   margin-left: 0 !important;
   table-layout: fixed !important;
@@ -4403,10 +4422,10 @@ mark.search-highlight {
   overflow: visible !important;
 }
 
-/* Trn / Item / Item name: clamp header paint so narrow cols don???t stack on each other */
-.report-table--sale-list thead th:nth-child(11),
+/* Trn / Item / Item name headers */
 .report-table--sale-list thead th:nth-child(12),
-.report-table--sale-list thead th:nth-child(13) {
+.report-table--sale-list thead th:nth-child(13),
+.report-table--sale-list thead th:nth-child(14) {
   overflow: hidden !important;
   text-overflow: ellipsis;
 }
@@ -4416,33 +4435,33 @@ mark.search-highlight {
   text-align: right !important;
 }
 
-/* No InvDate column ??? widths: <colgroup> + table inline width + vars --sl-col-1???5 on <table> */
+/* Tp, InvDate, InvNo, Bt, Party — locked via --sl-col-1…5 */
 .report-table--sale-list thead th:nth-child(1),
 .report-table--sale-list tr.sale-list-line td:nth-child(1) {
-  width: var(--sl-col-1, 18px) !important;
-  max-width: var(--sl-col-1, 18px) !important;
-  min-width: 0 !important;
+  width: var(--sl-col-1, 22px) !important;
+  max-width: var(--sl-col-1, 22px) !important;
+  min-width: var(--sl-col-1, 22px) !important;
   text-align: left;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
+  padding-left: 0.06rem !important;
+  padding-right: 0.06rem !important;
 }
 
-/* Left-align short lead cols ??? enforce width so colspan / nowrap rows cannot stretch Tp???Party */
 .report-table--sale-list thead th:nth-child(2),
 .report-table--sale-list tr.sale-list-line td:nth-child(2) {
-  width: var(--sl-col-2, 32px) !important;
-  max-width: var(--sl-col-2, 32px) !important;
-  min-width: 0 !important;
+  width: var(--sl-col-2, 68px) !important;
+  max-width: var(--sl-col-2, 68px) !important;
+  min-width: var(--sl-col-2, 68px) !important;
   text-align: left !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .report-table--sale-list thead th:nth-child(3),
 .report-table--sale-list tr.sale-list-line td:nth-child(3) {
-  width: var(--sl-col-3, 12px) !important;
-  max-width: var(--sl-col-3, 12px) !important;
-  min-width: 0 !important;
+  width: var(--sl-col-3, 52px) !important;
+  max-width: var(--sl-col-3, 52px) !important;
+  min-width: var(--sl-col-3, 52px) !important;
   text-align: left !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
@@ -4450,9 +4469,9 @@ mark.search-highlight {
 
 .report-table--sale-list thead th:nth-child(4),
 .report-table--sale-list tr.sale-list-line td:nth-child(4) {
-  width: var(--sl-col-4, 44px) !important;
-  max-width: var(--sl-col-4, 44px) !important;
-  min-width: 0 !important;
+  width: var(--sl-col-4, 14px) !important;
+  max-width: var(--sl-col-4, 14px) !important;
+  min-width: var(--sl-col-4, 14px) !important;
   text-align: left !important;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4463,16 +4482,16 @@ mark.search-highlight {
 
 .report-table--sale-list thead th:nth-child(5),
 .report-table--sale-list tr.sale-list-line td:nth-child(5) {
-  width: var(--sl-col-5, 208px) !important;
-  max-width: var(--sl-col-5, 208px) !important;
-  min-width: 0 !important;
+  width: var(--sl-col-5, 52px) !important;
+  max-width: var(--sl-col-5, 52px) !important;
+  min-width: var(--sl-col-5, 52px) !important;
   text-align: left;
   padding-left: 0.2rem !important;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* City / PAN: nowrap + narrow cols caused overlap; clip + gutter + rule */
+/* Name, City, PAN, GST */
 .report-table--sale-list thead th:nth-child(6),
 .report-table--sale-list tr.sale-list-line td:nth-child(6) {
   text-align: left !important;
@@ -4496,27 +4515,21 @@ mark.search-highlight {
   font-variant-numeric: tabular-nums;
 }
 
-/* BKH: broker-hold flag; body is typically one character */
-.report-table--sale-list thead th:nth-child(14),
-.report-table--sale-list tr.sale-list-line td:nth-child(14) {
-  text-align: center !important;
+.report-table--sale-list thead th:nth-child(8),
+.report-table--sale-list tr.sale-list-line td:nth-child(8),
+.report-table--sale-list thead th:nth-child(9),
+.report-table--sale-list tr.sale-list-line td:nth-child(9) {
+  text-align: left !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-left: 0.02rem !important;
-  padding-right: 0.02rem !important;
+  padding-left: 0.12rem !important;
+  padding-right: 0.2rem !important;
 }
 
-.report-table--sale-list thead th:nth-child(14) {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1.05;
-}
-
-/* Bk: was right-aligned in a 28px col ??? code sat on the edge and met Bk name (looked like "26001SELF") */
-.report-table--sale-list thead th:nth-child(9),
-.report-table--sale-list tr.sale-list-line td:nth-child(9) {
+/* Bk / Bk name */
+.report-table--sale-list thead th:nth-child(10),
+.report-table--sale-list tr.sale-list-line td:nth-child(10) {
   text-align: left !important;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4525,30 +4538,19 @@ mark.search-highlight {
   border-right: 1px solid #e2e8f0;
 }
 
-.report-table--sale-list thead th:nth-child(10),
-.report-table--sale-list tr.sale-list-line td:nth-child(10) {
+.report-table--sale-list thead th:nth-child(11),
+.report-table--sale-list tr.sale-list-line td:nth-child(11) {
   padding-left: 0.28rem !important;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.report-table--sale-list thead th:nth-child(11),
-.report-table--sale-list tr.sale-list-line td:nth-child(11) {
-  text-align: left !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding-left: 0.1rem !important;
-  padding-right: 0.22rem !important;
-  border-right: 1px solid #e2e8f0;
-}
-
-/* Item code: varchar-style, left-aligned; gutter after Trn (above) and before Item name */
 .report-table--sale-list thead th:nth-child(12),
 .report-table--sale-list tr.sale-list-line td:nth-child(12) {
   text-align: left !important;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-left: 0.24rem !important;
+  padding-left: 0.1rem !important;
   padding-right: 0.22rem !important;
   border-right: 1px solid #e2e8f0;
 }
@@ -4559,17 +4561,22 @@ mark.search-highlight {
   overflow: hidden;
   text-overflow: ellipsis;
   padding-left: 0.24rem !important;
+  padding-right: 0.22rem !important;
+  border-right: 1px solid #e2e8f0;
+}
+
+.report-table--sale-list thead th:nth-child(14),
+.report-table--sale-list tr.sale-list-line td:nth-child(14) {
+  text-align: left !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 0.24rem !important;
   padding-right: 0.12rem !important;
 }
 
-.report-table--sale-list tr.sale-list-line td:nth-child(5) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Qty ??? Bill amt (no Lot column) ??? wide enough for Indian-format totals; padding avoids digit run-on */
-.report-table--sale-list thead th:nth-child(n+15),
-.report-table--sale-list tr.sale-list-line td:nth-child(n+15),
+/* Qty … Round off (cols 17+) */
+.report-table--sale-list thead th:nth-child(n+17),
+.report-table--sale-list tr.sale-list-line td:nth-child(n+17),
 .report-table--sale-list tr.sale-list-day-total td:nth-child(n+2),
 .report-table--sale-list tr.sale-list-bill-total td:nth-child(n+2),
 .report-table--sale-list tr.sale-list-grand-total td:nth-child(n+2) {
@@ -4980,6 +4987,56 @@ td.sale-list-total-pad {
   flex: 1 1 10rem;
   font-size: 0.95rem;
   line-height: 1.25;
+}
+
+.sale-bill-print-modal .sale-bill-modal-head__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.sale-bill-bulk-badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+}
+
+.sale-bill-bulk-bar {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(15, 30, 60, 0.08);
+}
+
+.sale-bill-bulk-bar__hint {
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.35;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.sale-bill-bulk-bar__next {
+  flex-shrink: 0;
+  font-size: 0.78rem !important;
+  padding: 0.4rem 0.75rem !important;
+}
+
+.sale-bill-bulk-bar__done {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #15803d;
 }
 
 .sale-bill-print-modal .sale-bill-print-actions {
@@ -6072,19 +6129,19 @@ td.sale-list-total-pad {
 }
 
 @media print {
-  body * {
+  body.windal-sale-bill-printing * {
     visibility: hidden;
   }
 
-  #sale-bill-print-area,
-  #sale-bill-print-area *,
-  #purchase-bill-print-area,
-  #purchase-bill-print-area * {
+  body.windal-sale-bill-printing #sale-bill-print-area,
+  body.windal-sale-bill-printing #sale-bill-print-area *,
+  body.windal-sale-bill-printing #purchase-bill-print-area,
+  body.windal-sale-bill-printing #purchase-bill-print-area * {
     visibility: visible;
   }
 
-  #sale-bill-print-area,
-  #purchase-bill-print-area {
+  body.windal-sale-bill-printing #sale-bill-print-area,
+  body.windal-sale-bill-printing #purchase-bill-print-area {
     position: absolute;
     left: 0;
     top: 0;
@@ -9204,12 +9261,16 @@ body.force-desktop-view .app--desktop {
   text-align: right;
   font-weight: 700;
   color: #334155;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .master-party-pick__panel--voucherParty .master-party-pick__opt--dual .master-party-pick__opt-hint {
   white-space: normal;
   word-break: break-word;
   line-height: 1.35;
+  min-width: 0;
 }
 
 .master-party-pick__panel--voucherParty .master-party-pick__opt--triple .master-party-pick__opt-name {
@@ -9217,14 +9278,18 @@ body.force-desktop-view .app--desktop {
   word-break: break-word;
   line-height: 1.35;
   color: #1e293b;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .master-party-pick__panel--voucherParty .master-party-pick__opt--triple .master-party-pick__opt-city {
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.35;
   color: #64748b;
   font-size: 0.92em;
+  min-width: 0;
 }
 
 /* VFP Name Search style — name, city, gst_no, pan, tel_no_o, code */
@@ -9929,6 +9994,7 @@ body.force-desktop-view .app--desktop {
 .app--no-header .slide-77-compdet.compdet-screen,
 .app--no-header .slide-78-gstprof.gstprof-screen,
 .app--no-header .slide-79-updt.updt-screen,
+.app--no-header .slide-82-stkupdt.updt-screen,
 .slide-57-square.square-screen,
 .slide-58-trldif.trldif-screen,
 .slide-59-amerge.amerge-screen,
@@ -14458,8 +14524,390 @@ body.force-desktop-view .app--desktop {
   margin-left: auto;
 }
 
-/* Updation (Slide 79) — VFP DO FORM update (desktop only) */
-.slide-79-updt.updt-screen.detail-mast-screen {
+/* Default Setting (Slide 85) — VFP default + default2 → DEFVALUE */
+.slide-85-defset.defset-screen.detail-mast-screen {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+  padding: 0.75rem;
+  gap: 0.65rem;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.slide-85-defset .defset-screen__head-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.slide-85-defset .defset-screen__hint {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.slide-85-defset .defset-screen__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.35rem;
+}
+
+.slide-85-defset .defset-screen__tab {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.slide-85-defset .defset-screen__tab--active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+}
+
+.slide-85-defset .defset-screen__panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.75rem;
+}
+
+.slide-85-defset .defset-screen__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem 1rem;
+}
+
+@media (min-width: 900px) {
+  .slide-85-defset .defset-screen__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .slide-85-defset .defset-screen__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.slide-85-defset .defset-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.slide-85-defset .defset-field__lbl {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.25;
+}
+
+.slide-85-defset .defset-field__tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: #e0e7ff;
+  color: #4338ca;
+  vertical-align: middle;
+}
+
+.slide-85-defset .defset-field__input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.82rem;
+}
+
+.slide-85-defset .defset-field__input:disabled {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.slide-85-defset .defset-field__code-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.slide-85-defset .defset-field__code-wrap .master-party-pick {
+  width: 100%;
+}
+
+.slide-85-defset .defset-field__code-wrap .master-party-pick__trigger,
+.slide-85-defset .defset-field__code-wrap .form-input {
+  font-size: 0.82rem;
+  padding: 0.35rem 0.5rem;
+  min-height: 2rem;
+}
+
+.slide-85-defset .master-party-pick__panel--voucherParty.master-party-pick__panel--dropdown {
+  min-width: min(36rem, 96vw);
+  width: min(40rem, 96vw) !important;
+}
+
+.slide-85-defset .defset-field__ac-name {
+  font-size: 0.68rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gfas-file-pick {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.gfas-file-pick__input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gfas-file-pick__btn {
+  flex: 0 0 auto;
+  width: 2rem;
+  min-height: 2rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.gfas-file-pick__btn:hover:not(:disabled) {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+}
+
+.gfas-file-pick__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.gfas-file-pick__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12040;
+  border: none;
+  background: rgba(15, 23, 42, 0.35);
+  cursor: default;
+}
+
+.gfas-file-pick__panel {
+  position: fixed;
+  z-index: 12050;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 2rem));
+  max-height: min(70vh, 520px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+}
+
+.gfas-file-pick__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.gfas-file-pick__head-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.gfas-file-pick__close {
+  border: none;
+  background: transparent;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #64748b;
+}
+
+.gfas-file-pick__path {
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.72rem;
+  color: #475569;
+  background: #fff;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gfas-file-pick__err {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  color: #b91c1c;
+}
+
+.gfas-file-pick__nav {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.gfas-file-pick__list {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 0.35rem;
+}
+
+.gfas-file-pick__row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: #1e293b;
+}
+
+.gfas-file-pick__row:hover {
+  background: #eef2ff;
+}
+
+.gfas-file-pick__row--file {
+  color: #312e81;
+}
+
+.gfas-file-pick__empty {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  color: #64748b;
+  text-align: center;
+}
+
+/* Set Task Scheduler (Slide 86) — VFP schtask WITH 1 */
+.slide-86-schtask.schtask-screen.detail-mast-screen {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0.75rem;
+  gap: 0.65rem;
+  box-sizing: border-box;
+}
+
+.slide-86-schtask .schtask-screen__head-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.slide-86-schtask .schtask-screen__hint {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.slide-86-schtask .schtask-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.slide-86-schtask .schtask-screen__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.slide-86-schtask .schtask-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.slide-86-schtask .schtask-field__lbl {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.slide-86-schtask .schtask-field__hint {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.slide-86-schtask .schtask-field__input {
+  max-width: 12rem;
+}
+
+.slide-86-schtask .schtask-field__input--num {
+  max-width: 8rem;
+}
+
+.slide-86-schtask .schtask-screen__meta {
+  font-size: 0.75rem;
+  color: #475569;
+  padding: 0.65rem 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.slide-86-schtask .schtask-screen__meta p {
+  margin: 0.25rem 0;
+}
+
+/* Updation (Slide 79) / Updation Stock (Slide 82) — VFP update / stkupdt (desktop only) */
+.slide-79-updt.updt-screen.detail-mast-screen,
+.slide-82-stkupdt.updt-screen.detail-mast-screen {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -14473,14 +14921,16 @@ body.force-desktop-view .app--desktop {
 }
 
 @media (min-width: 768px) {
-  .slide-79-updt.updt-screen.detail-mast-screen {
+  .slide-79-updt.updt-screen.detail-mast-screen,
+  .slide-82-stkupdt.updt-screen.detail-mast-screen {
     justify-content: center;
     min-height: calc(100dvh - 3rem);
     padding: 1.25rem;
   }
 }
 
-.slide-79-updt .updt-screen__card {
+.slide-79-updt .updt-screen__card,
+.slide-82-stkupdt .updt-screen__card {
   width: 100%;
   max-width: 26rem;
   display: flex;
@@ -14493,27 +14943,31 @@ body.force-desktop-view .app--desktop {
   box-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
 }
 
-.slide-79-updt .updt-screen__hint {
+.slide-79-updt .updt-screen__hint,
+.slide-82-stkupdt .updt-screen__hint {
   margin: 0;
   font-size: 0.76rem;
   color: #64748b;
   line-height: 1.35;
 }
 
-.slide-79-updt .updt-screen__form {
+.slide-79-updt .updt-screen__form,
+.slide-82-stkupdt .updt-screen__form {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
   margin: 0;
 }
 
-.slide-79-updt .updt-field.inttrf-field {
+.slide-79-updt .updt-field.inttrf-field,
+.slide-82-stkupdt .updt-field.inttrf-field {
   flex-direction: column;
   align-items: stretch;
   gap: 0.12rem;
 }
 
-.slide-79-updt .updt-field .inttrf-field__lbl {
+.slide-79-updt .updt-field .inttrf-field__lbl,
+.slide-82-stkupdt .updt-field .inttrf-field__lbl {
   flex: none;
   width: 100%;
   text-align: left;
@@ -14521,22 +14975,26 @@ body.force-desktop-view .app--desktop {
   font-size: 0.72rem;
 }
 
-.slide-79-updt .updt-field .inttrf-field__ctl {
+.slide-79-updt .updt-field .inttrf-field__ctl,
+.slide-82-stkupdt .updt-field .inttrf-field__ctl {
   width: 100%;
 }
 
-.slide-79-updt .updt-field .inttrf-input {
+.slide-79-updt .updt-field .inttrf-input,
+.slide-82-stkupdt .updt-field .inttrf-input {
   width: 100%;
   box-sizing: border-box;
 }
 
-.slide-79-updt .updt-screen__status {
+.slide-79-updt .updt-screen__status,
+.slide-82-stkupdt .updt-screen__status {
   margin: 0;
   font-size: 0.8rem;
   color: #475569;
 }
 
-.slide-79-updt .updt-screen__footer {
+.slide-79-updt .updt-screen__footer,
+.slide-82-stkupdt .updt-screen__footer {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
@@ -14546,14 +15004,337 @@ body.force-desktop-view .app--desktop {
   margin-top: 0.25rem;
 }
 
-.slide-79-updt .inttrf-screen__error {
+.slide-79-updt .inttrf-screen__error,
+.slide-82-stkupdt .inttrf-screen__error {
   margin: 0;
 }
 
-.slide-79-updt .updt-screen__card--loading {
+.slide-79-updt .updt-screen__card--loading,
+.slide-82-stkupdt .updt-screen__card--loading {
   align-items: center;
   justify-content: center;
   min-height: 8rem;
+}
+
+/* New Company Addition (Slide 83) — VFP DO FORM newcomp */
+.slide-83-newcomp.newcomp-screen {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 0.75rem 1rem 1.25rem;
+  box-sizing: border-box;
+}
+
+.slide-83-newcomp .newcomp-screen__toolbar {
+  margin: 0.5rem 0 0.75rem;
+}
+
+.slide-84-sale-form-gst.sale-form-gst-screen {
+  padding: 0.65rem 0.85rem 1rem;
+}
+
+.slide-84-sale-form-gst .sale-form-gst-screen__hint {
+  font-size: 0.88rem;
+  color: #5a6578;
+  margin: 0 0 0.75rem;
+  line-height: 1.45;
+}
+
+.slide-84-sale-form-gst .sale-form-gst-screen__table-wrap {
+  overflow: auto;
+  max-height: min(70vh, 560px);
+  border: 1px solid #d8dee9;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.slide-84-sale-form-gst .sale-form-gst-screen__table {
+  width: 100%;
+  min-width: 36rem;
+}
+
+.slide-84-sale-form-gst .sale-form-gst-screen__table th,
+.slide-84-sale-form-gst .sale-form-gst-screen__table td {
+  padding: 0.35rem 0.5rem;
+  vertical-align: middle;
+}
+
+.slide-84-sale-form-gst .sale-form-gst-screen__field-name {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.slide-84-sale-form-gst .sale-form-gst-screen__yn,
+.slide-84-sale-form-gst .sale-form-gst-screen__sno {
+  width: 100%;
+  min-width: 4.5rem;
+  box-sizing: border-box;
+}
+
+.slide-83-newcomp .newcomp-screen__hint {
+  font-size: 0.88rem;
+  color: var(--muted-fg, #5a6578);
+  margin: 0 0 0.75rem;
+  line-height: 1.45;
+}
+
+.slide-83-newcomp .newcomp-screen__form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem 0.75rem;
+}
+
+.slide-83-newcomp .newcomp-field.inttrf-field {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 34%) 1fr;
+  gap: 0.35rem 0.65rem;
+  align-items: center;
+}
+
+.slide-83-newcomp .newcomp-field .inttrf-field__lbl {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.slide-83-newcomp .newcomp-field__input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.slide-83-newcomp .newcomp-screen__status {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: #0f766e;
+}
+
+@media (min-width: 720px) {
+  .slide-83-newcomp .newcomp-screen__form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .slide-83-newcomp .newcomp-field.inttrf-field:has(#newcomp-COMP_NAME),
+  .slide-83-newcomp .newcomp-field.inttrf-field:has(#newcomp-COMP_ADD1),
+  .slide-83-newcomp .newcomp-field.inttrf-field:has(#newcomp-COMP_ADD2) {
+    grid-column: 1 / -1;
+  }
+}
+
+.newcomp-delete-picker-backdrop {
+  z-index: 10050;
+}
+
+.newcomp-delete-picker {
+  position: relative;
+  width: min(32rem, 96vw);
+  max-height: min(80vh, 520px);
+  display: flex;
+  flex-direction: column;
+}
+
+.newcomp-delete-picker__busy {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.newcomp-delete-picker__spinner {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 3px solid #e2e8f0;
+  border-top-color: #dc2626;
+  border-radius: 50%;
+  animation: newcomp-delete-spin 0.75s linear infinite;
+}
+
+@keyframes newcomp-delete-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.newcomp-delete-picker__busy-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.newcomp-delete-picker__busy-msg {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #475569;
+  max-width: 22rem;
+  line-height: 1.45;
+}
+
+.newcomp-delete-picker__progress-log {
+  margin-top: 0.35rem;
+  max-height: 8rem;
+  overflow-y: auto;
+  width: min(24rem, 90vw);
+  text-align: left;
+  font-size: 0.78rem;
+  font-family: ui-monospace, Consolas, monospace;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+}
+
+.newcomp-delete-picker__progress-line {
+  padding: 0.12rem 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.newcomp-progress {
+  margin: 0.65rem 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  background: #fffbeb;
+}
+
+.newcomp-progress__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.newcomp-progress__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #92400e;
+}
+
+.newcomp-progress__current {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: #78350f;
+}
+
+.newcomp-progress__log {
+  margin-top: 0.55rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.78rem;
+  background: #fff;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 0.35rem 0.45rem;
+}
+
+.newcomp-progress__line {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.1rem 0;
+  color: #334155;
+}
+
+.newcomp-progress__line--skip {
+  color: #64748b;
+}
+
+.newcomp-progress__line--error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.newcomp-progress__line-no {
+  flex: 0 0 auto;
+  color: #94a3b8;
+}
+
+.slide-83-newcomp .newcomp-screen__status {
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #b45309;
+  padding: 0.5rem 0.65rem;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+}
+
+.newcomp-delete-picker__sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: #5a6578;
+}
+
+.newcomp-delete-picker__body {
+  padding: 0.75rem 1rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 0;
+}
+
+.newcomp-delete-picker__filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.newcomp-delete-picker__table-wrap {
+  overflow: auto;
+  border: 1px solid #d8dee9;
+  border-radius: 6px;
+  max-height: 280px;
+}
+
+.newcomp-delete-picker__table {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.newcomp-delete-picker__table th,
+.newcomp-delete-picker__table td {
+  padding: 0.4rem 0.55rem;
+}
+
+.newcomp-delete-picker__action {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.newcomp-delete-picker__empty {
+  text-align: center;
+  color: #64748b;
+  padding: 1rem !important;
+}
+
+.newcomp-delete-picker__row--current td {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.newcomp-delete-picker__hint {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.newcomp-delete-picker__foot {
+  padding: 0.65rem 1rem 0.85rem;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #e8ecf1;
 }
 
 .slide-77-compdet .compdet-screen__form {
@@ -16468,3 +17249,501 @@ body.force-desktop-view .app--desktop {
 .app--mobile .slide-40-cust-int.cust-int-screen .account-master-screen__head {
   padding: 0.3rem 0.4rem;
 }
+
+/* Income Tax — Loaner List (Slide 88) */
+.slide-88-loaner-list.loaner-list-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.loaner-list-screen__panel {
+  padding: 0.75rem 1rem 1rem;
+}
+
+.loaner-list-screen__hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: #4b5563;
+}
+
+.loaner-list-screen__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.loaner-list-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.loaner-list-screen--report .loaner-list-screen__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.5rem 0.75rem 1rem;
+}
+
+.loaner-list-screen__meta {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  color: #4b5563;
+}
+
+.loaner-list-screen__table-wrap {
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.loaner-list-table {
+  width: 100%;
+  min-width: 72rem;
+  font-size: 0.78rem;
+  border-collapse: collapse;
+}
+
+.loaner-list-table th,
+.loaner-list-table td {
+  border: 1px solid #e5e7eb;
+  padding: 0.28rem 0.4rem;
+  white-space: nowrap;
+}
+
+.loaner-list-table th {
+  background: #f3f4f6;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.loaner-list-table td.num,
+.loaner-list-table th.num {
+  text-align: right;
+}
+
+.loaner-list-table__total td {
+  background: #f9fafb;
+  border-top: 2px solid #9ca3af;
+}
+
+/* Income Tax Reports — Slide 89 */
+.slide-89-itax.itax-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.app--fas-flow .slide-89-itax.itax-screen--report {
+  flex: 1;
+  align-self: stretch;
+  max-width: none !important;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.slide-89-itax.itax-screen--report {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.itax-screen__panel {
+  padding: 0.75rem 1rem 1rem;
+}
+
+.itax-screen__hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: #4b5563;
+}
+
+.itax-screen__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.itax-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.itax-screen--report .itax-screen__scroll {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.75rem 1rem;
+}
+
+.itax-screen--report .report-toolbar {
+  flex-shrink: 0;
+}
+
+.itax-screen__meta {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  color: #4b5563;
+  flex-shrink: 0;
+}
+
+.itax-screen__table-wrap {
+  flex: 1;
+  min-height: 8rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.itax-table {
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.78rem;
+  border-collapse: collapse;
+}
+
+.itax-table th,
+.itax-table td {
+  border: 1px solid #e5e7eb;
+  padding: 0.28rem 0.4rem;
+  white-space: nowrap;
+}
+
+.itax-table th {
+  background: #f3f4f6;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.itax-table tbody tr.itax-row--ledger {
+  cursor: pointer;
+}
+
+.itax-table tbody tr.itax-row--ledger:hover td,
+.itax-table tbody tr.itax-row--ledger:focus-visible td {
+  background: #eff6ff;
+}
+
+.itax-table td.num,
+.itax-table th.num {
+  text-align: right;
+}
+
+.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow-x: hidden;
+}
+
+.itax-screen--compact-table .itax-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.itax-screen--compact-table .itax-col-code {
+  width: 5.5rem;
+}
+
+.itax-screen--compact-table .itax-col-name {
+  width: auto;
+}
+
+.itax-screen--month-pivot.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow-x: auto;
+}
+
+.itax-screen--month-pivot.itax-screen--compact-table .itax-table {
+  min-width: 74rem;
+}
+
+.itax-screen--month-pivot.itax-screen--compact-table .itax-col-name {
+  width: 7rem;
+  max-width: 7.5rem;
+}
+
+.itax-screen--compact-table .itax-col-pan {
+  width: 7.5rem;
+}
+
+.itax-screen--compact-table .itax-col-gst {
+  width: 9.5rem;
+}
+
+.itax-screen--compact-table .itax-col-amt {
+  width: 7rem;
+}
+
+.itax-screen--compact-table .itax-col-qty {
+  width: 4.75rem;
+}
+
+.itax-screen--month-pivot .itax-table {
+  font-size: 0.7rem;
+}
+
+.itax-screen--month-pivot .itax-table th,
+.itax-screen--month-pivot .itax-table td {
+  padding: 0.2rem 0.25rem;
+}
+
+.itax-screen--month-pivot .itax-col-code {
+  width: 3.5rem;
+}
+
+.itax-screen--month-pivot .itax-col-mth {
+  width: 4.5rem;
+  min-width: 4.5rem;
+}
+
+.itax-screen--month-pivot .itax-table td.num,
+.itax-screen--month-pivot .itax-table th.num {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
+  letter-spacing: -0.01em;
+  padding-left: 0.15rem;
+  padding-right: 0.15rem;
+}
+
+.itax-screen--month-pivot .itax-table td.itax-cell--name-short,
+.itax-screen--month-pivot .itax-table tbody tr:not(.itax-schedule-group) td.itax-cell--name-short {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 7.5rem;
+}
+
+.itax-screen--month-pivot .itax-table td.itax-col-name,
+.itax-screen--month-pivot .itax-table tbody tr:not(.itax-schedule-group) td:nth-child(2) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itax-table tbody tr.itax-schedule-group td {
+  background: #e8eef5;
+  color: #1e3a5f;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
+  border-top: 2px solid #9ca3af;
+  white-space: normal;
+}
+
+.itax-table tbody tr.itax-schedule-group:first-child td {
+  border-top: none;
+}
+
+/* Income tax — mobile party-wise cards */
+.itax-screen--party-cards .itax-screen__table-wrap {
+  overflow-x: visible;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.itax-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.itax-mobile-list__empty {
+  margin: 0.5rem 0;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.itax-mobile-card {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+}
+
+.itax-mobile-card--ledger {
+  cursor: pointer;
+}
+
+.itax-mobile-card--ledger:active,
+.itax-mobile-card--ledger:focus-visible {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  outline: none;
+}
+
+.itax-mobile-card__head {
+  margin-bottom: 0.35rem;
+}
+
+.itax-mobile-card__code {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #1e40af;
+}
+
+.itax-mobile-card__party {
+  margin-bottom: 0.45rem;
+}
+
+.itax-mobile-card__party .itax-party-block__name {
+  font-size: 0.9rem;
+}
+
+.itax-mobile-card__party .itax-party-block__sub {
+  font-size: 0.78rem;
+}
+
+.itax-mobile-card__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 0.75rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.itax-mobile-card__attr {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.itax-mobile-card__attr-label {
+  color: #6b7280;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.itax-mobile-card__attr-val {
+  font-size: 0.82rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.itax-mobile-card__attr-val.num {
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Income tax — mobile table horizontal scroll (month pivot etc.) */
+.app--mobile .itax-screen--mobile-scroll .itax-screen__table-wrap,
+.app--mobile .itax-screen--month-pivot .itax-screen__table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app--mobile .itax-screen--mobile-scroll.itax-screen--compact-table .itax-table,
+.app--mobile .itax-screen--month-pivot .itax-table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+}
+
+.app--mobile .itax-screen--mobile-scroll.itax-screen--compact-table .itax-table {
+  min-width: 40rem;
+}
+
+.app--mobile .itax-screen--month-pivot .itax-table {
+  min-width: 52rem;
+}
+
+.app--mobile .itax-screen--compact-table .itax-col-name {
+  min-width: 9rem;
+  max-width: 14rem;
+}
+
+.app--mobile .slide-89-itax.itax-screen--report .itax-screen__meta {
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+/* Party-wise purchase/sales — dedicated mobile toolbar */
+.slide-89-itax.itax-screen--party-cards .itax-party-toolbar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.slide-89-itax.itax-screen--party-cards .itax-party-toolbar .btn,
+.slide-89-itax.itax-screen--party-cards .itax-party-toolbar .btn-report-help {
+  min-width: 0 !important;
+  width: 100%;
+  max-width: none;
+  padding: 0.5rem 0.15rem !important;
+  font-size: 0.72rem !important;
+  line-height: 1.15;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.slide-89-itax.itax-screen--party-cards .report-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
+}
+
+@media (max-width: 640px) {
+  .slide-89-itax.itax-screen--party-cards .itax-party-toolbar {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .slide-89-itax.itax-screen--party-cards .itax-party-toolbar .btn-export,
+  .slide-89-itax.itax-screen--party-cards .itax-party-toolbar .btn-whatsapp {
+    font-weight: 700;
+  }
+}
+
+.itax-table td.itax-cell--party {
+  white-space: normal !important;
+  vertical-align: top;
+  overflow: visible;
+  height: auto;
+}
+
+.itax-party-block {
+  display: block;
+  line-height: 1.35;
+}
+
+.itax-party-block__name {
+  font-weight: 600;
+  line-height: 1.3;
+  display: block;
+  white-space: normal;
+}
+
+.itax-party-block__sub {
+  font-size: 0.72rem;
+  color: #4b5563;
+  line-height: 1.35;
+  display: block;
+  white-space: normal;
+}
+

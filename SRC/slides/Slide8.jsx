@@ -7,6 +7,13 @@ import { downloadExcelRows } from '../utils/excelExport';
 import { toInputDateString, toOracleDate, toDisplayDate } from '../utils/dateFormat';
 import { formatApiOrigin } from '../utils/apiLabel';
 import ReportHelpButton from '../components/ReportHelpButton';
+import FasReportHeader from '../components/FasReportHeader';
+import TrialBalanceSessionCard from '../components/TrialBalanceSessionCard';
+import {
+  filterCodeNameCityRows,
+  filterItemCodeNameRows,
+  SEARCH_NO_MATCH,
+} from '../utils/masterSearchFilter';
 import '../styles/saleListScreen.css';
 
 function highlightMatch(text, q) {
@@ -26,7 +33,27 @@ function highlightMatch(text, q) {
   );
 }
 
-export default function Slide8({ apiBase, formData, onPrev, onReset }) {
+const SL_FIELD_FOCUS_ORDER = ['sl-start', 'sl-end', 'sl-party-search', 'sl-broker-search', 'sl-item-search'];
+
+function focusNextSlField(currentId) {
+  const idx = SL_FIELD_FOCUS_ORDER.indexOf(currentId);
+  if (idx === -1 || idx >= SL_FIELD_FOCUS_ORDER.length - 1) return;
+  document.getElementById(SL_FIELD_FOCUS_ORDER[idx + 1])?.focus();
+}
+
+function SaleListFormShell({ className = '', header, footer = null, children }) {
+  return (
+    <div className={`slide slide-8 fas-tb-host${className ? ` ${className}` : ''}`}>
+      <div className="fas-flow fas-tb-flow fas-tb-flow--form-app">
+        <div className="fas-ledger-sticky-top">{header}</div>
+        <div className="fas-flow-body fas-tb-body fas-tb-body--form-scroll">{children}</div>
+        {footer ? <div className="fas-tb-form-footer-bar">{footer}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+export default function Slide8({ apiBase, formData, onPrev, onReset, viewMode = 'desktop' }) {
   const [parties, setParties] = useState([]);
   const [brokers, setBrokers] = useState([]);
   const [items, setItems] = useState([]);
@@ -129,37 +156,20 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
     load();
   }, [apiBase, compCode, compUid, startDate, endDate]);
 
-  const filteredParties = useMemo(() => {
-    const q = partySearch.trim().toLowerCase();
-    if (!q) return parties.slice(0, 150);
-    return parties.filter((p) => {
-      const code = String(p.CODE ?? p.code ?? '').toLowerCase();
-      const name = String(p.NAME ?? p.name ?? '').toLowerCase();
-      const city = String(p.CITY ?? p.city ?? '').toLowerCase();
-      return code.includes(q) || name.includes(q) || city.includes(q);
-    });
-  }, [parties, partySearch]);
+  const filteredParties = useMemo(
+    () => filterCodeNameCityRows(parties, partySearch, 50),
+    [parties, partySearch]
+  );
 
-  const filteredBrokers = useMemo(() => {
-    const q = brokerSearch.trim().toLowerCase();
-    if (!q) return brokers.slice(0, 150);
-    return brokers.filter((b) => {
-      const code = String(b.CODE ?? b.code ?? '').toLowerCase();
-      const name = String(b.NAME ?? b.name ?? '').toLowerCase();
-      const city = String(b.CITY ?? b.city ?? '').toLowerCase();
-      return code.includes(q) || name.includes(q) || city.includes(q);
-    });
-  }, [brokers, brokerSearch]);
+  const filteredBrokers = useMemo(
+    () => filterCodeNameCityRows(brokers, brokerSearch, 50),
+    [brokers, brokerSearch]
+  );
 
-  const filteredItems = useMemo(() => {
-    const q = itemSearch.trim().toLowerCase();
-    if (!q) return items.slice(0, 150);
-    return items.filter((row) => {
-      const code = String(row.ITEM_CODE ?? row.item_code ?? '').toLowerCase();
-      const name = String(row.ITEM_NAME ?? row.item_name ?? '').toLowerCase();
-      return code.includes(q) || name.includes(q);
-    });
-  }, [items, itemSearch]);
+  const filteredItems = useMemo(
+    () => filterItemCodeNameRows(items, itemSearch, 50),
+    [items, itemSearch]
+  );
 
   useEffect(() => {
     setPartyHi(0);
@@ -174,18 +184,6 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
   const safePartyHi = Math.min(partyHi, Math.max(0, filteredParties.length - 1));
   const safeBrokerHi = Math.min(brokerHi, Math.max(0, filteredBrokers.length - 1));
   const safeItemHi = Math.min(itemHi, Math.max(0, filteredItems.length - 1));
-
-  const partyListEmptyHint = partySearch.trim()
-    ? 'No matches — try different letters.'
-    : 'Type to search or leave empty for all parties.';
-
-  const brokerListEmptyHint = brokerSearch.trim()
-    ? 'No matches — try different letters.'
-    : 'Type to search or leave empty for all brokers.';
-
-  const itemListEmptyHint = itemSearch.trim()
-    ? 'No matches — try different letters.'
-    : 'Type to search or leave empty for all items.';
 
   const selectedPartyRow = parties.find((p) => String(p.CODE ?? p.code) === String(selectedMcode));
   const selectedBrokerRow = brokers.find((b) => String(b.CODE ?? b.code) === String(selectedBk));
@@ -264,7 +262,7 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
   }, [formData.saleChartDrilldown, apiBase, compCode, compUid]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     if (!startDate || !endDate) {
       alert('Please set starting and ending dates.');
       return;
@@ -300,6 +298,23 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
       setLoading(false);
     }
   };
+
+  const handleFormKeyDown = (e) => {
+    if (e.key !== 'Enter' || e.defaultPrevented) return;
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
+    if (
+      target.id === 'sl-party-search' ||
+      target.id === 'sl-broker-search' ||
+      target.id === 'sl-item-search'
+    ) {
+      return;
+    }
+    e.preventDefault();
+    focusNextSlField(target.id);
+  };
+
+  const isDesktopView = viewMode === 'desktop';
 
   const pdfMeta = {
     companyName: compName,
@@ -452,310 +467,338 @@ export default function Slide8({ apiBase, formData, onPrev, onReset }) {
   }
 
   return (
-    <div className="slide slide-8 sale-list-screen">
-      <div className="sale-list-screen__scroll">
-      <h2>Sale list</h2>
-      <p className="company-info">
-        {compName} | FY {compYear}
-        <br />
-        <span className="compdet-date-hint">
-          Report uses types <strong>SL, SE, CN</strong>. Help lists now show full master/item lists (not date-filtered): parties from
-          <code>MASTER</code>, brokers from <code>MASTER</code> (codes starting with B), and items from <code>ITEMMAST</code>.
-          Click a report row to open the printable sale bill.
-        </span>
-      </p>
-
-      {lookupError ? (
-        <div className="form-api-error" role="alert">
-          <strong>Could not load help lists.</strong> {lookupError}
-        </div>
-      ) : null}
-
-      <form onSubmit={handleSubmit} className="report-form">
-        <div className="button-group button-group--form-top">
-          <button type="button" className="btn btn-secondary" onClick={onPrev}>
-            ← Back
+    <SaleListFormShell
+      className="fas-tb-host--form"
+      footer={
+        isDesktopView ? (
+          <button
+            type="button"
+            className="fas-btn fas-btn-primary fas-tb-run-bottom"
+            disabled={loading}
+            onClick={() => void handleSubmit()}
+          >
+            {loading ? 'Loading…' : '▶ Run'}
           </button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? '⏳ Loading…' : 'Run'}
-          </button>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="sl-start">Starting date</label>
-          <input
-            id="sl-start"
-            type="date"
-            lang="en-GB"
-            className="form-input"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="sl-end">Ending date</label>
-          <input
-            id="sl-end"
-            type="date"
-            lang="en-GB"
-            className="form-input"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-        </div>
-
-        {/* Party MCODE */}
-        <div className="form-group account-search-group">
-          <label htmlFor="sl-party-search">Specific party (MCODE) — optional</label>
-          <input
-            id="sl-party-search"
-            type="search"
-            className="form-input"
-            autoComplete="off"
-            placeholder="Search party name, city, or code…"
-            value={partySearch}
-            onChange={(e) => setPartySearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (selectedMcode) return;
-              const max = Math.max(0, filteredParties.length - 1);
-              if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                if (filteredParties.length === 0) return;
-                setPartyHi((h) => Math.min(max, h + 1));
-              } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setPartyHi((h) => Math.max(0, h - 1));
-              } else if (e.key === 'Enter') {
-                const r = filteredParties[safePartyHi];
-                if (r) {
-                  e.preventDefault();
-                  setSelectedMcode(String(r.CODE ?? r.code ?? '').trim());
-                  setPartySearch('');
-                }
-              }
-            }}
-          />
-          {selectedMcode ? (
-            <p className="account-selected-hint">
-              Selected: <strong>{selectedPartyRow?.NAME ?? '—'}</strong> (<code>{selectedMcode}</code>)
+        ) : null
+      }
+      header={
+        <FasReportHeader
+          title="Sale Bill List"
+          onBack={onPrev}
+          rightSlot={
+            isDesktopView ? (
+              <ReportHelpButton
+                reportId="sale-list"
+                includeSalesEntry={false}
+                includeStockLot={true}
+                appName="GFASORCL Accounting"
+              />
+            ) : (
               <button
                 type="button"
-                className="btn-text-clear"
-                onClick={() => {
-                  setSelectedMcode('');
-                  setPartySearch('');
-                }}
+                className="fas-report-header__run"
+                disabled={loading}
+                onClick={() => void handleSubmit()}
               >
-                Clear
+                {loading ? 'Loading…' : '▶ Run'}
               </button>
-            </p>
-          ) : (
-            <div className="account-search-results party-search-results" role="listbox">
-              <div className="account-search-header party-search-header" aria-hidden="true">
-                <span>Code</span>
-                <span>Name</span>
-                <span>City</span>
-              </div>
-              {filteredParties.length === 0 ? (
-                <div className="account-search-empty">{partyListEmptyHint}</div>
-              ) : (
-                filteredParties.map((row, index) => {
-                  const code = row.CODE ?? row.code;
-                  const rowHi = safePartyHi === index;
-                  return (
-                    <button
-                      key={String(code)}
-                      type="button"
-                      role="option"
-                      className={`account-search-row party-search-row${rowHi ? ' is-highlight' : ''}`}
-                      onMouseEnter={() => setPartyHi(index)}
-                      onClick={() => {
-                        setSelectedMcode(String(code).trim());
-                        setPartySearch('');
-                      }}
-                    >
-                      <span className="account-search-code">{highlightMatch(code, partySearch)}</span>
-                      <span className="account-search-name">{highlightMatch(row.NAME ?? row.name, partySearch)}</span>
-                      <span className="account-search-city">{row.CITY ?? row.city ?? '—'}</span>
-                    </button>
-                  );
-                })
-              )}
+            )
+          }
+        />
+      }
+    >
+      <form
+        id="sl-params-form"
+        onSubmit={handleSubmit}
+        onKeyDown={handleFormKeyDown}
+        className="fas-tb-form-shell fas-slb-form-shell"
+      >
+        <TrialBalanceSessionCard compact formData={formData} helpReportId="sale-list" />
+
+        {lookupError ? (
+          <div className="form-api-error fas-slb-form__lookup-error" role="alert">
+            <strong>Lookups:</strong> {lookupError}
+          </div>
+        ) : null}
+
+        <div className="fas-slb-form__grid">
+          <div className="fas-field-group">
+            <div className="fas-field-label">From date</div>
+            <div className="fas-field-input fas-tb-date-field">
+              <span className="fas-field-icon" aria-hidden="true">
+                📅
+              </span>
+              <input
+                id="sl-start"
+                type="date"
+                lang="en-GB"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+              />
             </div>
-          )}
+          </div>
+          <div className="fas-field-group">
+            <div className="fas-field-label">To date</div>
+            <div className="fas-field-input fas-tb-date-field">
+              <span className="fas-field-icon" aria-hidden="true">
+                📅
+              </span>
+              <input
+                id="sl-end"
+                type="date"
+                lang="en-GB"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="fas-field-group fas-slb-form__search">
+            <div className="fas-field-label">Party (MCODE)</div>
+            <div className="fas-field-input">
+              <input
+                id="sl-party-search"
+                type="search"
+                autoComplete="off"
+                placeholder="Code, name, city…"
+                value={partySearch}
+                onChange={(e) => setPartySearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (selectedMcode) return;
+                  const max = Math.max(0, filteredParties.length - 1);
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (filteredParties.length === 0) return;
+                    setPartyHi((h) => Math.min(max, h + 1));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setPartyHi((h) => Math.max(0, h - 1));
+                  } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const r = filteredParties[safePartyHi];
+                    if (r) {
+                      setSelectedMcode(String(r.CODE ?? r.code ?? '').trim());
+                      setPartySearch('');
+                    }
+                    focusNextSlField('sl-party-search');
+                  }
+                }}
+              />
+            </div>
+            {selectedMcode ? (
+              <p className="account-selected-hint">
+                <strong>{selectedPartyRow?.NAME ?? '—'}</strong> (<code>{selectedMcode}</code>)
+                <button
+                  type="button"
+                  className="btn-text-clear"
+                  onClick={() => {
+                    setSelectedMcode('');
+                    setPartySearch('');
+                  }}
+                >
+                  Clear
+                </button>
+              </p>
+            ) : partySearch.trim() ? (
+              <div className="account-search-results party-search-results" role="listbox">
+                {filteredParties.length === 0 ? (
+                  <div className="account-search-empty">{SEARCH_NO_MATCH}</div>
+                ) : (
+                  filteredParties.map((row, index) => {
+                    const code = row.CODE ?? row.code;
+                    const rowHi = safePartyHi === index;
+                    return (
+                      <button
+                        key={String(code)}
+                        type="button"
+                        role="option"
+                        className={`account-search-row party-search-row${rowHi ? ' is-highlight' : ''}`}
+                        onMouseEnter={() => setPartyHi(index)}
+                        onClick={() => {
+                          setSelectedMcode(String(code).trim());
+                          setPartySearch('');
+                        }}
+                      >
+                        <span className="account-search-code">{highlightMatch(code, partySearch)}</span>
+                        <span className="account-search-name">{highlightMatch(row.NAME ?? row.name, partySearch)}</span>
+                        <span className="account-search-city">{row.CITY ?? row.city ?? '—'}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="fas-field-group fas-slb-form__search">
+            <div className="fas-field-label">Broker (BK_CODE)</div>
+            <div className="fas-field-input">
+              <input
+                id="sl-broker-search"
+                type="search"
+                autoComplete="off"
+                placeholder="Code, name, city…"
+                value={brokerSearch}
+                onChange={(e) => setBrokerSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (selectedBk) return;
+                  const max = Math.max(0, filteredBrokers.length - 1);
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (filteredBrokers.length === 0) return;
+                    setBrokerHi((h) => Math.min(max, h + 1));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setBrokerHi((h) => Math.max(0, h - 1));
+                  } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const r = filteredBrokers[safeBrokerHi];
+                    if (r) {
+                      setSelectedBk(String(r.CODE ?? r.code ?? '').trim());
+                      setBrokerSearch('');
+                    }
+                    focusNextSlField('sl-broker-search');
+                  }
+                }}
+              />
+            </div>
+            {selectedBk ? (
+              <p className="account-selected-hint">
+                <strong>{selectedBrokerRow?.NAME ?? '—'}</strong> (<code>{selectedBk}</code>)
+                <button
+                  type="button"
+                  className="btn-text-clear"
+                  onClick={() => {
+                    setSelectedBk('');
+                    setBrokerSearch('');
+                  }}
+                >
+                  Clear
+                </button>
+              </p>
+            ) : brokerSearch.trim() ? (
+              <div className="account-search-results party-search-results" role="listbox">
+                {filteredBrokers.length === 0 ? (
+                  <div className="account-search-empty">{SEARCH_NO_MATCH}</div>
+                ) : (
+                  filteredBrokers.map((row, index) => {
+                    const code = row.CODE ?? row.code;
+                    const rowHi = safeBrokerHi === index;
+                    return (
+                      <button
+                        key={String(code)}
+                        type="button"
+                        role="option"
+                        className={`account-search-row party-search-row${rowHi ? ' is-highlight' : ''}`}
+                        onMouseEnter={() => setBrokerHi(index)}
+                        onClick={() => {
+                          setSelectedBk(String(code).trim());
+                          setBrokerSearch('');
+                        }}
+                      >
+                        <span className="account-search-code">{highlightMatch(code, brokerSearch)}</span>
+                        <span className="account-search-name">{highlightMatch(row.NAME ?? row.name, brokerSearch)}</span>
+                        <span className="account-search-city">{row.CITY ?? row.city ?? '—'}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="fas-field-group fas-slb-form__span-full fas-slb-form__search">
+            <div className="fas-field-label">Item (ITEM_CODE)</div>
+            <div className="fas-field-input">
+              <input
+                id="sl-item-search"
+                type="search"
+                autoComplete="off"
+                placeholder="Item code or name…"
+                value={itemSearch}
+                onChange={(e) => setItemSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (selectedItem) return;
+                  const max = Math.max(0, filteredItems.length - 1);
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (filteredItems.length === 0) return;
+                    setItemHi((h) => Math.min(max, h + 1));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setItemHi((h) => Math.max(0, h - 1));
+                  } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const r = filteredItems[safeItemHi];
+                    if (r) {
+                      setSelectedItem(String(r.ITEM_CODE ?? r.item_code ?? '').trim());
+                      setItemSearch('');
+                    }
+                  }
+                }}
+              />
+            </div>
+            {selectedItem ? (
+              <p className="account-selected-hint">
+                <strong>{selectedItemRow?.ITEM_NAME ?? selectedItemRow?.item_name ?? '—'}</strong> (
+                <code>{selectedItem}</code>)
+                <button
+                  type="button"
+                  className="btn-text-clear"
+                  onClick={() => {
+                    setSelectedItem('');
+                    setItemSearch('');
+                  }}
+                >
+                  Clear
+                </button>
+              </p>
+            ) : itemSearch.trim() ? (
+              <div className="account-search-results broker-search-results" role="listbox">
+                {filteredItems.length === 0 ? (
+                  <div className="account-search-empty">{SEARCH_NO_MATCH}</div>
+                ) : (
+                  filteredItems.map((row, index) => {
+                    const code = row.ITEM_CODE ?? row.item_code;
+                    const rowHi = safeItemHi === index;
+                    return (
+                      <button
+                        key={String(code)}
+                        type="button"
+                        role="option"
+                        className={`account-search-row broker-search-row${rowHi ? ' is-highlight' : ''}`}
+                        onMouseEnter={() => setItemHi(index)}
+                        onClick={() => {
+                          setSelectedItem(String(code).trim());
+                          setItemSearch('');
+                        }}
+                      >
+                        <span className="account-search-code">{highlightMatch(code, itemSearch)}</span>
+                        <span className="account-search-name">
+                          {highlightMatch(row.ITEM_NAME ?? row.item_name, itemSearch)}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        {/* Broker */}
-        <div className="form-group account-search-group">
-          <label htmlFor="sl-broker-search">Specific broker (BK_CODE) — optional</label>
-          <input
-            id="sl-broker-search"
-            type="search"
-            className="form-input"
-            autoComplete="off"
-            placeholder="Search broker…"
-            value={brokerSearch}
-            onChange={(e) => setBrokerSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (selectedBk) return;
-              const max = Math.max(0, filteredBrokers.length - 1);
-              if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                if (filteredBrokers.length === 0) return;
-                setBrokerHi((h) => Math.min(max, h + 1));
-              } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setBrokerHi((h) => Math.max(0, h - 1));
-              } else if (e.key === 'Enter') {
-                const r = filteredBrokers[safeBrokerHi];
-                if (r) {
-                  e.preventDefault();
-                  setSelectedBk(String(r.CODE ?? r.code ?? '').trim());
-                  setBrokerSearch('');
-                }
-              }
-            }}
-          />
-          {selectedBk ? (
-            <p className="account-selected-hint">
-              Selected: <strong>{selectedBrokerRow?.NAME ?? '—'}</strong> (<code>{selectedBk}</code>)
-              <button
-                type="button"
-                className="btn-text-clear"
-                onClick={() => {
-                  setSelectedBk('');
-                  setBrokerSearch('');
-                }}
-              >
-                Clear
-              </button>
-            </p>
-          ) : (
-            <div className="account-search-results party-search-results" role="listbox">
-              <div className="account-search-header party-search-header" aria-hidden="true">
-                <span>Code</span>
-                <span>Name</span>
-                <span>City</span>
-              </div>
-              {filteredBrokers.length === 0 ? (
-                <div className="account-search-empty">{brokerListEmptyHint}</div>
-              ) : (
-                filteredBrokers.map((row, index) => {
-                  const code = row.CODE ?? row.code;
-                  const rowHi = safeBrokerHi === index;
-                  return (
-                    <button
-                      key={String(code)}
-                      type="button"
-                      className={`account-search-row party-search-row${rowHi ? ' is-highlight' : ''}`}
-                      onMouseEnter={() => setBrokerHi(index)}
-                      onClick={() => {
-                        setSelectedBk(String(code).trim());
-                        setBrokerSearch('');
-                      }}
-                    >
-                      <span className="account-search-code">{highlightMatch(code, brokerSearch)}</span>
-                      <span className="account-search-name">{highlightMatch(row.NAME ?? row.name, brokerSearch)}</span>
-                      <span className="account-search-city">{row.CITY ?? row.city ?? '—'}</span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Item */}
-        <div className="form-group account-search-group">
-          <label htmlFor="sl-item-search">Specific item (ITEM_CODE) — optional</label>
-          <input
-            id="sl-item-search"
-            type="search"
-            className="form-input"
-            autoComplete="off"
-            placeholder="Search item name or code…"
-            value={itemSearch}
-            onChange={(e) => setItemSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (selectedItem) return;
-              const max = Math.max(0, filteredItems.length - 1);
-              if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                if (filteredItems.length === 0) return;
-                setItemHi((h) => Math.min(max, h + 1));
-              } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setItemHi((h) => Math.max(0, h - 1));
-              } else if (e.key === 'Enter') {
-                const r = filteredItems[safeItemHi];
-                if (r) {
-                  e.preventDefault();
-                  setSelectedItem(String(r.ITEM_CODE ?? r.item_code ?? '').trim());
-                  setItemSearch('');
-                }
-              }
-            }}
-          />
-          {selectedItem ? (
-            <p className="account-selected-hint">
-              Selected: <strong>{selectedItemRow?.ITEM_NAME ?? selectedItemRow?.item_name ?? '—'}</strong> (
-              <code>{selectedItem}</code>)
-              <button
-                type="button"
-                className="btn-text-clear"
-                onClick={() => {
-                  setSelectedItem('');
-                  setItemSearch('');
-                }}
-              >
-                Clear
-              </button>
-            </p>
-          ) : (
-            <div className="account-search-results broker-search-results" role="listbox">
-              <div className="account-search-header broker-search-header" aria-hidden="true">
-                <span>Code</span>
-                <span>Name</span>
-              </div>
-              {filteredItems.length === 0 ? (
-                <div className="account-search-empty">{itemListEmptyHint}</div>
-              ) : (
-                filteredItems.map((row, index) => {
-                  const code = row.ITEM_CODE ?? row.item_code;
-                  const rowHi = safeItemHi === index;
-                  return (
-                    <button
-                      key={String(code)}
-                      type="button"
-                      className={`account-search-row broker-search-row${rowHi ? ' is-highlight' : ''}`}
-                      onMouseEnter={() => setItemHi(index)}
-                      onClick={() => {
-                        setSelectedItem(String(code).trim());
-                        setItemSearch('');
-                      }}
-                    >
-                      <span className="account-search-code">{highlightMatch(code, itemSearch)}</span>
-                      <span className="account-search-name">
-                        {highlightMatch(row.ITEM_NAME ?? row.item_name, itemSearch)}
-                      </span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="button-group">
-          <button type="button" className="btn btn-secondary" onClick={onPrev}>
-            ← Back
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? '⏳ Loading…' : 'Run'}
-          </button>
-        </div>
+        {!isDesktopView ? (
+          <div className="button-group">
+            <button type="button" className="btn btn-secondary" onClick={onPrev}>
+              ← Back
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? 'Loading…' : 'Run'}
+            </button>
+          </div>
+        ) : null}
       </form>
-      </div>
-    </div>
+    </SaleListFormShell>
   );
 }

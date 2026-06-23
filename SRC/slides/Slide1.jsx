@@ -1,12 +1,66 @@
 import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import { exitApp } from '../utils/exitApp';
 import WindalInitialFlowCard from '../components/WindalInitialFlowCard';
+import { apiUrl } from '../utils/resolveApiBase';
 
-export default function Slide1({ companies, onNext, onExit, userName = '', flowHeaderActions = null }) {
+/** Company list always from GRAINFAS — refetched when this screen opens. */
+export default function Slide1({
+  apiBase,
+  companies: companiesProp = [],
+  refreshKey = 0,
+  onNext,
+  onExit,
+  userName = '',
+  onCompaniesLoaded,
+  flowHeaderActions = null,
+}) {
+  const [companies, setCompanies] = useState(companiesProp);
+  const [listLoading, setListLoading] = useState(Boolean(apiBase));
   const [selected, setSelected] = useState('');
 
   useEffect(() => {
-    if (!Array.isArray(companies) || companies.length === 0) return;
+    if (!apiBase) {
+      setCompanies(Array.isArray(companiesProp) ? companiesProp : []);
+      setListLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setListLoading(true);
+      try {
+        const { data } = await axios.get(apiUrl(apiBase, '/api/companies'), {
+          params: {
+            ...(userName ? { user_name: userName } : {}),
+            _: Date.now(),
+          },
+          withCredentials: true,
+        });
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : [];
+        setCompanies(list);
+        onCompaniesLoaded?.(list);
+      } catch (err) {
+        console.error('Company list load error:', err);
+        if (!cancelled) {
+          setCompanies(Array.isArray(companiesProp) ? companiesProp : []);
+        }
+      } finally {
+        if (!cancelled) setListLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    }, [apiBase, userName, refreshKey, onCompaniesLoaded]);
+
+  useEffect(() => {
+    if (!Array.isArray(companies) || companies.length === 0) {
+      setSelected('');
+      return;
+    }
     setSelected((prev) => {
       if (prev && companies.some((comp) => String(comp.COMP_CODE) === String(prev))) return prev;
       const firstCode = companies[0]?.COMP_CODE;
@@ -41,7 +95,9 @@ export default function Slide1({ companies, onNext, onExit, userName = '', flowH
       >
         <div className="windal-initial-section-label">Select Company</div>
 
-        {count === 0 ? (
+        {listLoading ? (
+          <p className="windal-initial-company-line loading-msg">Loading companies from GRAINFAS…</p>
+        ) : count === 0 ? (
           <p className="windal-initial-company-line">No companies loaded. Check the server connection.</p>
         ) : (
           <ul className="windal-initial-list" role="listbox" aria-label="Companies">
@@ -83,7 +139,7 @@ export default function Slide1({ companies, onNext, onExit, userName = '', flowH
             type="button"
             className="windal-initial-btn windal-initial-btn--primary"
             onClick={handleNext}
-            disabled={!selected || count === 0}
+            disabled={!selected || count === 0 || listLoading}
           >
             ✓ Select
           </button>

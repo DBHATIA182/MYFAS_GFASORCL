@@ -5,6 +5,7 @@ import { rupeesToWords } from '../utils/rupeesInWords';
 import { signedQrCodeToDataUrl, dataUrlToObjectUrl } from '../utils/qrDataUrl';
 import { buildReportHtml, generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { downloadExcelWorkbook } from '../utils/excelExport';
+import { runWindalSaleBillPrint } from '../utils/windalBrowserPrint';
 import { rowFieldCI, rowFieldAny } from '../utils/rowFieldCI';
 
 function signedQrRaw(row) {
@@ -89,7 +90,16 @@ function cleanPrintText(raw) {
   return s;
 }
 
-export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, compUid, billParams, companyName = '' }) {
+export default function SaleBillPrintModal({
+  open,
+  onClose,
+  apiBase,
+  compCode,
+  compUid,
+  billParams,
+  companyName = '',
+  bulkQueue = null,
+}) {
   const [header, setHeader] = useState(null);
   const [lines, setLines] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -319,6 +329,11 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
     generatePDF('sale-bill', pdfData, pdfMeta).catch((e) => alert(String(e?.message || e)));
   }, [pdfData, pdfMeta]);
 
+  const handleBrowserPrint = useCallback(() => {
+    if (!lines.length) return;
+    runWindalSaleBillPrint();
+  }, [lines.length]);
+
   const handleDownloadExcel = useCallback(() => {
     if (!lines.length) return;
     try {
@@ -465,8 +480,18 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sale-bill-modal-head no-print">
-          <h3 id="sale-bill-print-title">{billParams.label || 'Sale bill'}</h3>
+          <div className="sale-bill-modal-head__title-row">
+            <h3 id="sale-bill-print-title">{billParams.label || 'Sale bill'}</h3>
+            {bulkQueue ? (
+              <span className="sale-bill-bulk-badge">
+                Bill {bulkQueue.current} of {bulkQueue.total}
+              </span>
+            ) : null}
+          </div>
           <div className="sale-bill-print-actions">
+            <button type="button" className="btn btn-secondary" disabled={!lines.length} onClick={handleBrowserPrint}>
+              Print
+            </button>
             <button
               type="button"
               className="btn btn-export"
@@ -490,6 +515,25 @@ export default function SaleBillPrintModal({ open, onClose, apiBase, compCode, c
               ×
             </button>
           </div>
+          {bulkQueue ? (
+            <div className="sale-bill-bulk-bar">
+              <span className="sale-bill-bulk-bar__hint">
+                Preview on screen — use Print, Pdf, or WhatsApp, then continue to the next bill.
+              </span>
+              {bulkQueue.hasNext ? (
+                <button
+                  type="button"
+                  className="btn btn-primary sale-bill-bulk-bar__next"
+                  disabled={loading || !lines.length}
+                  onClick={bulkQueue.onNext}
+                >
+                  Next bill → ({bulkQueue.current + 1}/{bulkQueue.total})
+                </button>
+              ) : (
+                <span className="sale-bill-bulk-bar__done">Last bill in queue</span>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <div className="sale-bill-modal-body sale-bill-print-body">

@@ -1,12 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import SessionInfoLine from '../components/SessionInfoLine';
 import {
   findUtilitiesModuleItem,
+  isUtilityDesktopOnlyBlocked,
+  resolveUtilitiesSlideNo,
   utilityCategoryLabel,
+  utilityDesktopOnlyMessage,
   UTILITIES_MODULE_ITEMS,
+  UTILITIES_PLACEHOLDER_SLIDE,
 } from '../data/utilitiesModuleConfig';
 
-export default function Slide49UtilitiesPlaceholder({ formData, userName, onPrev, onReset }) {
+export default function Slide49UtilitiesPlaceholder({
+  formData,
+  userName,
+  onPrev,
+  onReset,
+  onNavigateSlide,
+}) {
   const reportType = String(formData?.reportType ?? '').trim().toLowerCase();
   const meta = findUtilitiesModuleItem(reportType);
 
@@ -17,6 +27,46 @@ export default function Slide49UtilitiesPlaceholder({ formData, userName, onPrev
 
   const liveCount = UTILITIES_MODULE_ITEMS.filter((u) => u.implemented).length;
   const totalCount = UTILITIES_MODULE_ITEMS.length;
+  const targetSlide = resolveUtilitiesSlideNo(reportType);
+  const desktopBlocked = meta?.implemented && isUtilityDesktopOnlyBlocked(meta);
+
+  useEffect(() => {
+    if (
+      targetSlide != null &&
+      targetSlide !== UTILITIES_PLACEHOLDER_SLIDE &&
+      typeof onNavigateSlide === 'function'
+    ) {
+      onNavigateSlide(targetSlide);
+    }
+  }, [targetSlide, onNavigateSlide]);
+
+  if (desktopBlocked) {
+    return (
+      <div className="slide slide-49-utilities-placeholder slide-utility-denied">
+        <div className="master-placeholder-screen__head">
+          <h2 className="sale-bill-page__title">{title}</h2>
+          <SessionInfoLine formData={formData} userName={userName} helpReportId={reportType || 'utilities-module'} />
+        </div>
+        <div className="utility-denied utility-denied--mobile">
+          <p className="utility-denied__badge">Desktop only</p>
+          <p>
+            <strong>Not available on mobile.</strong> {utilityDesktopOnlyMessage(meta)}
+          </p>
+          <button type="button" className="btn btn-secondary" onClick={onPrev}>
+            ← Back to menu
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (meta?.implemented && targetSlide != null && targetSlide !== UTILITIES_PLACEHOLDER_SLIDE) {
+    return (
+      <div className="slide slide-49-utilities-placeholder">
+        <p className="loading-msg">Opening {title}…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="slide slide-49-utilities-placeholder master-placeholder-screen utilities-placeholder-screen">

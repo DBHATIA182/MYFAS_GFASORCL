@@ -414,6 +414,10 @@ export const UTILITIES_MODULE_ITEMS = [
     shortTitle: 'Stk Updt',
     description: 'Stock updation utility',
     vfpCommand: 'DO FORM stkupdt',
+    vfpFiles: ['stkupdt.scx', 'stkupdt.SCT'],
+    implemented: true,
+    slide: 82,
+    desktopOnly: true,
   },
   {
     id: 'new-company-addition',
@@ -422,6 +426,10 @@ export const UTILITIES_MODULE_ITEMS = [
     shortTitle: 'New Co.',
     description: 'Add a new company',
     vfpCommand: 'DO FORM newcomp',
+    vfpFiles: ['newcomp.scx', 'newcomp.SCT'],
+    implemented: true,
+    slide: 83,
+    desktopOnly: true,
   },
   {
     id: 'set-sale-exp',
@@ -430,30 +438,34 @@ export const UTILITIES_MODULE_ITEMS = [
     shortTitle: 'Sale Exp',
     description: 'Set sale expense (GST)',
     vfpCommand: "DO FORM saleform_Gst WITH 'SALE'",
+    vfpFiles: ['saleform_gst.scx', 'saleform_gst.SCT'],
+    implemented: true,
+    slide: 84,
+    desktopOnly: true,
   },
   {
     id: 'default-setting',
     category: 'installation',
     title: 'Default Setting',
     shortTitle: 'Default',
-    description: 'Default system settings',
+    description: 'Default system settings (DEFVALUE, includes default2 fields)',
     vfpCommand: 'DO FORM default',
-  },
-  {
-    id: 'default-setting-2',
-    category: 'installation',
-    title: 'Default Setting 2',
-    shortTitle: 'Default 2',
-    description: 'Additional default settings',
-    vfpCommand: 'DO FORM default2',
+    vfpFiles: ['default.scx', 'default.SCT', 'default2.scx', 'default2.SCT'],
+    implemented: true,
+    slide: 85,
+    desktopOnly: true,
   },
   {
     id: 'set-task-scheduler',
     category: 'installation',
     title: 'Set Task Scheduler',
     shortTitle: 'Task Schd',
-    description: 'Configure task scheduler',
+    description: 'ORABACK Windows scheduled backup task',
     vfpCommand: 'DO FORM schtask WITH 1',
+    vfpFiles: ['schtask.scx', 'schtask.SCT'],
+    implemented: true,
+    slide: 86,
+    desktopOnly: true,
   },
 ];
 
@@ -494,6 +506,21 @@ export function utilityDesktopOnlyMessage(item) {
   if (item?.id === 'takaja-query') return TAKAJA_QUERY_DESKTOP_ONLY_MESSAGE;
   if (item?.id === 'updation') {
     return 'Updation is available on desktop only. Open the app on a computer, or switch to Desktop View in Settings.';
+  }
+  if (item?.id === 'updation-stock') {
+    return 'Updation Stock is available on desktop only. Open the app on a computer, or switch to Desktop View in Settings.';
+  }
+  if (item?.id === 'new-company-addition') {
+    return 'New Company Addition is available on desktop only. Open the app on a computer, or switch to Desktop View in Settings.';
+  }
+  if (item?.id === 'set-sale-exp') {
+    return 'Set Sale Exp. is available on desktop only. Open the app on a computer, or switch to Desktop View in Settings.';
+  }
+  if (item?.id === 'default-setting') {
+    return 'Default Setting is available on desktop only. Open the app on a computer, or switch to Desktop View in Settings.';
+  }
+  if (item?.id === 'set-task-scheduler') {
+    return 'Set Task Scheduler is available on desktop only. Open the app on a computer, or switch to Desktop View in Settings.';
   }
   if (item?.desktopOnly) return GENERIC_DESKTOP_ONLY_UTILITY_MESSAGE;
   return `${item?.title || 'This utility'} is available on desktop only.`;

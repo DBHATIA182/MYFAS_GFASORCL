@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import axios from 'axios';
 import LoginSlide from './slides/LoginSlide';
 import Slide1 from './slides/Slide1';
@@ -24,6 +24,8 @@ const Slide33SaleGraph = lazy(() => import('./slides/Slide33SaleGraph'));
 const Slide34OverdueCustomers = lazy(() => import('./slides/Slide34OverdueCustomers'));
 const Slide21StateWiseSales = lazy(() => import('./slides/Slide21StateWiseSales'));
 const Slide22StateWisePurchase = lazy(() => import('./slides/Slide22StateWisePurchase'));
+const Slide80TrialBalanceSummary = lazy(() => import('./slides/Slide80TrialBalanceSummary'));
+const Slide81TrialDateWise = lazy(() => import('./slides/Slide81TrialDateWise'));
 import Slide26AccountMaster from './slides/Slide26AccountMaster';
 import Slide27ItemMaster from './slides/Slide27ItemMaster';
 import Slide28MasterPlaceholder from './slides/Slide28MasterPlaceholder';
@@ -76,6 +78,12 @@ import Slide76AuditTrailReport from './slides/Slide76AuditTrailReport';
 import Slide77CompanyDetailEdit from './slides/Slide77CompanyDetailEdit';
 import Slide78GstProfileSetting from './slides/Slide78GstProfileSetting';
 import Slide79Updation from './slides/Slide79Updation';
+import Slide82UpdationStock from './slides/Slide82UpdationStock';
+import Slide83NewCompanyAddition from './slides/Slide83NewCompanyAddition';
+import Slide84SetSaleExp from './slides/Slide84SetSaleExp';
+import Slide85DefaultSetting from './slides/Slide85DefaultSetting';
+import Slide86SetTaskScheduler from './slides/Slide86SetTaskScheduler';
+import Slide89IncomeTaxReport from './slides/Slide89IncomeTaxReport';
 import DesktopOnlyUtilityGate from './components/DesktopOnlyUtilityGate';
 import MasterSlideErrorBoundary from './components/MasterSlideErrorBoundary';
 
@@ -90,6 +98,12 @@ import {
   utilityDesktopOnlyMessage,
   UTILITIES_PLACEHOLDER_SLIDE,
 } from './data/utilitiesModuleConfig';
+import {
+  findIncomeTaxModuleItem,
+  resolveIncomeTaxSlideNo,
+  INCOME_TAX_PLACEHOLDER_SLIDE,
+  INCOME_TAX_REPORT_SLIDE,
+} from './data/incomeTaxModuleConfig';
 
 const MASTER_SLIDE_NOS = new Set([26, 27, 28, 29, 30, 31, 32, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, MASTER_PLACEHOLDER_SLIDE]);
 import { AppSessionContext } from './components/AppSessionContext';
@@ -108,6 +122,8 @@ import './styles/trialBalanceMobile.css';
 import './styles/trialBalanceDesktop.css';
 import './styles/ledgerDesktop.css';
 import './styles/ledgerFullBleed.css';
+import './styles/saleBillPrinting.css';
+import './styles/saleListForm.css';
 import { getGfasDocumentTitle } from './utils/gfasBrand';
 import {
   formatApiBaseForDisplay,
@@ -306,6 +322,7 @@ function App() {
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
   const [loginUserName, setLoginUserName] = useState('');
+  const [companiesRevision, setCompaniesRevision] = useState(0);
 
   /* Always open on login (do not skip to company from saved session). */
   useEffect(() => {
@@ -535,6 +552,65 @@ function App() {
     fetchCompanies();
   }, [authenticated, loginUserName]);
 
+  /** GRAINFAS.COMPANY — refresh when opening Change Company / Change Year (utilities). */
+  const refreshCompanies = useCallback(async () => {
+    if (!authenticated) return;
+    try {
+      const response = await axios.get(apiUrl(API_BASE, '/api/companies'), {
+        params: {
+          ...(loginUserName ? { user_name: loginUserName } : {}),
+          _: Date.now(),
+        },
+        withCredentials: true,
+      });
+      setCompanies(response.data || []);
+    } catch (error) {
+      console.error('Error refreshing companies:', error);
+    }
+  }, [authenticated, loginUserName]);
+
+  const bumpCompaniesCatalog = useCallback(() => {
+    setCompaniesRevision((v) => v + 1);
+    refreshCompanies();
+  }, [refreshCompanies]);
+
+  const handleCompaniesLoaded = useCallback((list) => {
+    setCompanies(Array.isArray(list) ? list : []);
+  }, []);
+
+  const handleYearsLoaded = useCallback((list) => {
+    setYears(Array.isArray(list) ? list : []);
+  }, []);
+
+  const refreshYearsForCompany = useCallback(
+    async (compCode) => {
+      const code = String(compCode ?? '').trim();
+      if (!authenticated || !code) return;
+      try {
+        const response = await axios.get(apiUrl(API_BASE, '/api/years'), {
+          params: { comp_code: code },
+          withCredentials: true,
+        });
+        setYears(response.data || []);
+      } catch (error) {
+        console.error('Error refreshing years:', error);
+      }
+    },
+    [authenticated]
+  );
+
+  useEffect(() => {
+    if (!authenticated || currentSlide !== 1) return;
+    refreshCompanies();
+  }, [authenticated, currentSlide, refreshCompanies]);
+
+  useEffect(() => {
+    if (!authenticated || currentSlide !== 2) return;
+    refreshCompanies();
+    const code = formData.comp_code ?? formData.COMP_CODE;
+    if (code) refreshYearsForCompany(code);
+  }, [authenticated, currentSlide, formData.comp_code, formData.COMP_CODE, refreshCompanies, refreshYearsForCompany]);
+
   const handleLoginSuccess = (payload) => {
     const u = String(payload?.userName ?? payload?.user_name ?? '').trim().toUpperCase();
     setLoginUserName(u);
@@ -610,6 +686,13 @@ function App() {
     }
   }, [currentSlide, formData?.reportType]);
 
+  useEffect(() => {
+    if (currentSlide !== INCOME_TAX_PLACEHOLDER_SLIDE) return;
+    const target = resolveIncomeTaxSlideNo(String(formData?.reportType ?? '').trim().toLowerCase());
+    if (target != null && target !== INCOME_TAX_PLACEHOLDER_SLIDE && target !== currentSlide) {
+      setCurrentSlide(target);
+    }
+  }, [currentSlide, formData?.reportType]);
   const handleNewYearCreated = async (yearRow) => {
     const code = formData.comp_code ?? formData.COMP_CODE;
     try {
@@ -674,6 +757,8 @@ function App() {
     else if (reportType === 'balance-sheet') setCurrentSlide(20);
     else if (reportType === 'sale-chart' || reportType === 'sale-graph') setCurrentSlide(33);
     else if (reportType === 'overdue-customers') setCurrentSlide(34);
+    else if (reportType === 'trial-balance-summary') setCurrentSlide(80);
+    else if (reportType === 'trial-date-wise') setCurrentSlide(81);
     else if (reportType === 'user-master') setCurrentSlide(32);
     else {
       const utilItem = findUtilitiesModuleItem(reportType);
@@ -688,6 +773,9 @@ function App() {
           return;
         }
         if (utilItem.navSlide) {
+          if (utilItem.id === 'change-company' || utilItem.id === 'change-year') {
+            bumpCompaniesCatalog();
+          }
           setCurrentSlide(utilItem.navSlide);
           return;
         }
@@ -700,6 +788,11 @@ function App() {
           return;
         }
         setCurrentSlide(UTILITIES_PLACEHOLDER_SLIDE);
+        return;
+      }
+      const incomeTaxItem = findIncomeTaxModuleItem(reportType);
+      if (incomeTaxItem) {
+        setCurrentSlide(INCOME_TAX_REPORT_SLIDE);
         return;
       }
       const masterSlide = resolveMasterSlideNo(reportType);
@@ -788,9 +881,38 @@ function App() {
     setCurrentSlide(5);
   };
 
+  const openLedgerFromIncomeTax = (payload) => {
+    setFormData((prev) => {
+      const { ledgerReturnSlide, ...rest } = prev;
+      return {
+        ...rest,
+        reportType: 'ledger',
+        ledgerDrilldown: {
+          code: String(payload?.code ?? '').trim(),
+          autoRun: true,
+          returnSlide: INCOME_TAX_REPORT_SLIDE,
+          incomeTaxReportType: String(payload?.reportType ?? rest.reportType ?? '').trim(),
+          startDate: payload?.sdt,
+          endDate: payload?.edt,
+          at: Date.now(),
+        },
+      };
+    });
+    setCurrentSlide(5);
+  };
+
   const backFromLedger = () => {
     const d = formData.ledgerDrilldown;
     const returnSlide = d?.returnSlide ?? formData.ledgerReturnSlide ?? 3;
+    if (returnSlide === INCOME_TAX_REPORT_SLIDE) {
+      setFormData((prev) => {
+        const { ledgerDrilldown, ledgerReturnSlide, ...rest } = prev;
+        const rt = ledgerDrilldown?.incomeTaxReportType || rest.reportType;
+        return { ...rest, reportType: rt };
+      });
+      setCurrentSlide(INCOME_TAX_REPORT_SLIDE);
+      return;
+    }
     if (returnSlide === 58) {
       setFormData((prev) => {
         const { ledgerDrilldown, ledgerReturnSlide, ...rest } = prev;
@@ -844,6 +966,7 @@ function App() {
   };
 
   const handleReset = () => {
+    bumpCompaniesCatalog();
     setCurrentSlide(1);
     setYears([]);
   };
@@ -1457,19 +1580,25 @@ function App() {
         <Suspense fallback={<SlideRouteFallback />}>
         {currentSlide === 1 && (
           <Slide1
+            apiBase={API_BASE}
             companies={companies}
+            refreshKey={companiesRevision}
             onNext={handleSlide1Next}
             onExit={handleExitApp}
             userName={loginUserName}
+            onCompaniesLoaded={handleCompaniesLoaded}
             flowHeaderActions={flowHeaderActions}
           />
         )}
         {currentSlide === 2 && (
           <Slide2
+            apiBase={API_BASE}
             years={years}
+            refreshKey={companiesRevision}
             formData={formData}
             onPrev={handlePrev}
             onNext={handleSlide2Next}
+            onYearsLoaded={handleYearsLoaded}
             flowHeaderActions={flowHeaderActions}
           />
         )}
@@ -1489,7 +1618,7 @@ function App() {
           <Slide7 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
         {currentSlide === 8 && (
-          <Slide8 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+          <Slide8 apiBase={API_BASE} formData={formData} viewMode={viewMode} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
         {currentSlide === 9 && (
           <Slide9 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
@@ -1504,7 +1633,7 @@ function App() {
           <Slide12 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
         {currentSlide === 13 && (
-          <Slide13 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+          <Slide13 apiBase={API_BASE} formData={formData} viewMode={viewMode} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
         {currentSlide === 14 && (
           <Slide14 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
@@ -1567,6 +1696,7 @@ function App() {
             userName={loginUserName}
             onPrev={() => setCurrentSlide(3)}
             onReset={handleResetToMenu}
+            onNavigateSlide={setCurrentSlide}
           />
         )}
         {currentSlide === 50 && (
@@ -1957,6 +2087,113 @@ function App() {
               onPrev={() => setCurrentSlide(3)}
             />
           </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 82 && (
+          <DesktopOnlyUtilityGate
+            utilityId="updation-stock"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide82UpdationStock
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 83 && (
+          <DesktopOnlyUtilityGate
+            utilityId="new-company-addition"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide83NewCompanyAddition
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+              onCompaniesChanged={bumpCompaniesCatalog}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 84 && (
+          <DesktopOnlyUtilityGate
+            utilityId="set-sale-exp"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide84SetSaleExp
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+              onReset={handleResetToMenu}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 85 && (
+          <DesktopOnlyUtilityGate
+            utilityId="default-setting"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide85DefaultSetting
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+              onReset={handleResetToMenu}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === 86 && (
+          <DesktopOnlyUtilityGate
+            utilityId="set-task-scheduler"
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+          >
+            <Slide86SetTaskScheduler
+              apiBase={API_BASE}
+              formData={formData}
+              userName={loginUserName}
+              onPrev={() => setCurrentSlide(3)}
+              onReset={handleResetToMenu}
+            />
+          </DesktopOnlyUtilityGate>
+        )}
+        {currentSlide === INCOME_TAX_REPORT_SLIDE && (
+          <Slide89IncomeTaxReport
+            apiBase={API_BASE}
+            formData={formData}
+            viewMode={viewMode}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onOpenLedger={openLedgerFromIncomeTax}
+          />
+        )}
+        {currentSlide === 80 && (
+          <Slide80TrialBalanceSummary
+            apiBase={API_BASE}
+            formData={formData}
+            viewMode={viewMode}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+          />
+        )}
+        {currentSlide === 81 && (
+          <Slide81TrialDateWise
+            apiBase={API_BASE}
+            formData={formData}
+            viewMode={viewMode}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+          />
         )}
         </Suspense>
         )}

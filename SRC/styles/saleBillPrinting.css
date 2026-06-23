@@ -1,0 +1,293 @@
+/* Sale Bill Printing — parameters card (desktop + mobile) */
+
+@media (min-width: 641px) {
+  .app--desktop .app-main:has(> .slide-13.fas-tb-host--form) {
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 12px 12px !important;
+    overflow: auto !important;
+    background: linear-gradient(160deg, #e8eef8 0%, #eef2f7 45%, #f4f6fb 100%) !important;
+  }
+
+  .app--desktop .app-main:has(> .slide-13.fas-tb-host--form) > .slide-13.fas-tb-host--form {
+    width: min(700px, calc(100vw - 24px)) !important;
+    max-width: 700px !important;
+    height: auto !important;
+    max-height: calc(100dvh - 40px) !important;
+    flex: 0 0 auto !important;
+    align-self: center !important;
+    margin: auto !important;
+    border-radius: 16px !important;
+    box-shadow:
+      0 20px 50px rgba(15, 30, 60, 0.12),
+      0 0 0 1px rgba(15, 30, 60, 0.06) !important;
+    background: #fff !important;
+    overflow: hidden !important;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-flow--form-app {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    max-height: calc(100dvh - 40px) !important;
+    border-radius: 16px !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-report-header {
+    border-radius: 16px 16px 0 0 !important;
+    padding: 8px 12px !important;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-report-header__title {
+    font-size: 15px !important;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: hidden !important;
+    overflow-x: hidden !important;
+    padding: 6px 12px 2px !important;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-body:has(.account-search-results) {
+    overflow-y: auto !important;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-form-footer-bar {
+    flex: 0 0 auto;
+    padding: 6px 12px 10px;
+    border-top: 1px solid #e2e8f0;
+    background: #fff;
+    border-radius: 0 0 16px 16px;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-form-footer-bar .fas-tb-run-bottom {
+    width: 100%;
+    min-height: 36px;
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-form-shell {
+    gap: 4px;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-session-card--compact {
+    padding: 4px 8px;
+    gap: 4px;
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    align-items: center;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-session-card--compact .fas-tb-session-card__company {
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-session-card--compact .fas-tb-session-card__meta {
+    margin-top: 1px;
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-session-card__actions {
+    display: none;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-sbp-form__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 8px;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-field-group {
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-field-label {
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    line-height: 1.2;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-field-input {
+    padding: 3px 6px;
+    min-height: 30px;
+    box-shadow: none;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-field-input input,
+  .app--desktop .slide-13.fas-tb-host--form .fas-field-input select {
+    font-size: 12px;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-tb-date-field .fas-field-icon {
+    font-size: 13px;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-sbp-form__lookup-error {
+    font-size: 10px;
+    padding: 4px 6px;
+    margin: 0;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .account-search-results {
+    max-height: 72px;
+    overflow-y: auto;
+    margin-top: 2px;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .account-selected-hint {
+    margin: 2px 0 0;
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-sbp-form__party .account-search-row {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .app--desktop .slide-13.fas-tb-host--form .fas-sbp-form__party {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .slide-13.fas-tb-host--form {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .slide-13.fas-tb-host--form .fas-tb-flow--form-app {
+    height: 100% !important;
+    max-height: none !important;
+  }
+
+  .slide-13.fas-tb-host--form .fas-tb-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 10px 4px;
+  }
+
+  .slide-13.fas-tb-host--form .fas-sbp-form__grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .slide-13.fas-tb-host--form .fas-tb-form-shell {
+    gap: 6px;
+  }
+
+  .slide-13.fas-tb-host--form .fas-field-group {
+    gap: 2px;
+  }
+
+  .slide-13.fas-tb-host--form .fas-field-input {
+    padding: 4px 8px;
+    min-height: 34px;
+  }
+
+  .slide-13.fas-tb-host--form .account-search-results {
+    max-height: 100px;
+    overflow-y: auto;
+  }
+}
+
+.slide-13-report .sbp-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.slide-13-report .sbp-list-toolbar__select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+}
+
+.slide-13-report .sbp-list-toolbar__select input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.slide-13-report .sbp-list-col-check {
+  width: 44px;
+  min-width: 44px;
+  text-align: center;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.slide-13-report .sbp-list-col-check input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.slide-13-report .sbp-list-col-check__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.slide-13-report .sbp-list-row--checked {
+  background: rgba(59, 99, 204, 0.06);
+}
+
+.slide-13-report .sbp-list-toolbar--bulk-actions {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+
+.slide-13-report .sbp-list-toolbar__heading {
+  flex: 1 1 100%;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.slide-13-report .sbp-bulk-action-status {
+  flex: 1 1 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+@media (max-width: 640px) {
+  .slide-13-report .sbp-list-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .slide-13-report .sbp-list-toolbar .btn {
+    width: 100%;
+  }
+}

@@ -1,6 +1,8 @@
-import React, { useMemo, useState, useLayoutEffect } from 'react';
+import React, { useEffect, useMemo, useState, useLayoutEffect } from 'react';
+import axios from 'axios';
 import { formatLedgerDateDisplay } from '../utils/dateFormat';
 import WindalInitialFlowCard from '../components/WindalInitialFlowCard';
+import { apiUrl } from '../utils/resolveApiBase';
 
 function parseDateBoundary(value, endOfDay) {
   if (value == null || value === '') return null;
@@ -32,8 +34,53 @@ function defaultYearUid(yearRows) {
   return uid0 != null && uid0 !== '' ? String(uid0) : '';
 }
 
-export default function Slide2({ years, formData, onPrev, onNext, flowHeaderActions = null }) {
+export default function Slide2({
+  apiBase,
+  years: yearsProp = [],
+  refreshKey = 0,
+  formData,
+  onPrev,
+  onNext,
+  onYearsLoaded,
+  flowHeaderActions = null,
+}) {
+  const [years, setYears] = useState(yearsProp);
+  const [listLoading, setListLoading] = useState(Boolean(apiBase));
   const [selectedUid, setSelectedUid] = useState('');
+  const compCode = formData?.comp_code ?? formData?.COMP_CODE ?? '';
+
+  useEffect(() => {
+    const code = String(compCode ?? '').trim();
+    if (!apiBase || !code) {
+      setYears(Array.isArray(yearsProp) ? yearsProp : []);
+      setListLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setListLoading(true);
+      try {
+        const { data } = await axios.get(apiUrl(apiBase, '/api/years'), {
+          params: { comp_code: code, _: Date.now() },
+          withCredentials: true,
+        });
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : [];
+        setYears(list);
+        onYearsLoaded?.(list);
+      } catch (err) {
+        console.error('Year list load error:', err);
+        if (!cancelled) setYears(Array.isArray(yearsProp) ? yearsProp : []);
+      } finally {
+        if (!cancelled) setListLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, compCode, refreshKey, onYearsLoaded]);
 
   useLayoutEffect(() => {
     if (!years?.length) {
@@ -82,7 +129,9 @@ export default function Slide2({ years, formData, onPrev, onNext, flowHeaderActi
           </div>
         )}
 
-        {!years?.length ? (
+        {listLoading ? (
+          <p className="windal-initial-company-line loading-msg">Loading financial years from GRAINFAS…</p>
+        ) : !years?.length ? (
           <p className="windal-initial-company-line">No financial years available.</p>
         ) : (
           <>
@@ -142,7 +191,7 @@ export default function Slide2({ years, formData, onPrev, onNext, flowHeaderActi
             type="button"
             className="windal-initial-btn windal-initial-btn--primary"
             onClick={handleNext}
-            disabled={!selectedUid}
+            disabled={!selectedUid || listLoading}
           >
             ✓ Select & Login
           </button>

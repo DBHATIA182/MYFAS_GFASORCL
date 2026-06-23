@@ -53,6 +53,7 @@ export default function MasterPartyPickList({
   searchBtnTabIndex,
   onAfterSelect,
   onFilterChange,
+  onOpen,
 }) {
   const triggerLabel = getTriggerLabel ?? getLabel;
   const optionLabel = getOptionLabel ?? getLabel;
@@ -360,7 +361,21 @@ export default function MasterPartyPickList({
     setFilter('');
     setHighlightIndex(0);
     setOpen(true);
-  }, [disabled]);
+    onOpen?.();
+  }, [disabled, onOpen]);
+
+  const handleHelpKeyDown = useCallback(
+    (e) => {
+      if (e.key === 'F1' || e.keyCode === 112) {
+        e.preventDefault();
+        e.stopPropagation();
+        openSearch();
+        return true;
+      }
+      return false;
+    },
+    [openSearch]
+  );
 
   const handleTriggerFocus = () => {
     if (disabled || !openOnFocus || showSearchIcon || selectingRef.current) return;
@@ -536,13 +551,13 @@ export default function MasterPartyPickList({
                         </>
                       ) : getOptionHint && getOptionCity ? (
                         <>
-                          <span className="master-party-pick__opt-code">{optionLabel(o)}</span>
+                          <span className="master-party-pick__opt-code">{v || optionLabel(o)}</span>
                           <span className="master-party-pick__opt-name">{getOptionHint(o)}</span>
                           <span className="master-party-pick__opt-city">{getOptionCity(o) || '—'}</span>
                         </>
                       ) : getOptionHint ? (
                         <>
-                          <span className="master-party-pick__opt-code">{optionLabel(o)}</span>
+                          <span className="master-party-pick__opt-code">{v || optionLabel(o)}</span>
                           <span className="master-party-pick__opt-hint">{getOptionHint(o)}</span>
                         </>
                       ) : (
@@ -580,6 +595,7 @@ export default function MasterPartyPickList({
         onClick={handleTrigger}
         onFocus={handleTriggerFocus}
         onKeyDown={(e) => {
+          if (handleHelpKeyDown(e)) return;
           if (!open && e.key === 'Enter' && onKeyDown) {
             onKeyDown(e);
             if (e.defaultPrevented) return;
@@ -611,9 +627,12 @@ export default function MasterPartyPickList({
           type="button"
           className="master-party-pick__search-btn"
           disabled={disabled}
-          title="Search"
-          aria-label={`Search ${title}`}
+          title="Search (F1)"
+          aria-label={`Search ${title} (F1)`}
           tabIndex={searchBtnTabIndex}
+          onKeyDown={(e) => {
+            if (handleHelpKeyDown(e)) return;
+          }}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();

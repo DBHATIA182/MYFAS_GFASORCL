@@ -1,11 +1,42 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TrialBalanceDesktopTable from './TrialBalanceDesktopTable';
+import TrialDateWiseDesktopTable from './TrialDateWiseDesktopTable';
 import { formatLedgerDateDisplay } from '../utils/dateFormat';
+import {
+  sortTrialBalanceRows,
+  trialBalanceRowKind,
+  trialBalanceRowLabel,
+  findTrialGrandRow,
+} from '../utils/trialBalanceSort';
 import { buildBrokerOsDisplayRows } from '../utils/brokerOsDisplay';
 import { buildSaleListDisplayRows, saleListMeas } from '../utils/saleListDisplay';
 import { ageingCurBalDisplay } from '../utils/ageingDisplay';
 
 const LEDGER_SALE_VR_TYPES = new Set(['SL', 'SE', 'CN']);
+
+/** GFASORCL sale list: 27 columns (InvDate, Name, Bk, Lot, Status, Dis amt, etc.) */
+const SALE_LIST_COL_COUNT = 27;
+const SALE_LIST_LEAD_COL_SPAN = 16;
+
+const SALE_LIST_COL_WIDTHS_PX = [
+  /* Tp, InvDate, InvNo, Bt, Party */
+  22, 68, 52, 14, 52,
+  /* Name, City, PAN, GST */
+  140, 72, 88, 96,
+  /* Bk, Bk name, Trn, Item, Item name, Lot, Status */
+  36, 100, 36, 52, 120, 36, 44,
+  /* Qty, Wt, Rate, Amount, Taxable, CGST, SGST, IGST, Bill amt, Dis amt, Round off */
+  72, 88, 72, 100, 88, 72, 72, 72, 96, 72, 64,
+];
+
+const SALE_LIST_TABLE_WIDTH_PX = SALE_LIST_COL_WIDTHS_PX.reduce((s, w) => s + w, 0);
+
+const SALE_LIST_TABLE_STYLE = {
+  width: `${SALE_LIST_TABLE_WIDTH_PX}px`,
+  minWidth: `${SALE_LIST_TABLE_WIDTH_PX}px`,
+  ['--sl-table-width']: `${SALE_LIST_TABLE_WIDTH_PX}px`,
+  ...Object.fromEntries(SALE_LIST_COL_WIDTHS_PX.slice(0, 5).map((w, i) => [`--sl-col-${i + 1}`, `${w}px`])),
+};
 
 function formatBillLedgerPartyCaption(name, code, city, tel) {
   const n = String(name || '').trim();
@@ -23,6 +54,7 @@ export default function ReportTable({
   data,
   type,
   onLedgerClick,
+  onAnnexureClick,
   onSaleBillClick,
   onVoucherClick,
   onLedgerSaleBillClick,
@@ -148,6 +180,91 @@ export default function ReportTable({
   // --- TRIAL BALANCE VIEW (grouped schedules, expand/collapse, filters) ---
   if (type === 'trial-balance') {
     return <TrialBalanceDesktopTable data={data} onLedgerClick={onLedgerClick} />;
+  }
+
+  // --- TRIAL BALANCE SUMMARY (annexure / schedule totals only) ---
+  if (type === 'trial-balance-summary') {
+    const summaryRows = sortTrialBalanceRows(data).filter((row) => trialBalanceRowKind(row) === 1);
+    const grand = findTrialGrandRow(data);
+    const gDr = grand ? parseFloat(grand.DR_AMT ?? grand.dr_amt ?? 0) || 0 : 0;
+    const gCr = grand ? parseFloat(grand.CR_AMT ?? grand.cr_amt ?? 0) || 0 : 0;
+    const gCdr = grand ? parseFloat(grand.CLOSING_DR ?? grand.closing_dr ?? 0) || 0 : 0;
+    const gCcr = grand ? parseFloat(grand.CLOSING_CR ?? grand.closing_cr ?? 0) || 0 : 0;
+
+    return (
+      <div className="table-responsive table-responsive--trial">
+        <table className="report-table report-table--trial report-table--trial-summary">
+          <thead>
+            <tr>
+              <th scope="col">Annexure</th>
+              <th scope="col">Schedule name</th>
+              <th className="text-right" scope="col">
+                Clos. Dr
+              </th>
+              <th className="text-right" scope="col">
+                Clos. Cr
+              </th>
+              <th className="text-right" scope="col">
+                Dr amt
+              </th>
+              <th className="text-right" scope="col">
+                Cr amt
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {summaryRows.map((row, idx) => {
+              const schVal = row.SCHEDULE ?? row.schedule ?? '';
+              const nameVal = trialBalanceRowLabel(row);
+              const cdr = parseFloat(row.CLOSING_DR ?? row.closing_dr ?? 0) || 0;
+              const ccr = parseFloat(row.CLOSING_CR ?? row.closing_cr ?? 0) || 0;
+              const drAmt = parseFloat(row.DR_AMT ?? row.dr_amt ?? 0) || 0;
+              const crAmt = parseFloat(row.CR_AMT ?? row.cr_amt ?? 0) || 0;
+              return (
+                <tr
+                  key={idx}
+                  className="trial-schedule-total-row clickable-row"
+                  onClick={() => onAnnexureClick && onAnnexureClick(schVal, nameVal)}
+                >
+                  <td className="trial-sch">{schVal !== '' && schVal != null ? schVal : '—'}</td>
+                  <td className="trial-name">
+                    <span className="name-text">{nameVal}</span>
+                  </td>
+                  <td className={`text-right ${cdr > 0 ? 'dr-amt' : ''}`}>{cdr > 0 ? fmt(cdr) : '—'}</td>
+                  <td className={`text-right ${ccr > 0 ? 'cr-amt' : ''}`}>{ccr > 0 ? fmt(ccr) : '—'}</td>
+                  <td className={`text-right ${drAmt > 0 ? 'dr-amt' : ''}`}>{drAmt > 0 ? fmt(drAmt) : '—'}</td>
+                  <td className={`text-right ${crAmt > 0 ? 'cr-amt' : ''}`}>{crAmt > 0 ? fmt(crAmt) : '—'}</td>
+                </tr>
+              );
+            })}
+            {grand ? (
+              <tr className="trial-grand-total trial-grand-total-footer">
+                <td colSpan={2}>
+                  <strong>GRAND TOTAL</strong>
+                </td>
+                <td className="text-right">
+                  <strong>{fmtAlways(gCdr)}</strong>
+                </td>
+                <td className="text-right">
+                  <strong>{fmtAlways(gCcr)}</strong>
+                </td>
+                <td className="text-right">
+                  <strong>{fmtAlways(gDr)}</strong>
+                </td>
+                <td className="text-right">
+                  <strong>{fmtAlways(gCr)}</strong>
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // --- TRIAL DATE WISE (opening / transactions / closing) ---
+  if (type === 'trial-date-wise') {
+    return <TrialDateWiseDesktopTable data={data} onLedgerClick={onLedgerClick} />;
   }
 
   // --- LEDGER VIEW ---
@@ -906,7 +1023,13 @@ export default function ReportTable({
           ]
             .filter(Boolean)
             .join(' ')}
+          style={SALE_LIST_TABLE_STYLE}
         >
+          <colgroup>
+            {SALE_LIST_COL_WIDTHS_PX.map((w, idx) => (
+              <col key={`slc-${idx}`} style={{ width: `${w}px` }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               <th scope="col">Tp</th>
@@ -965,7 +1088,7 @@ export default function ReportTable({
               if (item.kind === 'day-header') {
                 return (
                   <tr key={`dh-${i}`} className="sale-list-day-banner">
-                    <td colSpan={27}>
+                    <td colSpan={SALE_LIST_COL_COUNT}>
                       <strong>Day — {item.dateLabel}</strong>
                     </td>
                   </tr>
@@ -974,7 +1097,7 @@ export default function ReportTable({
               if (item.kind === 'day-total') {
                 return (
                   <tr key={`dt-${i}`} className="sale-list-day-total">
-                    <td colSpan={16}>
+                    <td colSpan={SALE_LIST_LEAD_COL_SPAN}>
                       <strong>Day total</strong> — {item.dateLabel}
                     </td>
                     <td className="text-right">{fmtAlways(item.qnty)}</td>
@@ -994,7 +1117,7 @@ export default function ReportTable({
               if (item.kind === 'bill-total') {
                 return (
                   <tr key={`bt-${i}`} className="sale-list-bill-total">
-                    <td colSpan={16}>
+                    <td colSpan={SALE_LIST_LEAD_COL_SPAN}>
                       <strong>Bill total</strong> — {item.type} / {item.billDateLabel} / {item.billNo} / {item.bType}
                     </td>
                     <td className="text-right">{fmtAlways(item.qnty)}</td>
@@ -1014,7 +1137,7 @@ export default function ReportTable({
               if (item.kind === 'section-label') {
                 return (
                   <tr key={`sl-${i}`} className="sale-list-section-label">
-                    <td colSpan={27}>
+                    <td colSpan={SALE_LIST_COL_COUNT}>
                       <strong>{item.label}</strong>
                     </td>
                   </tr>
@@ -1038,7 +1161,7 @@ export default function ReportTable({
                     <th scope="col" className="text-right">
                       Amount
                     </th>
-                    <td colSpan={22} className="sale-list-item-summary-filler sale-list-item-summary-filler--trail" />
+                    <td colSpan={SALE_LIST_COL_COUNT - 5} className="sale-list-item-summary-filler sale-list-item-summary-filler--trail" />
                   </tr>
                 );
               }
@@ -1052,7 +1175,7 @@ export default function ReportTable({
                     <td className="text-right">{fmtAlways(item.qnty)}</td>
                     <td className="text-right">{fmtAlways(item.weight)}</td>
                     <td className="text-right">{fmtAlways(item.amount)}</td>
-                    <td colSpan={22} className="sale-list-item-summary-filler sale-list-item-summary-filler--trail">
+                    <td colSpan={SALE_LIST_COL_COUNT - 5} className="sale-list-item-summary-filler sale-list-item-summary-filler--trail">
                       —
                     </td>
                   </tr>
@@ -1061,7 +1184,7 @@ export default function ReportTable({
               if (item.kind === 'grand-total') {
                 return (
                   <tr key={`gt-${i}`} className="sale-list-grand-total">
-                    <td colSpan={16}>
+                    <td colSpan={SALE_LIST_LEAD_COL_SPAN}>
                       <strong>Grand total</strong>
                     </td>
                     <td className="text-right">{fmtAlways(item.qnty)}</td>
@@ -1082,7 +1205,7 @@ export default function ReportTable({
               const billDt = row.BILL_DATE ?? row.bill_date;
               const saleType = String(row.TYPE ?? row.type ?? '').trim().toUpperCase();
               const isCreditNote = saleType === 'CN';
-              const rowClass = [clickable && 'sale-list-row-clickable', isCreditNote && 'sale-list-row-cn']
+              const rowClass = ['sale-list-line', clickable && 'sale-list-row-clickable', isCreditNote && 'sale-list-row-cn']
                 .filter(Boolean)
                 .join(' ');
               return (

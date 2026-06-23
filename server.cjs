@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const express = require('express');
 const oracledb = require('oracledb');
 const cors = require('cors');
@@ -555,6 +555,18 @@ async function resolveActiveDbConfig() {
 // --- 4. runQuery: hub user (no 3rd arg) vs company year user comp_uid/comp_uid@XE (3rd arg) ---
 
 async function runQuery(sql, binds = {}, schema = null, executeExtra = {}) {
+  const extra = executeExtra && typeof executeExtra === 'object' ? executeExtra : {};
+  const { returnMeta = false, ...rest } = extra;
+  const result = await runExecute(sql, binds, schema, rest);
+  if (returnMeta) return result;
+  return result.rows;
+}
+
+const { createIncomeTaxReports } = require('./server/incomeTaxReports.cjs');
+const { buildIncomeTaxReport } = createIncomeTaxReports(runQuery);
+
+/** DML / DDL — returns { rows, rowsAffected }. Hub default = activeDbConfig; pass hubOverride: DB_PRIMARY for GRAINFAS.COMPANY. */
+async function runExecute(sql, binds = {}, schema = null, executeExtra = {}) {
   let conn;
   const extra = executeExtra && typeof executeExtra === 'object' ? executeExtra : {};
   const { suppressDbErrorLog = false, hubOverride = null, ...oracleExecuteExtra } = extra;
@@ -574,17 +586,30 @@ async function runQuery(sql, binds = {}, schema = null, executeExtra = {}) {
 
     const opts = { outFormat: oracledb.OUT_FORMAT_OBJECT, ...oracleExecuteExtra };
     const result = await conn.execute(sql, binds, opts);
-    return result.rows;
+    return { rows: result.rows, rowsAffected: result.rowsAffected || 0 };
   } catch (err) {
     if (!suppressDbErrorLog) {
-      console.error("❌ DB EXECUTION ERROR:", err.message);
+      console.error('❌ DB EXECUTION ERROR:', err.message);
     }
     throw err;
   } finally {
     if (conn) {
-      try { await conn.close(); } catch (e) { console.error(e); }
+      try {
+        await conn.close();
+      } catch (e) {
+        console.error(e);
+      }
     }
   }
+}
+
+/** VFP G_MAIN_DATABASE — COMPANY / COMPDET always live in GRAINFAS, not the year schema user. */
+function runGrainfasHubQuery(sql, binds = {}, executeExtra = {}) {
+  return runQuery(sql, binds, null, { hubOverride: DB_PRIMARY, ...executeExtra });
+}
+
+function runGrainfasHubExecute(sql, binds = {}, executeExtra = {}) {
+  return runExecute(sql, binds, null, { hubOverride: DB_PRIMARY, ...executeExtra });
 }
 
 function isGrainfasHubUser(connCfg) {
@@ -1931,7 +1956,7 @@ async function fetchCompanyListRows(compCode = '') {
     let lastErr = null;
     for (const sql of sqlCandidates) {
       try {
-        return await runQuery(sql, { comp_code: code }, null, { suppressDbErrorLog: true });
+        return await runGrainfasHubQuery(sql, { comp_code: code }, { suppressDbErrorLog: true });
       } catch (err) {
         lastErr = err;
       }
@@ -1946,7 +1971,7 @@ async function fetchCompanyListRows(compCode = '') {
   let lastErr = null;
   for (const sql of sqlCandidates) {
     try {
-      return await runQuery(sql, {}, null, { suppressDbErrorLog: true });
+      return await runGrainfasHubQuery(sql, {}, { suppressDbErrorLog: true });
     } catch (err) {
       lastErr = err;
     }
@@ -2909,11 +2934,14 @@ app.get('/api/companies', async (req, res) => {
   }
 });
 
-// 2. Get Years for Company
+// 2. Get Years for Company (GRAINFAS.COMPDET — not year schema)
 app.get('/api/years', async (req, res) => {
   try {
-    const rows = await runQuery(
-      "SELECT comp_uid, comp_year, comp_s_dt, comp_e_dt FROM compdet WHERE comp_code = :code ORDER BY comp_year DESC",
+    const rows = await runGrainfasHubQuery(
+      `SELECT comp_uid, comp_year, comp_s_dt, comp_e_dt, comp_name
+         FROM compdet
+        WHERE comp_code = :code
+        ORDER BY comp_year DESC`,
       { code: req.query.comp_code }
     );
     res.json(rows);
@@ -4348,6 +4376,60 @@ app.get('/api/trial-balance', async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("❌ Trial Balance SQL Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3B. Trial Balance Date Wise (opening / period / closing with PAN)
+app.get('/api/trial-date-wise', async (req, res) => {
+  try {
+    const { comp_code, s_date, e_date, schedule, comp_uid } = req.query;
+    if (!comp_code || !s_date || !e_date) {
+      return res.status(400).json({ error: 'comp_code, s_date, and e_date are required' });
+    }
+    const schedValRaw = String(schedule ?? '').trim().replace(',', '.');
+    const schedValNum = Number(schedValRaw);
+    const hasScheduleFilter = Number.isFinite(schedValNum) && schedValNum > 0;
+
+    let sql = `SELECT 
+                 b.schedule, 
+                 MAX(c.name) AS sch_name, 
+                 a.code, 
+                 CASE 
+                   WHEN a.code IS NULL AND b.schedule IS NOT NULL THEN 'TOTAL ' || NVL(MAX(c.name), 'SCHEDULE') || ' ' || TO_CHAR(b.schedule)
+                   WHEN a.code IS NULL AND b.schedule IS NULL THEN '*** GRAND TOTAL ***'
+                   ELSE MAX(b.name) 
+                 END AS name,
+                 MAX(b.city) AS city,
+                 MAX(b.pan) AS pan,
+                 CASE WHEN SUM(CASE WHEN a.vr_date < TO_DATE(:s_date, 'DD-MM-YYYY') THEN NVL(a.dr_amt,0) - NVL(a.cr_amt,0) ELSE 0 END) > 0
+                   THEN SUM(CASE WHEN a.vr_date < TO_DATE(:s_date, 'DD-MM-YYYY') THEN NVL(a.dr_amt,0) - NVL(a.cr_amt,0) ELSE 0 END) ELSE 0 END AS op_dr,
+                 CASE WHEN SUM(CASE WHEN a.vr_date < TO_DATE(:s_date, 'DD-MM-YYYY') THEN NVL(a.dr_amt,0) - NVL(a.cr_amt,0) ELSE 0 END) < 0
+                   THEN ABS(SUM(CASE WHEN a.vr_date < TO_DATE(:s_date, 'DD-MM-YYYY') THEN NVL(a.dr_amt,0) - NVL(a.cr_amt,0) ELSE 0 END)) ELSE 0 END AS op_cr,
+                 SUM(CASE WHEN a.vr_date >= TO_DATE(:s_date, 'DD-MM-YYYY') AND a.vr_date <= TO_DATE(:e_date, 'DD-MM-YYYY') THEN NVL(a.dr_amt,0) ELSE 0 END) AS trn_dr,
+                 SUM(CASE WHEN a.vr_date >= TO_DATE(:s_date, 'DD-MM-YYYY') AND a.vr_date <= TO_DATE(:e_date, 'DD-MM-YYYY') THEN NVL(a.cr_amt,0) ELSE 0 END) AS trn_cr,
+                 CASE WHEN SUM(CASE WHEN a.vr_date <= TO_DATE(:e_date, 'DD-MM-YYYY') THEN NVL(a.dr_amt,0) - NVL(a.cr_amt,0) ELSE 0 END) > 0
+                   THEN SUM(CASE WHEN a.vr_date <= TO_DATE(:e_date, 'DD-MM-YYYY') THEN NVL(a.dr_amt,0) - NVL(a.cr_amt,0) ELSE 0 END) ELSE 0 END AS cl_dr,
+                 CASE WHEN SUM(CASE WHEN a.vr_date <= TO_DATE(:e_date, 'DD-MM-YYYY') THEN NVL(a.dr_amt,0) - NVL(a.cr_amt,0) ELSE 0 END) < 0
+                   THEN ABS(SUM(CASE WHEN a.vr_date <= TO_DATE(:e_date, 'DD-MM-YYYY') THEN NVL(a.dr_amt,0) - NVL(a.cr_amt,0) ELSE 0 END)) ELSE 0 END AS cl_cr
+               FROM ledger a, master b, schedule c 
+               WHERE a.comp_code = :comp_code 
+               AND a.comp_code = b.comp_code AND a.code = b.code
+               AND b.comp_code = c.comp_code AND b.schedule = c.no`;
+
+    const bindParams = { comp_code, s_date, e_date };
+    if (hasScheduleFilter) {
+      sql += ` AND b.schedule = :schedule`;
+      bindParams.schedule = schedValNum;
+    }
+
+    sql += ` GROUP BY ROLLUP(b.schedule, a.code) 
+             ORDER BY b.schedule NULLS LAST, GROUPING(a.code), MAX(b.name) NULLS LAST`;
+
+    const rows = await runQuery(sql, bindParams, comp_uid);
+    res.json(rows);
+  } catch (err) {
+    console.error('❌ Trial Date Wise SQL Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -14057,6 +14139,783 @@ app.put('/api/sale-cond', async (req, res) => {
   }
 });
 
+// --- Sale Form GST (VFP DO FORM saleform_Gst WITH 'SALE' → SALEFORM_GST) ---
+const SALEFORM_GST_TABLE = 'SALEFORM_GST';
+const SALEFORM_GST_DEFAULT_FORM = 'SALE';
+const SALEFORM_GST_HIDE_RESTRICTED = new Set(['SUP_DATE']);
+
+function normalizeSaleFormGstFormName(v) {
+  return String(v ?? SALEFORM_GST_DEFAULT_FORM)
+    .trim()
+    .toUpperCase()
+    .slice(0, 20);
+}
+
+function normalizeSaleFormGstFieldName(v) {
+  return String(v ?? '')
+    .trim()
+    .toUpperCase()
+    .slice(0, 50);
+}
+
+function normalizeSaleFormGstYn(v, fallback = 'N') {
+  const s = String(v ?? '').trim().toUpperCase();
+  if (s === 'Y' || s === 'N') return s;
+  return fallback;
+}
+
+function mapSaleFormGstRow(row) {
+  const f_name = normalizeSaleFormGstFieldName(row.F_NAME ?? row.f_name);
+  return {
+    F_NAME: f_name,
+    f_name,
+    ADD_YN: normalizeSaleFormGstYn(row.ADD_YN ?? row.add_yn, 'Y'),
+    add_yn: normalizeSaleFormGstYn(row.ADD_YN ?? row.add_yn, 'Y'),
+    EDIT_YN: normalizeSaleFormGstYn(row.EDIT_YN ?? row.edit_yn, 'Y'),
+    edit_yn: normalizeSaleFormGstYn(row.EDIT_YN ?? row.edit_yn, 'Y'),
+    S_NO: Number(row.S_NO ?? row.s_no ?? 0) || 0,
+    s_no: Number(row.S_NO ?? row.s_no ?? 0) || 0,
+    HIDE_COL: normalizeSaleFormGstYn(row.HIDE_COL ?? row.hide_col, 'N'),
+    hide_col: normalizeSaleFormGstYn(row.HIDE_COL ?? row.hide_col, 'N'),
+  };
+}
+
+function isSaleFormGstMissingTableError(err) {
+  const msg = String(err?.message || '');
+  return (
+    isOracleMissingObjectError(err) ||
+    /table or view does not exist/i.test(msg) ||
+    msg.includes('ORA-00942')
+  );
+}
+
+async function resolveSaleFormGstSchema(comp_uid) {
+  const probe = `SELECT 1 AS OK FROM ${SALEFORM_GST_TABLE} WHERE ROWNUM = 1`;
+  if (isEffectiveCompUid(comp_uid)) {
+    const schema = String(comp_uid).trim();
+    try {
+      await runQuery(probe, {}, schema, { suppressDbErrorLog: true });
+      return schema;
+    } catch (err) {
+      if (!isSaleFormGstMissingTableError(err)) throw err;
+    }
+  }
+  return null;
+}
+
+async function withSaleFormGstConnection(comp_uid, fn) {
+  const schema = await resolveSaleFormGstSchema(comp_uid);
+  let conn;
+  try {
+    const connCfg = schema
+      ? { user: schema, password: schema, connectString: activeDbConfig.connectString }
+      : activeDbConfig;
+    conn = await oracledb.getConnection(connCfg);
+    const result = await fn(conn);
+    await conn.commit();
+    return result;
+  } catch (err) {
+    if (conn) {
+      try {
+        await conn.rollback();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    throw err;
+  } finally {
+    if (conn) {
+      try {
+        await conn.close();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+}
+
+async function querySaleFormGstRows(sql, binds, comp_uid) {
+  const schema = await resolveSaleFormGstSchema(comp_uid);
+  try {
+    return await runQuery(sql, binds, schema, { suppressDbErrorLog: schema == null });
+  } catch (err) {
+    if (schema != null && isSaleFormGstMissingTableError(err)) {
+      return await runQuery(sql, binds, null, { suppressDbErrorLog: true });
+    }
+    throw err;
+  }
+}
+
+async function fetchSaleFormGstRows(form_name, comp_uid) {
+  const formName = normalizeSaleFormGstFormName(form_name);
+  const sql = `SELECT F_NAME,
+                      NVL(ADD_YN, 'N') AS ADD_YN,
+                      NVL(EDIT_YN, 'N') AS EDIT_YN,
+                      NVL(S_NO, 0) AS S_NO,
+                      NVL(HIDE_COL, 'N') AS HIDE_COL
+                 FROM ${SALEFORM_GST_TABLE}
+                WHERE FORM_NAME = :form_name
+                ORDER BY S_NO, F_NAME`;
+  const rows = await querySaleFormGstRows(sql, { form_name: formName }, comp_uid);
+  return (rows || []).map(mapSaleFormGstRow);
+}
+
+function validateSaleFormGstSaveRows(rows, form_name) {
+  const formName = normalizeSaleFormGstFormName(form_name);
+  const list = Array.isArray(rows) ? rows : [];
+  const out = [];
+  for (const raw of list) {
+    const f_name = normalizeSaleFormGstFieldName(raw.F_NAME ?? raw.f_name);
+    if (!f_name) continue;
+    const hide_col = normalizeSaleFormGstYn(raw.HIDE_COL ?? raw.hide_col, 'N');
+    if (SALEFORM_GST_HIDE_RESTRICTED.has(f_name) && hide_col === 'Y') {
+      const err = new Error('You can not hide this column. Restricted col.');
+      err.status = 400;
+      throw err;
+    }
+    out.push({
+      form_name: formName,
+      f_name,
+      add_yn: normalizeSaleFormGstYn(raw.ADD_YN ?? raw.add_yn, 'Y'),
+      edit_yn: normalizeSaleFormGstYn(raw.EDIT_YN ?? raw.edit_yn, 'Y'),
+      s_no: Number(raw.S_NO ?? raw.s_no ?? 0) || 0,
+      hide_col,
+    });
+  }
+  return out;
+}
+
+async function saveSaleFormGstRows(form_name, comp_uid, rows) {
+  const normalized = validateSaleFormGstSaveRows(rows, form_name);
+  if (!normalized.length) {
+    const err = new Error('No rows to save.');
+    err.status = 400;
+    throw err;
+  }
+
+  const mergeSql = `MERGE INTO ${SALEFORM_GST_TABLE} t
+    USING (
+      SELECT :form_name AS form_name,
+             :f_name AS f_name,
+             :add_yn AS add_yn,
+             :edit_yn AS edit_yn,
+             :s_no AS s_no,
+             :hide_col AS hide_col
+        FROM dual
+    ) s
+    ON (t.FORM_NAME = s.form_name AND t.F_NAME = s.f_name)
+    WHEN MATCHED THEN
+      UPDATE SET t.ADD_YN = s.add_yn,
+                 t.EDIT_YN = s.edit_yn,
+                 t.S_NO = s.s_no,
+                 t.HIDE_COL = s.hide_col
+    WHEN NOT MATCHED THEN
+      INSERT (FORM_NAME, F_NAME, ADD_YN, EDIT_YN, S_NO, HIDE_COL)
+      VALUES (s.form_name, s.f_name, s.add_yn, s.edit_yn, s.s_no, s.hide_col)`;
+
+  const saved = await withSaleFormGstConnection(comp_uid, async (conn) => {
+    const result = await conn.executeMany(mergeSql, normalized, {
+      autoCommit: false,
+      batchSize: 250,
+    });
+    return Number(result?.rowsAffected ?? normalized.length) || normalized.length;
+  });
+
+  return {
+    saved,
+    updated: saved,
+    inserted: 0,
+    form_name: normalizeSaleFormGstFormName(form_name),
+  };
+}
+
+app.get('/api/sale-form-gst-user-permissions', async (req, res) => {
+  try {
+    const { comp_uid, user_name } = req.query;
+    if (comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_uid and user_name are required' });
+    }
+    const { f5, source } = await fetchItemMasterUserF5String(String(user_name), comp_uid);
+    res.json({ f5, source, ...itemMasterPermissionsFromF5(f5) });
+  } catch (err) {
+    console.error('❌ sale-form-gst-user-permissions error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/sale-form-gst', async (req, res) => {
+  try {
+    const comp_uid = req.query.comp_uid;
+    const form_name = normalizeSaleFormGstFormName(req.query.form_name ?? req.query.mode ?? 'SALE');
+    if (comp_uid == null || String(comp_uid).trim() === '') {
+      return res.status(400).json({ error: 'comp_uid is required' });
+    }
+    const rows = await fetchSaleFormGstRows(form_name, comp_uid);
+    res.json({ ok: true, form_name, rows });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ sale-form-gst GET error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.put('/api/sale-form-gst', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const comp_uid = body.comp_uid;
+    const user_name = String(body.user_name ?? body.actor_name ?? '').trim();
+    const form_name = normalizeSaleFormGstFormName(body.form_name ?? body.mode ?? 'SALE');
+    const rows = Array.isArray(body.rows) ? body.rows : body.ROWS;
+    if (comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_uid and user_name are required' });
+    }
+    if (!Array.isArray(rows)) {
+      return res.status(400).json({ error: 'rows array is required' });
+    }
+    const { f5 } = await fetchItemMasterUserF5String(user_name, comp_uid);
+    const perms = itemMasterPermissionsFromF5(f5);
+    if (!perms.canOpen) return res.status(403).json({ error: 'Access Denied' });
+    if (!perms.canEdit) return res.status(403).json({ error: 'You Can Not Edit' });
+
+    const result = await saveSaleFormGstRows(form_name, comp_uid, rows);
+    const saved = await fetchSaleFormGstRows(form_name, comp_uid);
+    res.json({ ok: true, message: 'DONE', ...result, rows: saved });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ sale-form-gst PUT error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// --- Default Setting (VFP DO FORM default + default2 → DEFVALUE) ---
+const DEFVALUE_TABLE = 'DEFVALUE';
+const DEFVALUE_EDITABLE_COLS = new Set(require('./SRC/data/defaultSettingEditableKeys.cjs'));
+const DEFVALUE_READONLY_COLS = new Set(['COMP_CODE', 'ROWID']);
+const DEFVALUE_DATE_COLS = new Set(['GST_TAX_RATE_DATE', 'TCS_S_DATE']);
+const defvalueColCache = new Map();
+
+function normalizeGfasorclFilePathServer(raw) {
+  let s = String(raw ?? '').trim();
+  if (!s) return '';
+  s = s.replace(/\//g, '\\');
+  s = s.replace(/^[A-Za-z]:/i, '');
+  const token = '\\GFASORCL';
+  const idx = s.toUpperCase().indexOf(token);
+  if (idx >= 0) s = s.slice(idx);
+  else {
+    const trimmed = s.replace(/^\\+/, '');
+    s = trimmed ? `${token}\\${trimmed}` : token;
+  }
+  return s.replace(/\\{2,}/g, '\\');
+}
+
+function defvalueRowValue(row, logical) {
+  if (!row) return '';
+  const u = String(logical || '').toUpperCase();
+  const l = u.toLowerCase();
+  const raw = row[u] ?? row[l];
+  if (raw == null) return '';
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return formatDateDmyFromRaw(raw);
+  }
+  if (typeof raw === 'object') return '';
+  return String(raw).trim();
+}
+
+function formatDefvalueRowForClient(row, comp_code) {
+  const out = { COMP_CODE: String(comp_code ?? '').trim() };
+  if (!row) return out;
+  for (const col of DEFVALUE_EDITABLE_COLS) {
+    let val = defvalueRowValue(row, col);
+    if (
+      col === 'DEF_PIC' ||
+      col === 'SALE_LOGO' ||
+      col === 'SIGNATURE_FILE' ||
+      col === 'BANK_QR_LOGO' ||
+      col === 'SALE_LOGO2'
+    ) {
+      val = normalizeGfasorclFilePathServer(val);
+    }
+    out[col] = val;
+  }
+  out.COMP_CODE = defvalueRowValue(row, 'COMP_CODE') || out.COMP_CODE;
+  return out;
+}
+
+function normalizeDefvalueSaveValue(col, raw) {
+  const key = String(col || '').toUpperCase();
+  if (DEFVALUE_DATE_COLS.has(key)) {
+    const s = String(raw ?? '').trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [y, m, d] = s.split('-');
+      return `${d}-${m}-${y}`;
+    }
+    return s;
+  }
+  if (raw == null) return '';
+  const s = String(raw).trim();
+  if (
+    key === 'DEF_PIC' ||
+    key === 'SALE_LOGO' ||
+    key === 'SIGNATURE_FILE' ||
+    key === 'BANK_QR_LOGO' ||
+    key === 'SALE_LOGO2'
+  ) {
+    return normalizeGfasorclFilePathServer(s);
+  }
+  return s;
+}
+
+async function getDefvalueColumns(comp_uid) {
+  const key = `${String(comp_uid || '_').trim()}:DEFVALUE`;
+  if (defvalueColCache.has(key)) return defvalueColCache.get(key);
+  const cols = await getTableColumns(comp_uid, DEFVALUE_TABLE);
+  defvalueColCache.set(key, cols);
+  return cols;
+}
+
+async function loadDefvalueRow(comp_code, comp_uid) {
+  const code = String(comp_code ?? '').trim();
+  const rows = await runQuery(
+    `SELECT * FROM ${DEFVALUE_TABLE} WHERE COMP_CODE = :comp_code AND ROWNUM = 1`,
+    { comp_code: code },
+    comp_uid,
+    { suppressDbErrorLog: true }
+  ).catch(() => []);
+  return rows?.[0] || null;
+}
+
+async function updateDefvalueRow(comp_code, comp_uid, fields) {
+  const tableCols = await getDefvalueColumns(comp_uid);
+  if (!tableCols.size) {
+    const err = new Error('DEFVALUE table not found in year schema.');
+    err.status = 404;
+    throw err;
+  }
+  const existing = await loadDefvalueRow(comp_code, comp_uid);
+  if (!existing) {
+    const err = new Error('DEFVALUE row not found for this company. Create it in Oracle first.');
+    err.status = 404;
+    throw err;
+  }
+  const body = fields && typeof fields === 'object' ? fields : {};
+  const sets = [];
+  const binds = { comp_code: String(comp_code ?? '').trim() };
+
+  for (const col of DEFVALUE_EDITABLE_COLS) {
+    if (!tableCols.has(col) || DEFVALUE_READONLY_COLS.has(col)) continue;
+    const raw = body[col] ?? body[col.toLowerCase()];
+    if (raw === undefined) continue;
+    const bind = `dv_${col.toLowerCase()}`;
+    const val = normalizeDefvalueSaveValue(col, raw);
+    if (DEFVALUE_DATE_COLS.has(col)) {
+      if (val == null || val === '') {
+        sets.push(`${col} = NULL`);
+      } else {
+        sets.push(`${col} = TO_DATE(:${bind}, 'DD-MM-YYYY')`);
+        binds[bind] = val;
+      }
+    } else {
+      sets.push(`${col} = :${bind}`);
+      binds[bind] = val;
+    }
+  }
+
+  if (!sets.length) {
+    const err = new Error('No editable DEFVALUE columns to update.');
+    err.status = 400;
+    throw err;
+  }
+
+  await runExecute(
+    `UPDATE ${DEFVALUE_TABLE} SET ${sets.join(', ')} WHERE COMP_CODE = :comp_code`,
+    binds,
+    comp_uid,
+    { autoCommit: true }
+  );
+}
+
+app.get('/api/defvalue-user-permissions', async (req, res) => {
+  try {
+    const { comp_uid, user_name } = req.query;
+    if (comp_uid == null || String(comp_uid).trim() === '' || !user_name) {
+      return res.status(400).json({ error: 'comp_uid and user_name are required' });
+    }
+    const { f5, source } = await fetchItemMasterUserF5String(String(user_name), comp_uid);
+    res.json({ f5, source, ...itemMasterPermissionsFromF5(f5) });
+  } catch (err) {
+    console.error('❌ defvalue-user-permissions error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/defvalue', async (req, res) => {
+  try {
+    const comp_code = req.query.comp_code;
+    const comp_uid = req.query.comp_uid;
+    const user_name = String(req.query.user_name ?? '').trim();
+    if (comp_code == null || String(comp_code).trim() === '' || comp_uid == null || String(comp_uid).trim() === '') {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    if (user_name) {
+      const { f5 } = await fetchItemMasterUserF5String(user_name, comp_uid);
+      const perms = itemMasterPermissionsFromF5(f5);
+      if (!perms.canOpen) return res.status(403).json({ error: 'Access Denied' });
+    }
+    const row = await loadDefvalueRow(comp_code, comp_uid);
+    res.json({
+      ok: true,
+      exists: Boolean(row),
+      row: formatDefvalueRowForClient(row, comp_code),
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ defvalue GET error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.put('/api/defvalue', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const comp_code = body.comp_code;
+    const comp_uid = body.comp_uid;
+    const user_name = String(body.user_name ?? body.actor_name ?? '').trim();
+    const fields = body.fields && typeof body.fields === 'object' ? body.fields : body;
+    if (comp_code == null || String(comp_code).trim() === '' || comp_uid == null || String(comp_uid).trim() === '') {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    if (!user_name) {
+      return res.status(400).json({ error: 'user_name is required' });
+    }
+    const { f5 } = await fetchItemMasterUserF5String(user_name, comp_uid);
+    const perms = itemMasterPermissionsFromF5(f5);
+    if (!perms.canOpen) return res.status(403).json({ error: 'Access Denied' });
+    if (!perms.canEdit) return res.status(403).json({ error: 'You Can Not Edit' });
+
+    await updateDefvalueRow(comp_code, comp_uid, fields);
+    const row = await loadDefvalueRow(comp_code, comp_uid);
+    res.json({
+      ok: true,
+      message: 'DONE',
+      row: formatDefvalueRowForClient(row, comp_code),
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ defvalue PUT error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// --- GFASORCL file browse (Default Setting logos / pictures) ---
+const GFAS_FILE_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']);
+
+function normalizeGfasBrowseRelInput(rel) {
+  let s = String(rel ?? '').trim().replace(/\//g, '\\');
+  s = s.replace(/^[A-Za-z]:/i, '');
+  const token = '\\GFASORCL';
+  const idx = s.toUpperCase().indexOf(token);
+  if (idx >= 0) s = s.slice(idx);
+  if (!s || s.toUpperCase() === token) return '';
+  const prefix = `${token}\\`;
+  if (s.toUpperCase().startsWith(prefix.toUpperCase())) s = s.slice(prefix.length);
+  else s = s.replace(/^\\+/, '');
+  if (s.includes('..')) {
+    const err = new Error('Invalid path');
+    err.status = 400;
+    throw err;
+  }
+  return s;
+}
+
+function resolveGfasBrowseAbsDir(rel) {
+  const relPart = normalizeGfasBrowseRelInput(rel);
+  const abs = path.resolve(GFASORCL_ROOT, relPart);
+  const rootAbs = path.resolve(GFASORCL_ROOT);
+  if (abs !== rootAbs && !abs.startsWith(`${rootAbs}${path.sep}`)) {
+    const err = new Error('Path outside GFASORCL folder.');
+    err.status = 400;
+    throw err;
+  }
+  return { abs, relPart };
+}
+
+app.get('/api/gfas-file-browse', async (req, res) => {
+  try {
+    const { abs, relPart } = resolveGfasBrowseAbsDir(req.query.path ?? '');
+    if (!fs.existsSync(abs)) {
+      return res.status(404).json({ error: 'Folder not found.' });
+    }
+    const st = fs.statSync(abs);
+    if (!st.isDirectory()) {
+      return res.status(400).json({ error: 'Not a folder.' });
+    }
+    const entries = fs.readdirSync(abs, { withFileTypes: true });
+    const dirs = [];
+    const files = [];
+    const currentVfp = relPart
+      ? `\\GFASORCL\\${relPart.replace(/\//g, '\\')}`
+      : '\\GFASORCL';
+    for (const e of entries) {
+      if (e.name.startsWith('.')) continue;
+      if (e.isDirectory()) dirs.push(e.name);
+      else if (GFAS_FILE_IMAGE_EXT.has(path.extname(e.name).toLowerCase())) {
+        files.push({
+          name: e.name,
+          path: `${currentVfp}\\${e.name}`,
+        });
+      }
+    }
+    dirs.sort((a, b) => a.localeCompare(b));
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    const parentRel = relPart.replace(/[/\\][^/\\]+$/, '');
+    const parent = relPart
+      ? parentRel
+        ? `\\GFASORCL\\${parentRel.replace(/\//g, '\\')}`
+        : '\\GFASORCL'
+      : null;
+    res.json({
+      ok: true,
+      root: '\\GFASORCL',
+      current: currentVfp,
+      parent,
+      dirs,
+      files,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ gfas-file-browse error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// --- Set Task Scheduler (VFP DO FORM schtask WITH 1) ---
+const SCHTASK_ORABACK_TN = 'ORABACK';
+const SCHTASK_START_TIME = '10:30';
+
+function normalizeSchtaskDriveLetter(v) {
+  const s = String(v ?? '').trim().toUpperCase();
+  const m = s.match(/^([A-Z])/);
+  return m ? m[1] : '';
+}
+
+function schtaskDefaultDriveLetter() {
+  const root = path.parse(GFASORCL_ROOT).root || '';
+  return normalizeSchtaskDriveLetter(root) || 'C';
+}
+
+function schtaskOrabackExePath() {
+  return path.join(GFASORCL_ROOT, 'oraback.exe');
+}
+
+function execSchtasks(args) {
+  return new Promise((resolve, reject) => {
+    execFile('schtasks.exe', args, { windowsHide: true, timeout: 120000 }, (err, stdout, stderr) => {
+      const out = [String(stderr || '').trim(), String(stdout || '').trim()].filter(Boolean).join(' ');
+      if (err) {
+        if (args[0] === '/DELETE' && /cannot find|does not exist|not found/i.test(out)) {
+          resolve('');
+          return;
+        }
+        reject(new Error(out || err.message || 'schtasks failed'));
+        return;
+      }
+      resolve(out);
+    });
+  });
+}
+
+async function schtaskExists(taskName) {
+  if (process.platform !== 'win32') return false;
+  try {
+    await execSchtasks(['/Query', '/TN', taskName, '/FO', 'LIST']);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function loadSchtaskDefvalueFolders(comp_code, comp_uid) {
+  const rows = await runQuery(
+    `SELECT NVL(PKG_FOLDER, '') AS PKG_FOLDER, NVL(BACK_FOLDER, '') AS BACK_FOLDER
+       FROM DEFVALUE
+      WHERE COMP_CODE = :comp_code AND ROWNUM = 1`,
+    { comp_code: String(comp_code ?? '').trim() },
+    comp_uid,
+    { suppressDbErrorLog: true }
+  ).catch(() => []);
+  const r = rows?.[0] || {};
+  const pkg = normalizeSchtaskDriveLetter(r.PKG_FOLDER ?? r.pkg_folder);
+  const back = normalizeSchtaskDriveLetter(r.BACK_FOLDER ?? r.back_folder);
+  return {
+    pkg_folder: pkg || schtaskDefaultDriveLetter(),
+    back_folder: back || schtaskDefaultDriveLetter(),
+  };
+}
+
+async function saveSchtaskDefvalueFolders(comp_code, comp_uid, pkg_folder, back_folder) {
+  const pkg = normalizeSchtaskDriveLetter(pkg_folder);
+  const back = normalizeSchtaskDriveLetter(back_folder);
+  if (!pkg || !back) {
+    const err = new Error('Package Folder and Backup Folder drive letters are required.');
+    err.status = 400;
+    throw err;
+  }
+  const binds = { comp_code: String(comp_code ?? '').trim(), pkg, back };
+  await runExecute(
+    `UPDATE DEFVALUE SET PKG_FOLDER = :pkg, BACK_FOLDER = :back WHERE COMP_CODE = :comp_code`,
+    binds,
+    comp_uid,
+    { autoCommit: true }
+  );
+  for (const schema of [null, 'GRAIN']) {
+    try {
+      await runExecute(
+        `UPDATE DEFVALUE SET PKG_FOLDER = :pkg, BACK_FOLDER = :back WHERE COMP_CODE = :comp_code`,
+        binds,
+        schema,
+        { autoCommit: true, suppressDbErrorLog: true }
+      );
+    } catch {
+      /* hub row optional */
+    }
+  }
+  return { pkg_folder: pkg, back_folder: back };
+}
+
+async function createOrabackScheduledTask(rtime, exePath) {
+  if (process.platform !== 'win32') {
+    const err = new Error('Windows scheduled tasks are only supported when the API runs on Windows.');
+    err.status = 400;
+    throw err;
+  }
+  const hours = Math.max(1, Math.min(999, Number(rtime) || 1));
+  const tr = `"${exePath}"`;
+  await execSchtasks(['/DELETE', '/TN', SCHTASK_ORABACK_TN, '/F']).catch(() => {});
+  await execSchtasks([
+    '/CREATE',
+    '/SC',
+    'HOURLY',
+    '/MO',
+    String(hours),
+    '/TN',
+    SCHTASK_ORABACK_TN,
+    '/TR',
+    tr,
+    '/ST',
+    SCHTASK_START_TIME,
+    '/F',
+  ]);
+}
+
+function ensureSchtaskBackupFolder(back_folder) {
+  if (process.platform !== 'win32') return null;
+  const letter = normalizeSchtaskDriveLetter(back_folder);
+  if (!letter) return null;
+  const dir = `${letter}:\\BACKUP`;
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+async function buildSchtaskMeta() {
+  const orabackExe = schtaskOrabackExePath();
+  return {
+    is_windows: process.platform === 'win32',
+    oraback_exe: orabackExe,
+    oraback_exe_exists: fs.existsSync(orabackExe),
+    oraback_task_exists: await schtaskExists(SCHTASK_ORABACK_TN),
+    start_time: SCHTASK_START_TIME,
+    gfasorcl_root: GFASORCL_ROOT,
+  };
+}
+
+app.get('/api/schtask', async (req, res) => {
+  try {
+    const comp_code = req.query.comp_code;
+    const comp_uid = req.query.comp_uid;
+    const user_name = String(req.query.user_name ?? '').trim();
+    if (comp_code == null || String(comp_code).trim() === '' || comp_uid == null || String(comp_uid).trim() === '') {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const { f5, source } = await fetchItemMasterUserF5String(user_name, comp_uid);
+    const permissions = itemMasterPermissionsFromF5(f5);
+    if (!permissions.canOpen && !permissions.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+    const folders = await loadSchtaskDefvalueFolders(comp_code, comp_uid);
+    const meta = await buildSchtaskMeta();
+    res.json({
+      ok: true,
+      f5,
+      source,
+      permissions,
+      ...folders,
+      rtime: 1,
+      meta,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ schtask GET error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/schtask/proceed', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const comp_code = body.comp_code;
+    const comp_uid = body.comp_uid;
+    const user_name = String(body.user_name ?? '').trim();
+    const rtime = body.rtime;
+    if (comp_code == null || String(comp_code).trim() === '' || comp_uid == null || String(comp_uid).trim() === '') {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    if (!user_name) {
+      return res.status(400).json({ error: 'user_name is required' });
+    }
+    const { f5 } = await fetchItemMasterUserF5String(user_name, comp_uid);
+    const perms = itemMasterPermissionsFromF5(f5);
+    if (!perms.canOpen) return res.status(403).json({ error: 'Access Denied' });
+    if (!perms.canEdit && !perms.isSupervisor) return res.status(403).json({ error: 'You Can Not Edit' });
+
+    const pkg_folder = normalizeSchtaskDriveLetter(body.pkg_folder);
+    const back_folder = normalizeSchtaskDriveLetter(body.back_folder);
+    if (!pkg_folder || !back_folder) {
+      return res.status(400).json({ error: 'Package Folder and Backup Folder drive letters are required.' });
+    }
+
+    const orabackExe = schtaskOrabackExePath();
+    const steps = [];
+    if (!fs.existsSync(orabackExe)) {
+      steps.push(`Warning: oraback.exe not found at ${orabackExe}`);
+    } else {
+      await createOrabackScheduledTask(rtime, orabackExe);
+      steps.push(`Windows task ${SCHTASK_ORABACK_TN} created (hourly, start ${SCHTASK_START_TIME}).`);
+    }
+
+    const saved = await saveSchtaskDefvalueFolders(comp_code, comp_uid, pkg_folder, back_folder);
+    steps.push(`DEFVALUE PKG_FOLDER=${saved.pkg_folder}, BACK_FOLDER=${saved.back_folder} saved.`);
+
+    const backupDir = ensureSchtaskBackupFolder(back_folder);
+    if (backupDir) steps.push(`Backup folder ensured: ${backupDir}`);
+
+    const meta = await buildSchtaskMeta();
+    res.json({
+      ok: true,
+      message: 'TASK CREATED',
+      steps,
+      ...saved,
+      rtime: Math.max(1, Math.min(999, Number(rtime) || 1)),
+      meta,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ schtask proceed error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
 // --- Location Wise BType (VFP DO LOC_B_TYPE → LOC_B_TYPE) ---
 const LOC_B_TYPE_TABLE = 'LOC_B_TYPE';
 
@@ -21974,6 +22833,135 @@ app.get('/api/user-report-user-lookup', async (req, res) => {
   }
 });
 
+// --- Income Tax: Loaner List (VFP DO FORM LOANER WITH 'A' / prg/itaxrpt.prg LOANLST) ---
+function mapLoanerListRow(r) {
+  const op = Number(r.OP ?? r.op ?? 0);
+  const crAmt = Number(r.CR_AMT ?? r.cr_amt ?? 0);
+  const crInt = Number(r.CR_INT ?? r.cr_int ?? 0);
+  const drAmt = Number(r.DR_AMT ?? r.dr_amt ?? 0);
+  const drTds = Number(r.DR_TDS ?? r.dr_tds ?? 0);
+  const totCr = op > 0 ? op - (crAmt + crInt) : Math.abs(op) + crAmt + crInt;
+  return {
+    CODE: String(r.CODE ?? r.code ?? '').trim(),
+    NAME: String(r.NAME ?? r.name ?? '').trim(),
+    PAN: String(r.PAN ?? r.pan ?? '').trim(),
+    SCHEDULE: r.SCHEDULE ?? r.schedule ?? null,
+    ADD1: String(r.ADD1 ?? r.add1 ?? '').trim(),
+    ADD2: String(r.ADD2 ?? r.add2 ?? '').trim(),
+    ADD3: String(r.ADD3 ?? r.add3 ?? '').trim(),
+    CITY: String(r.CITY ?? r.city ?? '').trim(),
+    OP: op,
+    CR_AMT: crAmt,
+    CR_INT: crInt,
+    TOT_CR: totCr,
+    DR_AMT: drAmt,
+    DR_TDS: drTds,
+    TOT_DR: drAmt + drTds,
+    CL_BAL: Number(r.CL_BAL ?? r.cl_bal ?? 0),
+  };
+}
+
+async function buildLoanerListReport(comp_code, comp_uid, scheduleNoRaw) {
+  const schNo = Number(String(scheduleNoRaw ?? '0').trim().replace(',', '.'));
+  const scheduleFilter = Number.isFinite(schNo) && schNo !== 0 ? schNo : 0;
+
+  const sql = `
+    WITH X0 AS (
+      SELECT
+        A.CODE,
+        B.NAME,
+        B.PAN,
+        MAX(B.SCHEDULE) AS SCHEDULE,
+        MAX(B.ADD1) AS ADD1,
+        MAX(B.ADD2) AS ADD2,
+        MAX(B.ADD3) AS ADD3,
+        MAX(B.CITY) AS CITY,
+        SUM(CASE WHEN A.VR_TYPE = 'OP' THEN NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0) ELSE 0 END) AS OP,
+        SUM(
+          CASE
+            WHEN NVL(A.CR_AMT, 0) <> 0
+             AND SUBSTR(NVL(A.DETAIL, 'XXX'), 1, 3) <> 'INT'
+             AND A.VR_TYPE <> 'OP'
+            THEN A.CR_AMT
+            ELSE 0
+          END
+        ) AS CR_AMT,
+        SUM(
+          CASE
+            WHEN NVL(A.CR_AMT, 0) <> 0 AND SUBSTR(NVL(A.DETAIL, 'XXX'), 1, 3) = 'INT'
+            THEN A.CR_AMT
+            ELSE 0
+          END
+        ) AS CR_INT,
+        SUM(
+          CASE
+            WHEN NVL(A.DR_AMT, 0) <> 0
+             AND SUBSTR(NVL(A.DETAIL, 'XXX'), 1, 3) <> 'TDS'
+             AND A.VR_TYPE <> 'OP'
+            THEN A.DR_AMT
+            ELSE 0
+          END
+        ) AS DR_AMT,
+        SUM(
+          CASE
+            WHEN NVL(A.DR_AMT, 0) <> 0 AND SUBSTR(NVL(A.DETAIL, 'XXX'), 1, 3) = 'TDS'
+            THEN A.DR_AMT
+            ELSE 0
+          END
+        ) AS DR_TDS,
+        SUM(NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0)) AS CL_BAL
+      FROM LEDGER A
+      INNER JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.CODE = B.CODE
+      WHERE A.COMP_CODE = :comp_code
+        AND SUBSTR(A.CODE, 1, 1) = 'L'
+      GROUP BY A.CODE, B.NAME, B.PAN
+    )
+    SELECT *
+    FROM X0
+    WHERE (:schedule_no = 0 OR SCHEDULE = :schedule_no)
+    ORDER BY NAME, CODE
+  `;
+
+  const rawRows = await runQuery(sql, { comp_code, schedule_no: scheduleFilter }, comp_uid);
+  return (rawRows || []).map(mapLoanerListRow);
+}
+
+app.post('/api/income-tax-report', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const report_id = String(body.report_id ?? body.reportType ?? body.report_type ?? '').trim().toLowerCase();
+    const comp_code = String(body.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid;
+    if (!report_id) return res.status(400).json({ error: 'report_id is required' });
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const out = await buildIncomeTaxReport(report_id, comp_code, comp_uid, body);
+    res.json({ ok: true, ...out, total: (out.rows || []).length });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ income-tax-report error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/loaner-list', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const comp_code = String(body.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid;
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const out = await buildIncomeTaxReport('loaner-list', comp_code, comp_uid, body);
+    res.json({ ok: true, rows: out.rows, columns: out.columns, total: (out.rows || []).length });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ loaner-list error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
 app.post('/api/user-report-data', async (req, res) => {
   try {
     const body = req.body || {};
@@ -23321,6 +24309,1526 @@ app.post('/api/updation/execute', async (req, res) => {
   } catch (err) {
     const status = err.status || 500;
     if (status >= 500) console.error('❌ updation execute error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// --- Updation Stock (VFP DO FORM stkupdt) — desktop only; transfer LOTSTOCK opening to next year ---
+function updationStockRate(ramt, rwgt) {
+  const ra = Number(ramt) || 0;
+  const rw = Number(rwgt) || 0;
+  if (ra !== 0 && rw !== 0) return (ra / rw) * 100;
+  return 0;
+}
+
+function renumberUpdationStockBNo(rows) {
+  const sorted = [...rows].sort((a, b) => {
+    const bn = (Number(a.B_NO ?? a.b_no ?? 0) || 0) - (Number(b.B_NO ?? b.b_no ?? 0) || 0);
+    if (bn !== 0) return bn;
+    const ic = String(a.ITEM_CODE ?? a.item_code ?? '').localeCompare(
+      String(b.ITEM_CODE ?? b.item_code ?? ''),
+      undefined,
+      { numeric: true }
+    );
+    if (ic !== 0) return ic;
+    return (Number(a.LOT ?? a.lot ?? 0) || 0) - (Number(b.LOT ?? b.lot ?? 0) || 0);
+  });
+  let mx = 0;
+  let mbno = 0;
+  let prevBNo = null;
+  for (const row of sorted) {
+    const bNo = Number(row.B_NO ?? row.b_no ?? 0) || 0;
+    if (mx === 0) {
+      mbno += 1;
+      mx = 1;
+      prevBNo = bNo;
+    } else if (bNo !== prevBNo) {
+      mbno += 1;
+      prevBNo = bNo;
+    }
+    row.B_NO = mbno;
+  }
+  return sorted;
+}
+
+async function fetchUpdationStockSourceRows(comp_code, source_uid, end_date_dmy) {
+  const useG = await fetchShortageUsesGWeight(comp_code, source_uid);
+  const wgtFld = useG ? 'G_WEIGHT' : 'WEIGHT';
+  const sql = `
+    SELECT
+      TRIM(A.SUP_CODE) AS SUP_CODE,
+      MIN(A.VR_DATE) AS R_DATE,
+      MAX(A.B_NO) AS B_NO,
+      TRIM(A.ITEM_CODE) AS ITEM_CODE,
+      TRIM(A.STATUS) AS STATUS,
+      A.LOT,
+      TRIM(A.GOD_CODE) AS GOD_CODE,
+      MAX(TRIM(A.COST_CODE)) AS COST_CODE,
+      SUM(CASE WHEN A.E_TYPE = 'R' THEN NVL(A.QNTY, 0) ELSE NVL(A.QNTY, 0) * -1 END) AS QNTY,
+      SUM(CASE WHEN A.E_TYPE = 'R' THEN NVL(A.${wgtFld}, 0) ELSE NVL(A.${wgtFld}, 0) * -1 END) AS WEIGHT,
+      SUM(CASE WHEN A.E_TYPE = 'R' THEN NVL(A.AMOUNT, 0) ELSE NVL(A.AMOUNT, 0) * -1 END) AS AMOUNT,
+      SUM(CASE WHEN A.E_TYPE = 'R' THEN NVL(A.WEIGHT, 0) ELSE 0 END) AS RWGT,
+      SUM(CASE WHEN A.E_TYPE = 'R' THEN NVL(A.AMOUNT, 0) ELSE 0 END) AS RAMT,
+      MAX(TRIM(A.MSUP_CODE)) AS MSUP_CODE,
+      MAX(TRIM(A.EXP_CAT)) AS EXP_CAT,
+      MAX(TRIM(A.F_FORM)) AS F_FORM,
+      MAX(TRIM(A.LABOUR)) AS LABOUR,
+      MAX(TRIM(A.REMARKS)) AS REMARKS
+    FROM LOTSTOCK A
+    WHERE A.COMP_CODE = :comp_code
+      AND A.VR_DATE <= TO_DATE(:edt, 'DD-MM-YYYY')
+    GROUP BY A.SUP_CODE, A.ITEM_CODE, A.STATUS, A.LOT, A.GOD_CODE
+    HAVING SUM(CASE WHEN A.E_TYPE = 'R' THEN NVL(A.QNTY, 0) ELSE NVL(A.QNTY, 0) * -1 END) > 0`;
+  return runQuery(
+    sql,
+    { comp_code: String(comp_code).trim(), edt: end_date_dmy },
+    source_uid
+  );
+}
+
+async function deleteUpdationStockOpeningRows(comp_code, target_uid, end_date_dmy) {
+  const code = String(comp_code).trim();
+  // VFP stkupdt: clear prior PC opening rows in target year before re-insert (rerun-safe).
+  // CPUR uses R_DATE < ending date; LOTSTOCK uses VR_DATE <= ending date (same as VFP).
+  await runQuery(
+    `DELETE FROM CPUR
+      WHERE COMP_CODE = :comp_code
+        AND TYPE = 'PC'
+        AND R_DATE < TO_DATE(:edt, 'DD-MM-YYYY')`,
+    { comp_code: code, edt: end_date_dmy },
+    target_uid,
+    { autoCommit: true }
+  );
+  await runQuery(
+    `DELETE FROM LOTSTOCK
+      WHERE COMP_CODE = :comp_code
+        AND VR_TYPE = 'PC'
+        AND VR_DATE <= TO_DATE(:edt, 'DD-MM-YYYY')`,
+    { comp_code: code, edt: end_date_dmy },
+    target_uid,
+    { autoCommit: true }
+  );
+}
+
+async function nextUpdationStockLot(comp_code, target_uid, item_code) {
+  const rows = await runQuery(
+    `SELECT MAX(LOT) AS LOT
+       FROM CPUR
+      WHERE COMP_CODE = :comp_code
+        AND ITEM_CODE = :item_code`,
+    { comp_code: String(comp_code).trim(), item_code: String(item_code).trim() },
+    target_uid,
+    { suppressDbErrorLog: true }
+  ).catch(() => [{ LOT: 0 }]);
+  return (Number(rows?.[0]?.LOT ?? rows?.[0]?.lot ?? 0) || 0) + 1;
+}
+
+async function insertUpdationStockLotLine({
+  comp_code,
+  target_uid,
+  source_comp_year,
+  vr_no,
+  vr_date,
+  row,
+  status,
+  qty,
+  weight,
+  amount,
+  lot,
+  b_no,
+}) {
+  const sup = String(row.SUP_CODE ?? row.sup_code ?? '').trim();
+  const msup = String(row.MSUP_CODE ?? row.msup_code ?? '').trim() || sup;
+  const item = String(row.ITEM_CODE ?? row.item_code ?? '').trim();
+  const w = Number(weight) || 0;
+  await runQuery(
+    `INSERT INTO LOTSTOCK (
+       COMP_CODE, COMP_YEAR, VR_TYPE, VR_DATE, VR_NO, E_TYPE, SUP_CODE, ITEM_CODE, STATUS,
+       QNTY, WEIGHT, AMOUNT, LOT, B_NO, GOD_CODE, EXP_CAT, F_FORM, LABOUR, REMARKS,
+       SUP_DATE, MSUP_CODE, COST_CODE, G_WEIGHT, A_WEIGHT
+     ) VALUES (
+       :comp_code, :comp_year, 'PC', :vr_date, :vr_no, 'R', :sup_code, :item_code, :status,
+       :qnty, :weight, :amount, :lot, :b_no, :god_code, :exp_cat, :f_form, :labour, :remarks,
+       :sup_date, :msup_code, :cost_code, :g_weight, :a_weight
+     )`,
+    {
+      comp_code: String(comp_code).trim(),
+      comp_year: Number(source_comp_year) || 0,
+      vr_date: vr_date,
+      vr_no: vr_no,
+      sup_code: sup,
+      item_code: item,
+      status: String(status ?? '').trim(),
+      qnty: Number(qty) || 0,
+      weight: w,
+      amount: Number(amount) || 0,
+      lot: Number(lot) || 0,
+      b_no: Number(b_no) || 0,
+      god_code: String(row.GOD_CODE ?? row.god_code ?? '').trim(),
+      exp_cat: String(row.EXP_CAT ?? row.exp_cat ?? '').trim(),
+      f_form: String(row.F_FORM ?? row.f_form ?? 'N').trim() || 'N',
+      labour: String(row.LABOUR ?? row.labour ?? 'N').trim() || 'N',
+      remarks: String(row.REMARKS ?? row.remarks ?? '').trim(),
+      sup_date: vr_date,
+      msup_code: msup,
+      cost_code: String(row.COST_CODE ?? row.cost_code ?? '').trim(),
+      g_weight: w,
+      a_weight: w,
+    },
+    target_uid,
+    { autoCommit: true }
+  );
+}
+
+async function runUpdationStockTransfer({
+  comp_code,
+  source_uid,
+  target_uid,
+  end_date_dmy,
+  target_year,
+  source_comp_year,
+  rows,
+}) {
+  const code = String(comp_code).trim();
+  let cpurInserted = 0;
+  let lotstockInserted = 0;
+  let sno = 1;
+
+  for (const row of rows) {
+    const sup = String(row.SUP_CODE ?? row.sup_code ?? '').trim();
+    const msup = String(row.MSUP_CODE ?? row.msup_code ?? '').trim() || sup;
+    const item = String(row.ITEM_CODE ?? row.item_code ?? '').trim();
+    const status = String(row.STATUS ?? row.status ?? '').trim();
+    const qty = Number(row.QNTY ?? row.qnty ?? 0) || 0;
+    const weight = Number(row.WEIGHT ?? row.weight ?? 0) || 0;
+    const rate = updationStockRate(row.RAMT ?? row.ramt, row.RWGT ?? row.rwgt);
+    const amount = Math.round(((weight * rate) / 100) * 100) / 100;
+    const bNo = Number(row.B_NO ?? row.b_no ?? 0) || 0;
+    const vrDate = row.R_DATE ?? row.r_date;
+    const lot = await nextUpdationStockLot(code, target_uid, item);
+
+    const bags = status === 'B' ? qty : 0;
+    const katta = status === 'K' ? qty : 0;
+    const hkatta = status === 'H' ? qty : 0;
+
+    await runQuery(
+      `INSERT INTO CPUR (
+         COMP_CODE, COMP_YEAR, TYPE, R_NO, R_DATE, B_NO, ITEM_CODE, LOT, STATUS, SUP_CODE,
+         QNTY, WEIGHT, AMOUNT, REMARKS, BAGS, KATTA, HKATTA, MSUP_CODE, EXP_CAT, LABOUR,
+         F_FORM, GOD_CODE, COST_CODE
+       ) VALUES (
+         :comp_code, :comp_year, 'PC', :r_no, :r_date, :b_no, :item_code, :lot, :status, :sup_code,
+         :qnty, :weight, :amount, :remarks, :bags, :katta, :hkatta, :msup_code, :exp_cat, :labour,
+         :f_form, :god_code, :cost_code
+       )`,
+      {
+        comp_code: code,
+        comp_year: Number(target_year) || 0,
+        r_no: sno,
+        r_date: vrDate,
+        b_no: bNo,
+        item_code: item,
+        lot,
+        status,
+        sup_code: sup,
+        qnty: qty,
+        weight,
+        amount,
+        remarks: String(row.REMARKS ?? row.remarks ?? '').trim(),
+        bags,
+        katta,
+        hkatta,
+        msup_code: msup,
+        exp_cat: String(row.EXP_CAT ?? row.exp_cat ?? '').trim(),
+        labour: String(row.LABOUR ?? row.labour ?? 'N').trim() || 'N',
+        f_form: String(row.F_FORM ?? row.f_form ?? 'N').trim() || 'N',
+        god_code: String(row.GOD_CODE ?? row.god_code ?? '').trim(),
+        cost_code: String(row.COST_CODE ?? row.cost_code ?? '').trim(),
+      },
+      target_uid,
+      { autoCommit: true }
+    );
+    cpurInserted += 1;
+
+    const baseLotArgs = {
+      comp_code: code,
+      target_uid,
+      source_comp_year,
+      vr_no: sno,
+      vr_date: vrDate,
+      row,
+      lot,
+      b_no: bNo,
+    };
+
+    if (bags !== 0) {
+      await insertUpdationStockLotLine({ ...baseLotArgs, status: 'B', qty: bags, weight: 0, amount: 0 });
+      lotstockInserted += 1;
+    }
+    if (katta !== 0) {
+      await insertUpdationStockLotLine({ ...baseLotArgs, status: 'K', qty: katta, weight: 0, amount: 0 });
+      lotstockInserted += 1;
+    }
+    if (hkatta !== 0) {
+      await insertUpdationStockLotLine({ ...baseLotArgs, status: 'H', qty: hkatta, weight: 0, amount: 0 });
+      lotstockInserted += 1;
+    }
+
+    sno += 1;
+  }
+
+  return { cpurInserted, lotstockInserted };
+}
+
+async function executeUpdationStockTransfer(body) {
+  const comp_code = String(body.comp_code ?? '').trim();
+  const source_uid = String(body.source_comp_uid ?? body.comp_uid ?? '').trim();
+  const target_uid = String(body.next_year_directory ?? body.target_comp_uid ?? '').trim();
+  const end_date_dmy = updationEndDateDmy(body.end_date ?? body.e_date);
+
+  if (!comp_code || !source_uid) {
+    const err = new Error('comp_code and current year directory are required.');
+    err.status = 400;
+    throw err;
+  }
+  if (!target_uid) {
+    const err = new Error('!!! Directory Name Should Not Be Empty !!!');
+    err.status = 400;
+    throw err;
+  }
+  if (!end_date_dmy) {
+    const err = new Error('Ending Date is required.');
+    err.status = 400;
+    throw err;
+  }
+
+  safeOracleSchemaToken(target_uid);
+  safeOracleSchemaToken(source_uid);
+
+  const targetRow = await loadUpdationCompdetByUid(comp_code, target_uid);
+  if (!targetRow) {
+    const err = new Error('!!! Next Year Directory Not Found !!!');
+    err.status = 400;
+    throw err;
+  }
+  const targetEnd = targetRow.COMP_E_DT ?? targetRow.comp_e_dt;
+  if (updationDatesEqual(targetEnd, end_date_dmy)) {
+    const err = new Error('!!! You Can Not Update Same Year!!!');
+    err.status = 400;
+    throw err;
+  }
+
+  const sourceRow = await loadUpdationCompdetByUid(comp_code, source_uid);
+  const source_comp_year = Number(sourceRow?.COMP_YEAR ?? sourceRow?.comp_year ?? 0) || 0;
+  const target_year = Number(targetRow.COMP_YEAR ?? targetRow.comp_year ?? 0) || 0;
+
+  const rawRows = await fetchUpdationStockSourceRows(comp_code, source_uid, end_date_dmy);
+  const rows = renumberUpdationStockBNo(rawRows || []);
+  for (const row of rows) {
+    row.RATE = updationStockRate(row.RAMT ?? row.ramt, row.RWGT ?? row.rwgt);
+  }
+
+  await deleteUpdationStockOpeningRows(comp_code, target_uid, end_date_dmy);
+  const { cpurInserted, lotstockInserted } = await runUpdationStockTransfer({
+    comp_code,
+    source_uid,
+    target_uid,
+    end_date_dmy,
+    target_year,
+    source_comp_year,
+    rows,
+  });
+
+  return { cpurInserted, lotstockInserted, sourceLots: rows.length };
+}
+
+app.get('/api/updation-stock/context', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'Updation Stock cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const comp_code = String(req.query.comp_code ?? '').trim();
+    const comp_uid = String(req.query.comp_uid ?? '').trim();
+    const user_name = String(req.query.user_name ?? '').trim();
+    if (!comp_code || !comp_uid || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, and user_name are required' });
+    }
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canOpen && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+    const source = await runCompdetHeaderRow(comp_code, comp_uid);
+    if (!source) return res.status(404).json({ error: 'Current compdet row not found.' });
+
+    const nextRow = await findUpdationNextCompdet(
+      comp_code,
+      source.COMP_S_DT ?? source.comp_s_dt
+    );
+    const nextUid = nextRow ? String(nextRow.COMP_UID ?? nextRow.comp_uid ?? '').trim() : '';
+
+    res.json({
+      ok: true,
+      permissions: perms,
+      context: {
+        currentYearDirectory: comp_uid,
+        nextYearDirectory: nextUid,
+        hasNextYear: Boolean(nextUid),
+        endDate: formatDateDmyFromRaw(source.COMP_E_DT ?? source.comp_e_dt),
+      },
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ updation-stock context error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/updation-stock/execute', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'Updation Stock cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const body = req.body || {};
+    const comp_uid = String(body.comp_uid ?? body.source_comp_uid ?? '').trim();
+    const user_name = String(body.user_name ?? '').trim();
+    if (!comp_uid || !user_name) {
+      return res.status(400).json({ error: 'comp_uid and user_name are required' });
+    }
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canEdit && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'You Can Not Edit' });
+    }
+    const result = await executeUpdationStockTransfer(body);
+    res.json({ ok: true, message: 'DONE', ...result });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ updation-stock execute error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// --- New Company Addition (VFP DO FORM newcomp) — desktop only ---
+const NEWCOMP_ACCESS_PW = 'KOMVANYA99';
+const NEWCOMP_ACCESS_TOKEN_TTL_MS = 4 * 60 * 60 * 1000;
+const newCompanyAccessTokens = new Map();
+
+function verifyNewCompanyPassword(password) {
+  return String(password ?? '').trim().toUpperCase() === NEWCOMP_ACCESS_PW;
+}
+
+function issueNewCompanyAccessToken(comp_code) {
+  const token = crypto.randomBytes(24).toString('hex');
+  newCompanyAccessTokens.set(token, {
+    comp_code: String(comp_code ?? '').trim(),
+    expires: Date.now() + NEWCOMP_ACCESS_TOKEN_TTL_MS,
+  });
+  return token;
+}
+
+function resolveNewCompanyAccessToken(req) {
+  return String(
+    req.headers['x-new-company-access-token'] ||
+      req.body?.access_token ||
+      req.query?.access_token ||
+      ''
+  ).trim();
+}
+
+function assertNewCompanyAccessToken(req, comp_code) {
+  const token = resolveNewCompanyAccessToken(req);
+  const row = newCompanyAccessTokens.get(token);
+  if (!row || row.expires < Date.now()) {
+    if (token) newCompanyAccessTokens.delete(token);
+    const err = new Error('New company password required or expired.');
+    err.status = 403;
+    throw err;
+  }
+  if (row.comp_code !== String(comp_code ?? '').trim()) {
+    const err = new Error('New company password does not match this session.');
+    err.status = 403;
+    throw err;
+  }
+  return token;
+}
+
+const NEWCOMP_CLONE_TABLES = [
+  'BIKEXP',
+  'CAT',
+  'COST',
+  'DANE',
+  'GODOWN',
+  'GODRENT',
+  'HOLIDAY',
+  'ITEMMAST',
+  'ITEM_GRP',
+  'NATURE',
+  'NEWINT',
+  'MASTER',
+  'SCHEDULE',
+  'DEFVALUE',
+];
+const newcompColCache = new Map();
+
+function newcompEndDateDmy(raw) {
+  return updationEndDateDmy(raw);
+}
+
+async function fetchNextCompanyCode() {
+  const sqlCandidates = [
+    'SELECT MAX(NVL(COMP_CODE, 0)) AS MX FROM COMPANY',
+    'SELECT MAX(NVL(COMP_CODE, 0)) AS MX FROM COMPDET',
+  ];
+  for (const sql of sqlCandidates) {
+    try {
+      const rows = await runGrainfasHubQuery(sql, {}, { suppressDbErrorLog: true });
+      const mx = Number(rows?.[0]?.MX ?? rows?.[0]?.mx ?? 0) || 0;
+      return mx + 1;
+    } catch {
+      /* try next */
+    }
+  }
+  return 1;
+}
+
+async function companyCodeExists(comp_code) {
+  const code = Number(comp_code) || 0;
+  if (!code) return false;
+  for (const sql of [
+    'SELECT 1 AS X FROM COMPANY WHERE COMP_CODE = :comp_code AND ROWNUM = 1',
+    'SELECT 1 AS X FROM COMPDET WHERE COMP_CODE = :comp_code AND ROWNUM = 1',
+  ]) {
+    try {
+      const rows = await runGrainfasHubQuery(sql, { comp_code: code }, { suppressDbErrorLog: true });
+      if (rows?.length) return true;
+    } catch {
+      /* optional table */
+    }
+  }
+  return false;
+}
+
+async function compdetRowExists(comp_code, comp_year) {
+  const rows = await runGrainfasHubQuery(
+    `SELECT 1 AS X FROM compdet
+      WHERE comp_code = :comp_code AND NVL(comp_year, 0) = :comp_year AND ROWNUM = 1`,
+    { comp_code: Number(comp_code) || 0, comp_year: Number(comp_year) || 0 },
+    { suppressDbErrorLog: true }
+  ).catch(() => []);
+  return Boolean(rows?.length);
+}
+
+async function getNewcompTableColumns(tableName, schema) {
+  const key = `${schema || 'GRAINFAS'}|${String(tableName).toUpperCase()}`;
+  if (newcompColCache.has(key)) return newcompColCache.get(key);
+  const sql = `SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :t ORDER BY COLUMN_ID`;
+  const binds = { t: String(tableName).toUpperCase() };
+  const rows = isEffectiveCompUid(schema)
+    ? await runQuery(sql, binds, schema, { suppressDbErrorLog: true }).catch(() => [])
+    : await runGrainfasHubQuery(sql, binds, { suppressDbErrorLog: true }).catch(() => []);
+  const cols = (rows || [])
+    .map((r) => String(r.COLUMN_NAME ?? r.column_name ?? '').toUpperCase())
+    .filter(Boolean);
+  newcompColCache.set(key, cols);
+  return cols;
+}
+
+async function newcompTableExists(tableName, schema) {
+  const sql = `SELECT 1 AS X FROM USER_TABLES WHERE TABLE_NAME = :t AND ROWNUM = 1`;
+  const binds = { t: String(tableName).toUpperCase() };
+  const rows = isEffectiveCompUid(schema)
+    ? await runQuery(sql, binds, schema, { suppressDbErrorLog: true }).catch(() => [])
+    : await runGrainfasHubQuery(sql, binds, { suppressDbErrorLog: true }).catch(() => []);
+  return Boolean(rows?.length);
+}
+
+async function cloneNewcompTableRows(tableName, sourceCode, targetCode, compYear, schema) {
+  const table = String(tableName).toUpperCase();
+  if (!(await newcompTableExists(table, schema))) {
+    return { table, skipped: true, reason: 'missing_table', command: `SKIP ${table} (table missing)` };
+  }
+  const cols = await getNewcompTableColumns(table, schema);
+  if (!cols.includes('COMP_CODE')) {
+    return { table, skipped: true, reason: 'no_comp_code', command: `SKIP ${table} (no COMP_CODE)` };
+  }
+  const hasYear = cols.includes('COMP_YEAR');
+  const targetNum = Number(targetCode) || 0;
+  const sourceNum = Number(sourceCode) || 0;
+  const yearNum = Number(compYear) || 0;
+  const schemaLabel = schema || 'GRAINFAS';
+
+  const existing = await runQuery(
+    `SELECT COUNT(*) AS CNT FROM ${table} WHERE COMP_CODE = :target_code`,
+    { target_code: targetNum },
+    schema,
+    { suppressDbErrorLog: true }
+  ).catch(() => [{ CNT: 0 }]);
+  if (Number(existing?.[0]?.CNT ?? existing?.[0]?.cnt ?? 0) > 0) {
+    return {
+      table,
+      skipped: true,
+      reason: 'target_rows_exist',
+      command: `SKIP ${table} (company ${targetNum} rows already exist)`,
+    };
+  }
+
+  const sourceCountRows = await runQuery(
+    `SELECT COUNT(*) AS CNT FROM ${table} WHERE COMP_CODE = :source_code`,
+    { source_code: sourceNum },
+    schema,
+    { suppressDbErrorLog: true }
+  ).catch(() => [{ CNT: 0 }]);
+  const sourceCount = Number(sourceCountRows?.[0]?.CNT ?? sourceCountRows?.[0]?.cnt ?? 0) || 0;
+  if (sourceCount === 0) {
+    return {
+      table,
+      skipped: true,
+      reason: 'no_source_rows',
+      schema: schemaLabel,
+      command: `SKIP ${table} (no source rows for company ${sourceNum})`,
+    };
+  }
+
+  const binds = { source_code: sourceNum, target_code: targetNum, comp_year: yearNum };
+  const selectParts = cols.map((c) => {
+    if (c === 'COMP_CODE') return ':target_code AS COMP_CODE';
+    if (c === 'COMP_YEAR' && hasYear) return ':comp_year AS COMP_YEAR';
+    return c;
+  });
+  const command = `INSERT INTO ${table} (${cols.join(', ')}) SELECT … FROM ${table} WHERE COMP_CODE = ${sourceNum} → ${targetNum}`;
+
+  const { rowsAffected } = await runExecute(
+    `INSERT INTO ${table} (${cols.join(', ')})
+     SELECT ${selectParts.join(', ')}
+       FROM ${table}
+      WHERE COMP_CODE = :source_code`,
+    binds,
+    schema,
+    { autoCommit: true }
+  );
+
+  const rows = rowsAffected || sourceCount;
+  return {
+    table,
+    cloned: true,
+    rows,
+    schema: schemaLabel,
+    sourceRows: sourceCount,
+    command,
+  };
+}
+
+async function cloneNewCompanyMasterData(templateCode, newCode, compYear, templateYear, comp_uid) {
+  const schemas = isEffectiveCompUid(comp_uid) ? [String(comp_uid).trim(), null] : [null];
+  const tablesCloned = [];
+  const tablesSkipped = [];
+
+  for (const table of NEWCOMP_CLONE_TABLES) {
+    let done = false;
+    for (const schema of schemas) {
+      try {
+        const r = await cloneNewcompTableRows(
+          table,
+          templateCode,
+          newCode,
+          compYear,
+          schema
+        );
+        if (r.cloned) {
+          tablesCloned.push(r);
+          done = true;
+          break;
+        }
+        if (r.reason === 'missing_table' && schema !== schemas[schemas.length - 1]) continue;
+        if (r.reason === 'no_source_rows' && schema !== schemas[schemas.length - 1]) continue;
+        if (!done) tablesSkipped.push(r);
+        done = true;
+        break;
+      } catch (err) {
+        if (schema === schemas[schemas.length - 1]) {
+          tablesSkipped.push({ table, skipped: true, reason: err.message });
+        }
+      }
+    }
+  }
+
+  for (const schema of schemas) {
+    try {
+      await runQuery(
+        `UPDATE MASTER SET OP_BALANCE = 0
+          WHERE COMP_CODE = :comp_code AND COMP_YEAR = :comp_year`,
+        { comp_code: Number(newCode) || 0, comp_year: Number(compYear) || 0 },
+        schema,
+        { autoCommit: true }
+      );
+      break;
+    } catch {
+      /* optional */
+    }
+  }
+
+  return { tablesCloned, tablesSkipped };
+}
+
+const NEWCOMP_TX_WARN_TABLES = ['LEDGER', 'SALE', 'PURCHASE', 'VOUCHER'];
+const NEWCOMP_DELETE_LAST_TABLES = new Set(['COMPANY', 'COMPDET']);
+
+async function listNewcompTablesWithCompCode(schema) {
+  const sql = `SELECT C.TABLE_NAME
+       FROM USER_TAB_COLUMNS C
+       INNER JOIN USER_TABLES T ON T.TABLE_NAME = C.TABLE_NAME
+      WHERE C.COLUMN_NAME = 'COMP_CODE'
+      GROUP BY C.TABLE_NAME
+      ORDER BY C.TABLE_NAME`;
+  const rows = isEffectiveCompUid(schema)
+    ? await runQuery(sql, {}, schema, { suppressDbErrorLog: true }).catch(() => [])
+    : await runGrainfasHubQuery(sql, {}, { suppressDbErrorLog: true }).catch(() => []);
+  return (rows || [])
+    .map((r) => String(r.TABLE_NAME ?? r.table_name ?? '').toUpperCase())
+    .filter(Boolean);
+}
+
+async function countNewcompTableRows(table, comp_code, schema) {
+  const rows = await runQuery(
+    `SELECT COUNT(*) AS CNT FROM ${table} WHERE COMP_CODE = :comp_code`,
+    { comp_code: Number(comp_code) || 0 },
+    schema,
+    { suppressDbErrorLog: true }
+  ).catch(() => [{ CNT: 0 }]);
+  return Number(rows?.[0]?.CNT ?? rows?.[0]?.cnt ?? 0) || 0;
+}
+
+function sortNewcompDeleteTables(tables) {
+  const txSet = new Set([...NEW_YEAR_TX_TABLES, ...NEWCOMP_TX_WARN_TABLES]);
+  return [...tables].sort((a, b) => {
+    const rank = (t) => {
+      if (NEWCOMP_DELETE_LAST_TABLES.has(t)) return 2;
+      if (txSet.has(t)) return 0;
+      return 1;
+    };
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    return a.localeCompare(b);
+  });
+}
+
+async function fetchNewCompanyDeleteWarnings(targetCode, comp_uid) {
+  const code = Number(targetCode) || 0;
+  const schemas = isEffectiveCompUid(comp_uid) ? [String(comp_uid).trim()] : [];
+  const counts = {};
+  let hasTransactions = false;
+  for (const schema of schemas) {
+    for (const table of NEWCOMP_TX_WARN_TABLES) {
+      if (!(await newcompTableExists(table, schema))) continue;
+      const cnt = await countNewcompTableRows(table, code, schema);
+      if (cnt > 0) {
+        counts[table] = (counts[table] || 0) + cnt;
+        hasTransactions = true;
+      }
+    }
+  }
+  return { hasTransactions, counts };
+}
+
+async function deleteNewCompanyTableStep(targetCode, table, schemaKey) {
+  const code = Number(targetCode) || 0;
+  const tableUp = String(table || '').toUpperCase();
+  if (!tableUp) {
+    const err = new Error('table is required');
+    err.status = 400;
+    throw err;
+  }
+  const isHub = !schemaKey || schemaKey === 'GRAINFAS' || schemaKey === 'hub';
+  const schema = isHub ? null : String(schemaKey).trim();
+  const schemaLabel = isHub ? 'GRAINFAS' : schema;
+  const command = `DELETE FROM ${tableUp} WHERE COMP_CODE = ${code}`;
+  try {
+    const execFn = isHub ? runGrainfasHubExecute : runExecute;
+    const { rowsAffected } = await execFn(
+      `DELETE FROM ${tableUp} WHERE COMP_CODE = :comp_code`,
+      { comp_code: code },
+      schema,
+      { autoCommit: true, suppressDbErrorLog: true }
+    );
+    return {
+      table: tableUp,
+      schema: schemaLabel,
+      command,
+      rows: rowsAffected || 0,
+      deleted: rowsAffected > 0,
+      skipped: rowsAffected === 0,
+    };
+  } catch (err) {
+    return { table: tableUp, schema: schemaLabel, command, skipped: true, reason: err.message };
+  }
+}
+
+async function buildNewCompanyDeleteSteps(targetCode, comp_uid) {
+  const code = Number(targetCode) || 0;
+  const steps = [];
+  const schemaEntries = [];
+  if (isEffectiveCompUid(comp_uid)) {
+    schemaEntries.push({ key: String(comp_uid).trim(), label: String(comp_uid).trim() });
+  }
+  schemaEntries.push({ key: 'GRAINFAS', label: 'GRAINFAS' });
+
+  for (const { key, label } of schemaEntries) {
+    const schema = key === 'GRAINFAS' ? null : key;
+    const tables = sortNewcompDeleteTables(await listNewcompTablesWithCompCode(schema));
+    for (const table of tables) {
+      if (key !== 'GRAINFAS' && NEWCOMP_DELETE_LAST_TABLES.has(table)) continue;
+      steps.push({
+        schema: label,
+        table,
+        command: `DELETE FROM ${table} WHERE COMP_CODE = ${code}`,
+      });
+    }
+  }
+
+  for (const table of ['COMPDET', 'COMPANY']) {
+    if (!steps.some((s) => s.table === table && s.schema === 'GRAINFAS')) {
+      steps.push({
+        schema: 'GRAINFAS',
+        table,
+        command: `DELETE FROM ${table} WHERE COMP_CODE = ${code}`,
+      });
+    }
+  }
+
+  return steps.map((step, index) => ({ index, ...step }));
+}
+
+function buildNewCompanySaveSteps(templateCode, newCode, compYear, comp_uid) {
+  const tpl = Number(templateCode) || 0;
+  const code = Number(newCode) || 0;
+  const year = Number(compYear) || 0;
+  const schemaLabel = isEffectiveCompUid(comp_uid) ? String(comp_uid).trim() : 'GRAINFAS';
+  const steps = [
+    {
+      index: 0,
+      phase: 'insert',
+      schema: 'GRAINFAS',
+      table: 'COMPANY',
+      command: `INSERT INTO COMPANY (COMP_CODE, COMP_NAME) VALUES (${code}, …)`,
+    },
+    {
+      index: 1,
+      phase: 'insert',
+      schema: 'GRAINFAS',
+      table: 'COMPDET',
+      command: `INSERT INTO COMPDET (COMP_CODE=${code}, COMP_YEAR=${year}, …)`,
+    },
+  ];
+  let idx = 2;
+  for (const table of NEWCOMP_CLONE_TABLES) {
+    steps.push({
+      index: idx,
+      phase: 'clone',
+      schema: schemaLabel,
+      table,
+      command: `INSERT INTO ${table} SELECT … FROM ${table} WHERE COMP_CODE = ${tpl} → ${code}`,
+    });
+    idx += 1;
+  }
+  steps.push({
+    index: idx,
+    phase: 'update',
+    schema: schemaLabel,
+    table: 'MASTER',
+    command: `UPDATE MASTER SET OP_BALANCE = 0 WHERE COMP_CODE = ${code} AND COMP_YEAR = ${year}`,
+  });
+  return steps;
+}
+
+async function deleteNewCompanyFromSchema(targetCode, schema) {
+  const code = Number(targetCode) || 0;
+  const isHub = schema == null;
+  const schemaLabel = isHub ? 'GRAINFAS' : String(schema).trim();
+  const tables = sortNewcompDeleteTables(await listNewcompTablesWithCompCode(schema));
+  const deleted = [];
+  const skipped = [];
+  for (const table of tables) {
+    const r = await deleteNewCompanyTableStep(code, table, isHub ? 'GRAINFAS' : schemaLabel);
+    if (r.deleted) deleted.push({ table: r.table, schema: r.schema, rows: r.rows });
+    else if (r.reason) skipped.push({ table: r.table, schema: r.schema, reason: r.reason });
+  }
+  return { deleted, skipped };
+}
+
+async function fetchNewCompanyLabel(targetCode) {
+  const code = Number(targetCode) || 0;
+  for (const sql of [
+    'SELECT COMP_NAME FROM COMPANY WHERE COMP_CODE = :comp_code AND ROWNUM = 1',
+    'SELECT COMP_NAME FROM COMPDET WHERE COMP_CODE = :comp_code AND ROWNUM = 1',
+  ]) {
+    try {
+      const rows = await runGrainfasHubQuery(sql, { comp_code: code }, { suppressDbErrorLog: true });
+      const name = String(rows?.[0]?.COMP_NAME ?? rows?.[0]?.comp_name ?? '').trim();
+      if (name) return name;
+    } catch {
+      /* optional */
+    }
+  }
+  return '';
+}
+
+async function executeNewCompanyDelete(targetCode, sessionCompCode, comp_uid) {
+  const code = Number(targetCode) || 0;
+  const sessionCode = Number(sessionCompCode) || 0;
+  if (!code) {
+    const err = new Error('Comp Code is required for delete.');
+    err.status = 400;
+    throw err;
+  }
+  if (sessionCode && code === sessionCode) {
+    const err = new Error('Cannot delete the logged-in company. Switch company first.');
+    err.status = 400;
+    throw err;
+  }
+  if (!(await companyCodeExists(code))) {
+    const err = new Error(`Company code ${code} not found in COMPANY / COMPDET.`);
+    err.status = 404;
+    throw err;
+  }
+
+  const schemaResults = [];
+  if (isEffectiveCompUid(comp_uid)) {
+    schemaResults.push(await deleteNewCompanyFromSchema(code, String(comp_uid).trim()));
+  }
+  schemaResults.push(await deleteNewCompanyFromSchema(code, null));
+
+  const deleted = schemaResults.flatMap((r) => r.deleted);
+  const skipped = schemaResults.flatMap((r) => r.skipped);
+
+  for (const table of ['COMPDET', 'COMPANY']) {
+    const r = await deleteNewCompanyTableStep(code, table, 'GRAINFAS');
+    if (r.deleted) deleted.push({ table: r.table, schema: r.schema, rows: r.rows });
+    else if (r.reason) skipped.push({ table: r.table, schema: r.schema, reason: r.reason });
+  }
+
+  if (await companyCodeExists(code)) {
+    const err = new Error('Company delete incomplete — COMPANY / COMPDET row may still exist.');
+    err.status = 500;
+    err.details = { deleted, skipped };
+    throw err;
+  }
+
+  return { comp_code: code, deleted, skipped };
+}
+
+async function insertNewCompanyRows({
+  comp_code,
+  comp_year,
+  comp_uid,
+  fields,
+}) {
+  const code = Number(comp_code) || 0;
+  const year = Number(comp_year) || 0;
+  const name = String(fields.COMP_NAME ?? fields.comp_name ?? '').trim();
+  const sdt = newcompEndDateDmy(fields.COMP_S_DT ?? fields.comp_s_dt);
+  const edt = newcompEndDateDmy(fields.COMP_E_DT ?? fields.comp_e_dt);
+  if (!name) {
+    const err = new Error('Company Name is required.');
+    err.status = 400;
+    throw err;
+  }
+  if (!sdt || !edt) {
+    const err = new Error('Financial year start and end dates are required.');
+    err.status = 400;
+    throw err;
+  }
+  if (await companyCodeExists(code)) {
+    const err = new Error(`Company code ${code} already exists.`);
+    err.status = 409;
+    throw err;
+  }
+  if (await compdetRowExists(code, year)) {
+    const err = new Error(`COMPDET row already exists for company ${code} / year ${year}.`);
+    err.status = 409;
+    throw err;
+  }
+
+  const binds = {
+    comp_code: code,
+    comp_name: name,
+    comp_year: year,
+    comp_add1: String(fields.COMP_ADD1 ?? '').trim(),
+    comp_add2: String(fields.COMP_ADD2 ?? '').trim(),
+    comp_tel1: String(fields.COMP_TEL1 ?? '').trim(),
+    comp_tel2: String(fields.COMP_TEL2 ?? '').trim(),
+    comp_tel3: String(fields.COMP_TEL3 ?? '').trim(),
+    comp_pan: String(fields.COMP_PAN ?? '').trim(),
+    comp_tin: String(fields.COMP_TIN ?? '').trim(),
+    comp_tdsno: String(fields.COMP_TDSNO ?? '').trim(),
+    comp_prop: String(fields.COMP_PROP ?? '').trim(),
+    comp_p_d: String(fields.COMP_P_D ?? '').trim(),
+    bank_ac_no: String(fields.BANK_AC_NO ?? '').trim(),
+    group_id: code,
+    email: String(fields.EMAIL ?? '').trim(),
+    comp_uid: String(comp_uid ?? '').trim(),
+    sdt,
+    edt,
+  };
+
+  await runGrainfasHubExecute(
+    `INSERT INTO COMPANY (COMP_CODE, COMP_NAME) VALUES (:comp_code, :comp_name)`,
+    { comp_code: binds.comp_code, comp_name: binds.comp_name },
+    { autoCommit: true }
+  );
+
+  await runGrainfasHubExecute(
+    `INSERT INTO compdet (
+       comp_code, comp_year, comp_name, comp_add1, comp_add2,
+       comp_tel1, comp_tel2, comp_tel3, comp_pan, comp_tin, comp_tdsno,
+       comp_s_dt, comp_e_dt, comp_prop, comp_p_d, bank_ac_no, group_id, email, comp_uid
+     ) VALUES (
+       :comp_code, :comp_year, :comp_name, :comp_add1, :comp_add2,
+       :comp_tel1, :comp_tel2, :comp_tel3, :comp_pan, :comp_tin, :comp_tdsno,
+       TO_DATE(:sdt, 'DD-MM-YYYY'), TO_DATE(:edt, 'DD-MM-YYYY'),
+       :comp_prop, :comp_p_d, :bank_ac_no, :group_id, :email, :comp_uid
+     )`,
+    binds,
+    { autoCommit: true }
+  );
+
+  return binds;
+}
+
+app.post('/api/new-company-verify-password', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const body = req.body || {};
+    const comp_code = String(body.comp_code ?? req.headers['x-comp-code'] ?? '').trim();
+    const user_name = String(body.user_name ?? '').trim();
+    const password = body.password ?? body.apw ?? '';
+    if (!comp_code || !user_name) {
+      return res.status(400).json({ error: 'comp_code and user_name are required' });
+    }
+    if (!verifyNewCompanyPassword(password)) {
+      return res.status(403).json({ error: 'Invalid Passowrd' });
+    }
+    const token = issueNewCompanyAccessToken(comp_code);
+    res.json({ ok: true, token, compCode: comp_code });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company-verify-password error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.get('/api/new-company/context', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const comp_code = String(req.query.comp_code ?? '').trim();
+    const comp_uid = String(req.query.comp_uid ?? '').trim();
+    const user_name = String(req.query.user_name ?? '').trim();
+    if (!comp_code || !comp_uid || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, and user_name are required' });
+    }
+    assertNewCompanyAccessToken(req, comp_code);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canOpen && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+    const source = await runCompdetHeaderRow(comp_code, comp_uid);
+    if (!source) return res.status(404).json({ error: 'Current compdet row not found.' });
+
+    const suggestedCompCode = await fetchNextCompanyCode();
+    const templateCompYear = Number(source.COMP_YEAR ?? source.comp_year ?? 0) || 0;
+
+    res.json({
+      ok: true,
+      permissions: perms,
+      context: {
+        templateCompCode: Number(comp_code) || 0,
+        templateCompYear,
+        schemaUid: comp_uid,
+        suggestedCompCode,
+        defaultCompYear: templateCompYear,
+        defaultStartDate: formatDateDmyFromRaw(source.COMP_S_DT ?? source.comp_s_dt),
+        defaultEndDate: formatDateDmyFromRaw(source.COMP_E_DT ?? source.comp_e_dt),
+      },
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company context error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/new-company/save', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const body = req.body || {};
+    const comp_uid = String(body.comp_uid ?? '').trim();
+    const user_name = String(body.user_name ?? '').trim();
+    const sessionCompCode = String(body.comp_code ?? '').trim();
+    const templateCode = Number(body.template_comp_code ?? body.comp_code ?? 0) || 0;
+    const templateYear = Number(body.template_comp_year ?? 0) || 0;
+    const fields = body.fields && typeof body.fields === 'object' ? body.fields : body;
+
+    if (!comp_uid || !user_name) {
+      return res.status(400).json({ error: 'comp_uid and user_name are required' });
+    }
+    if (!sessionCompCode) {
+      return res.status(400).json({ error: 'comp_code is required' });
+    }
+    assertNewCompanyAccessToken(req, sessionCompCode);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canAdd && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+
+    const newCode = Number(fields.COMP_CODE ?? fields.comp_code ?? 0) || 0;
+    const newYear = Number(fields.COMP_YEAR ?? fields.comp_year ?? templateYear) || templateYear;
+    if (!newCode) {
+      return res.status(400).json({ error: 'Comp Code is required.' });
+    }
+
+    const inserted = await insertNewCompanyRows({
+      comp_code: newCode,
+      comp_year: newYear,
+      comp_uid,
+      fields,
+    });
+
+    const cloneResult = await cloneNewCompanyMasterData(
+      templateCode,
+      newCode,
+      newYear,
+      templateYear,
+      comp_uid
+    );
+
+    res.json({
+      ok: true,
+      message: 'DONE',
+      comp_code: newCode,
+      comp_year: newYear,
+      comp_name: inserted.comp_name,
+      tablesCloned: cloneResult.tablesCloned,
+      tablesSkipped: cloneResult.tablesSkipped,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company save error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.get('/api/new-company/list', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const sessionCompCode = String(req.query.comp_code ?? '').trim();
+    const comp_uid = String(req.query.comp_uid ?? '').trim();
+    const user_name = String(req.query.user_name ?? '').trim();
+    if (!sessionCompCode || !comp_uid || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, and user_name are required' });
+    }
+    assertNewCompanyAccessToken(req, sessionCompCode);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canDelete && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+    const rows = await fetchCompanyListRows('');
+    const sessionNum = Number(sessionCompCode) || 0;
+    const companies = (rows || []).map((row) => {
+      const code = Number(row.COMP_CODE ?? row.comp_code ?? 0) || 0;
+      const name = String(row.COMP_NAME ?? row.comp_name ?? '').trim();
+      return {
+        comp_code: code,
+        COMP_CODE: code,
+        comp_name: name,
+        COMP_NAME: name,
+        is_current: code === sessionNum ? 1 : 0,
+        isCurrent: code === sessionNum,
+        canDelete: code !== sessionNum && code > 0,
+      };
+    });
+    res.json({ ok: true, companies, currentCompCode: sessionNum });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company list error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.get('/api/new-company/delete-check', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const sessionCompCode = String(req.query.comp_code ?? '').trim();
+    const comp_uid = String(req.query.comp_uid ?? '').trim();
+    const user_name = String(req.query.user_name ?? '').trim();
+    const target_comp_code = Number(req.query.target_comp_code ?? req.query.delete_comp_code ?? 0) || 0;
+    if (!sessionCompCode || !comp_uid || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, and user_name are required' });
+    }
+    if (!target_comp_code) {
+      return res.status(400).json({ error: 'target_comp_code is required' });
+    }
+    assertNewCompanyAccessToken(req, sessionCompCode);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canDelete && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+    if (Number(sessionCompCode) === target_comp_code) {
+      return res.status(400).json({ error: 'Cannot delete the logged-in company. Switch company first.' });
+    }
+    const exists = await companyCodeExists(target_comp_code);
+    if (!exists) {
+      return res.status(404).json({ error: `Company code ${target_comp_code} not found.` });
+    }
+    const companyName = await fetchNewCompanyLabel(target_comp_code);
+    const warnings = await fetchNewCompanyDeleteWarnings(target_comp_code, comp_uid);
+    res.json({
+      ok: true,
+      targetCompCode: target_comp_code,
+      companyName,
+      exists: true,
+      transactionWarning: warnings,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company delete-check error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/new-company/delete', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const body = req.body || {};
+    const sessionCompCode = String(body.comp_code ?? '').trim();
+    const comp_uid = String(body.comp_uid ?? '').trim();
+    const user_name = String(body.user_name ?? '').trim();
+    const target_comp_code = Number(
+      body.target_comp_code ?? body.delete_comp_code ?? body.fields?.COMP_CODE ?? 0
+    ) || 0;
+    const acknowledge_transactions = Boolean(
+      body.acknowledge_transactions ?? body.confirm_transactions ?? body.force
+    );
+
+    if (!sessionCompCode || !comp_uid || !user_name) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, and user_name are required' });
+    }
+    if (!target_comp_code) {
+      return res.status(400).json({ error: 'target_comp_code is required' });
+    }
+    assertNewCompanyAccessToken(req, sessionCompCode);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canDelete && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+
+    const warnings = await fetchNewCompanyDeleteWarnings(target_comp_code, comp_uid);
+    if (warnings.hasTransactions && !acknowledge_transactions) {
+      return res.status(409).json({
+        error: 'Transaction entries exist. Confirm delete to remove LEDGER / SALE / PURCHASE / VOUCHER data.',
+        transactionWarning: warnings,
+        requiresConfirmation: true,
+      });
+    }
+
+    const result = await executeNewCompanyDelete(target_comp_code, sessionCompCode, comp_uid);
+    res.json({ ok: true, message: 'DONE', ...result });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company delete error:', err.message);
+    const payload = { error: err.message };
+    if (err.details) payload.details = err.details;
+    res.status(status).json(payload);
+  }
+});
+
+app.get('/api/new-company/delete/plan', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const sessionCompCode = String(req.query.comp_code ?? '').trim();
+    const comp_uid = String(req.query.comp_uid ?? '').trim();
+    const user_name = String(req.query.user_name ?? '').trim();
+    const target_comp_code = Number(req.query.target_comp_code ?? 0) || 0;
+    if (!sessionCompCode || !comp_uid || !user_name || !target_comp_code) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, user_name, and target_comp_code are required' });
+    }
+    assertNewCompanyAccessToken(req, sessionCompCode);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canDelete && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+    const steps = await buildNewCompanyDeleteSteps(target_comp_code, comp_uid);
+    res.json({ ok: true, targetCompCode: target_comp_code, steps, total: steps.length });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company delete/plan error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/new-company/delete/step', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const body = req.body || {};
+    const sessionCompCode = String(body.comp_code ?? '').trim();
+    const comp_uid = String(body.comp_uid ?? '').trim();
+    const user_name = String(body.user_name ?? '').trim();
+    const target_comp_code = Number(body.target_comp_code ?? 0) || 0;
+    const table = String(body.table ?? '').trim();
+    const schema = String(body.schema ?? 'GRAINFAS').trim();
+    const step_index = Number(body.step_index ?? body.index ?? 0) || 0;
+    const total_steps = Number(body.total_steps ?? body.total ?? 0) || 0;
+
+    if (!sessionCompCode || !comp_uid || !user_name || !target_comp_code || !table) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, user_name, target_comp_code, and table are required' });
+    }
+    assertNewCompanyAccessToken(req, sessionCompCode);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canDelete && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+
+    const result = await deleteNewCompanyTableStep(target_comp_code, table, schema);
+    res.json({
+      ok: true,
+      step: { index: step_index, total: total_steps, ...result },
+      progress: {
+        current: step_index + 1,
+        total: total_steps,
+        table: result.table,
+        schema: result.schema,
+        command: result.command,
+        rows: result.rows ?? 0,
+      },
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company delete/step error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.get('/api/new-company/save/plan', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const sessionCompCode = String(req.query.comp_code ?? '').trim();
+    const comp_uid = String(req.query.comp_uid ?? '').trim();
+    const user_name = String(req.query.user_name ?? '').trim();
+    const templateCode = Number(req.query.template_comp_code ?? sessionCompCode ?? 0) || 0;
+    const newCode = Number(req.query.new_comp_code ?? 0) || 0;
+    const compYear = Number(req.query.comp_year ?? 0) || 0;
+    if (!sessionCompCode || !comp_uid || !user_name || !newCode) {
+      return res.status(400).json({ error: 'comp_code, comp_uid, user_name, and new_comp_code are required' });
+    }
+    assertNewCompanyAccessToken(req, sessionCompCode);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canAdd && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+    const steps = buildNewCompanySaveSteps(templateCode, newCode, compYear, comp_uid);
+    res.json({ ok: true, steps, total: steps.length });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company save/plan error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/new-company/save/insert', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const body = req.body || {};
+    const comp_uid = String(body.comp_uid ?? '').trim();
+    const user_name = String(body.user_name ?? '').trim();
+    const sessionCompCode = String(body.comp_code ?? '').trim();
+    const fields = body.fields && typeof body.fields === 'object' ? body.fields : body;
+    const templateYear = Number(body.template_comp_year ?? 0) || 0;
+
+    if (!comp_uid || !user_name || !sessionCompCode) {
+      return res.status(400).json({ error: 'comp_uid, user_name, and comp_code are required' });
+    }
+    assertNewCompanyAccessToken(req, sessionCompCode);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canAdd && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+
+    const newCode = Number(fields.COMP_CODE ?? fields.comp_code ?? 0) || 0;
+    const newYear = Number(fields.COMP_YEAR ?? fields.comp_year ?? templateYear) || templateYear;
+    const inserted = await insertNewCompanyRows({
+      comp_code: newCode,
+      comp_year: newYear,
+      comp_uid,
+      fields,
+    });
+
+    res.json({
+      ok: true,
+      comp_code: newCode,
+      comp_year: newYear,
+      comp_name: inserted.comp_name,
+      command: `INSERT COMPANY/COMPDET for company ${newCode}`,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company save/insert error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/new-company/clone/table', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const body = req.body || {};
+    const comp_uid = String(body.comp_uid ?? '').trim();
+    const user_name = String(body.user_name ?? '').trim();
+    const sessionCompCode = String(body.comp_code ?? '').trim();
+    const templateCode = Number(body.template_comp_code ?? sessionCompCode ?? 0) || 0;
+    const newCode = Number(body.new_comp_code ?? body.target_comp_code ?? 0) || 0;
+    const compYear = Number(body.comp_year ?? 0) || 0;
+    const table = String(body.table ?? '').trim().toUpperCase();
+    const step_index = Number(body.step_index ?? body.index ?? 0) || 0;
+    const total_steps = Number(body.total_steps ?? body.total ?? 0) || 0;
+
+    if (!comp_uid || !user_name || !sessionCompCode || !newCode || !table) {
+      return res.status(400).json({
+        error: 'comp_uid, user_name, comp_code, new_comp_code, and table are required',
+      });
+    }
+    assertNewCompanyAccessToken(req, sessionCompCode);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canAdd && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+
+    const schemas = isEffectiveCompUid(comp_uid) ? [String(comp_uid).trim(), null] : [null];
+    let lastResult = null;
+    for (const schema of schemas) {
+      try {
+        const r = await cloneNewcompTableRows(table, templateCode, newCode, compYear, schema);
+        if (r.cloned) {
+          lastResult = r;
+          break;
+        }
+        if (r.reason === 'missing_table' && schema !== schemas[schemas.length - 1]) continue;
+        if (r.reason === 'no_source_rows' && schema !== schemas[schemas.length - 1]) continue;
+        lastResult = r;
+        break;
+      } catch (err) {
+        if (schema === schemas[schemas.length - 1]) throw err;
+      }
+    }
+
+    res.json({
+      ok: true,
+      result: lastResult,
+      progress: {
+        current: step_index + 1,
+        total: total_steps,
+        table,
+        schema: lastResult?.schema ?? comp_uid,
+        command: lastResult?.command ?? `CLONE ${table}`,
+        rows: lastResult?.rows ?? 0,
+        skipped: Boolean(lastResult?.skipped),
+      },
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company clone/table error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/new-company/clone/finish', async (req, res) => {
+  try {
+    if (isDesktopOnlyUtilityMobileClient(req)) {
+      return res.status(403).json({
+        error: 'New Company Addition cannot be run from mobile. Use desktop view on a computer.',
+      });
+    }
+    const body = req.body || {};
+    const comp_uid = String(body.comp_uid ?? '').trim();
+    const user_name = String(body.user_name ?? '').trim();
+    const sessionCompCode = String(body.comp_code ?? '').trim();
+    const newCode = Number(body.new_comp_code ?? 0) || 0;
+    const compYear = Number(body.comp_year ?? 0) || 0;
+    const command = `UPDATE MASTER SET OP_BALANCE = 0 WHERE COMP_CODE = ${newCode} AND COMP_YEAR = ${compYear}`;
+
+    if (!comp_uid || !user_name || !sessionCompCode || !newCode) {
+      return res.status(400).json({ error: 'comp_uid, user_name, comp_code, and new_comp_code are required' });
+    }
+    assertNewCompanyAccessToken(req, sessionCompCode);
+    const perms = await fetchUserMasterAdminPerms(user_name, comp_uid);
+    if (!perms.canAdd && !perms.isSupervisor) {
+      return res.status(403).json({ error: 'Access Denied' });
+    }
+
+    const schemas = isEffectiveCompUid(comp_uid) ? [String(comp_uid).trim(), null] : [null];
+    for (const schema of schemas) {
+      try {
+        await runExecute(
+          `UPDATE MASTER SET OP_BALANCE = 0
+            WHERE COMP_CODE = :comp_code AND COMP_YEAR = :comp_year`,
+          { comp_code: newCode, comp_year: compYear },
+          schema,
+          { autoCommit: true }
+        );
+        break;
+      } catch {
+        /* optional */
+      }
+    }
+
+    res.json({ ok: true, command });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ new-company clone/finish error:', err.message);
     res.status(status).json({ error: err.message });
   }
 });

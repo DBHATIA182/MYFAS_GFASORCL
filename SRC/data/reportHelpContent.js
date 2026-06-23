@@ -30,6 +30,42 @@ export const REPORT_HELP = {
         '6 Voucher — Voucher list',
         '7 Master — Schedules, accounts, items, users, godown & more',
         '8 Utilities — Change year/company/user, transfers, installation (from VFP UTILITIES menu)',
+        '9 Income Tax Reports — Party, item, monthly, cash movement & bill-wise payments (VFP incometaxr menu)',
+      ]),
+    ],
+  },
+
+  'trial-balance-summary': {
+    title: 'Trial Balance Summary',
+    summary: 'Annexure (schedule) totals first; open detail and ledger from a row.',
+    sections: [
+      section('Parameters', ['Set as-of (ending) date.', 'Run Report.']),
+      section('Summary screen', [
+        'Shows one row per annexure / schedule with closing and period totals.',
+        'Tap a row → account detail for that schedule.',
+        'Pdf, Excel, Print, and WhatsApp on the toolbar.',
+      ]),
+      section('Detail & ledger', [
+        'On detail, tap an account → ledger for the financial year.',
+        'On ledger, tap a line → voucher; sale bill print where mapped.',
+      ]),
+    ],
+  },
+
+  'trial-date-wise': {
+    title: 'Trial Balance Date Wise',
+    summary: 'Opening, transactions, and closing balances for a date range.',
+    sections: [
+      section('Parameters', ['Starting date and ending date.', 'Run Report.']),
+      section('Columns', [
+        'Code, Name, City, Pan',
+        'Opening Balance (Debit / Credit)',
+        'Transactions (Debit / Credit)',
+        'Closing Balance (Debit / Credit)',
+      ]),
+      section('Drill-down', [
+        'Tap an account row → ledger for the same date range as the report.',
+        'Export: Pdf, Excel, Print, WhatsApp.',
       ]),
     ],
   },
@@ -410,6 +446,51 @@ export const REPORT_HELP = {
         'Tree of schedules and accounts as on date.',
         'Click account rows → ledger for that account.',
         'From ledger → voucher on line click (same as trial flow).',
+      ]),
+    ],
+  },
+
+  'income-tax-module': {
+    title: 'Income Tax Reports',
+    summary:
+      'Income tax and related analysis reports from the legacy VFP BW_MENU popup incometaxr (34 reports).',
+    sections: [
+      section('Source', [
+        'Mapped from menu/BW_MENU.MPR — Income Tax Reports popup.',
+        'Forms in GFASORCL/forms, report layouts in GFASORCL/reports.',
+        'Most reports use DO FORM ITAXRPT WITH a mode letter (A–Y); others use dedicated forms (loaner, lotpursale, ledger_dc_code, cashflow, expenses_monthly, cust_pmt, broksale).',
+      ]),
+      section('Categories', [
+        'Party lists — Loaner list, Broker list.',
+        'Party-wise — Purchase/sales, bill-wise, item-wise, monthly, trading/consignment.',
+        'Item-wise — Purchase/sale, monthly, detail, Excel exports.',
+        'Cash & expenses — Cash movement monthly, cash/non-cash expenses.',
+        'Payments — Customer and supplier bill-wise payment detail/summary.',
+        'Broker — Broker and station-wise sales.',
+      ]),
+      section('Web status', [
+        'All 34 income tax menu reports open on the web (Slide 89) with Proceed and Back on the entry screen.',
+        'Pdf, Excel, and WhatsApp are available after Proceed on the report screen.',
+      ]),
+    ],
+  },
+
+  'loaner-list': {
+    title: 'Loaner List',
+    summary: 'Loaner party balances from ledger (VFP DO FORM LOANER WITH A, prg/itaxrpt.prg LOANLST).',
+    sections: [
+      section('Parameters', [
+        'Starting and ending dates default to the financial year (shown on screen; VFP LOANLST uses full ledger, not date-filtered).',
+        'Specific Schedule — enter a schedule number or leave 0 for all loaner accounts.',
+        'Proceed loads accounts whose code starts with L.',
+      ]),
+      section('Columns', [
+        'Opening, credit amount, credit interest, total credit, debit amount, TDS debit, total debit, closing balance.',
+        'Party name, PAN, and city are from MASTER.',
+      ]),
+      section('Export', [
+        'Pdf, Excel, and WhatsApp on the report toolbar after Proceed.',
+        'Excel matches VFP rptexcel / LOANLST export.',
       ]),
     ],
   },
@@ -973,6 +1054,130 @@ export const REPORT_HELP = {
     ],
   },
 
+  'updation-stock': {
+    title: 'Updation Stock',
+    summary:
+      'Transfer positive LOTSTOCK closing lots to next-year CPUR and LOTSTOCK opening (VFP DO FORM stkupdt).',
+    sections: [
+      section('Access', [
+        'Desktop only — open on a computer or switch to Desktop View in Settings.',
+        'Edit permission or supervisor required to run Proceed.',
+        'Opens from Utilities → Installation → Updation Stock.',
+      ]),
+      section('Fields', [
+        'Current Year Directory — logged-in comp_uid (read-only).',
+        'Next Year Directory — target year schema from COMPDET (auto-filled when found).',
+        'Ending Date — stock valued up to this date (financial year end).',
+      ]),
+      section('Proceed', [
+        'Aggregates current-year LOTSTOCK by supplier, item, status, lot, and godown with positive net qty.',
+        'Clears prior PC opening rows in target CPUR (R_DATE before ending date) and LOTSTOCK (VR_DATE on/before ending date), then re-inserts.',
+        'Inserts new CPUR (TYPE PC) and B/K/H LOTSTOCK lines in the next-year schema.',
+        'Cannot run when next year ending date equals the source ending date.',
+      ]),
+    ],
+  },
+
+  'new-company-addition': {
+    title: 'New Company Addition',
+    summary: 'Add a new company to COMPANY/COMPDET and clone master templates (VFP DO FORM newcomp).',
+    sections: [
+      section('Access', [
+        'Desktop only — installation utility for supervisors or users with Add permission.',
+        'Administrator password KOMVANYA99 required each time (VFP newcomp APW).',
+        'Opens from Utilities → Installation → New Company Addition.',
+      ]),
+      section('Toolbar', [
+        'Save — inserts COMPANY + COMPDET and clones master tables from current company code.',
+        'Delete — opens company list from GRAINFAS.COMPANY; pick one to remove (logged-in company cannot be deleted).',
+        'Exit — return to menu.',
+      ]),
+      section('Delete safety', [
+        'Cannot delete the logged-in company — switch company first.',
+        'If LEDGER, SALE, PURCHASE, or VOUCHER rows exist, a second confirmation lists counts before delete.',
+        'Removes hub COMPANY and COMPDET rows plus every table with COMP_CODE in GRAIN2027 (or current schema).',
+      ]),
+      section('Master clone', [
+        'Copies from current session schema (e.g. GRAIN2027) first, then hub — all rows for template COMP_CODE (VFP: no COMP_YEAR filter on source).',
+        'Tables: BIKEXP, CAT, COST, DANE, GODOWN, GODRENT, HOLIDAY, ITEMMAST, ITEM_GRP, NATURE, NEWINT, MASTER, SCHEDULE, DEFVALUE.',
+        'New rows use the new COMP_CODE and session COMP_YEAR; MASTER.OP_BALANCE set to 0.',
+      ]),
+    ],
+  },
+
+  'set-sale-exp': {
+    title: 'Set Sale Exp.',
+    summary: 'Configure Sale Invoice field visibility and order (VFP DO FORM saleform_Gst WITH \'SALE\').',
+    sections: [
+      section('Access', [
+        'Desktop only — Utilities → Installation → Set Sale Exp.',
+        'Uses Master F5 rights — Edit required to save.',
+      ]),
+      section('Grid columns', [
+        'Field Name — SALEFORM_GST.F_NAME (read-only).',
+        'Add (Y/N) — show field when adding a new sale bill.',
+        'Edit (Y/N) — show field when editing a sale bill.',
+        'Sr.No. — display order (S_NO); 0 = form-level field, non-zero = grid column order in Sale Invoice.',
+        'Hide Y/N — hide column on sale grid; SUP_DATE cannot be hidden.',
+      ]),
+      section('Toolbar', [
+        'Get Data — reload from SALEFORM_GST WHERE FORM_NAME = \'SALE\'.',
+        'Proceed — save all rows (VFP Proceed button).',
+      ]),
+    ],
+  },
+
+  'default-setting': {
+    title: 'Default Setting',
+    summary: 'Company-wide defaults in DEFVALUE (VFP DO FORM default + default2 combined in tabs).',
+    sections: [
+      section('Access', [
+        'Desktop only — Utilities → Installation → Default Setting.',
+        'Uses Master F5 rights — Edit required to save.',
+      ]),
+      section('Tabs', [
+        'General & Codes — arhat, dalali, broker, commission, labour, freight, dane codes.',
+        'Purchase — purchase options and default2 purchase expense codes.',
+        'Sale & Bikri — sale weight, bikri, order, stock rules; default2 sauda/ledger options.',
+        'Printing — bill header, reports, logos (path), email/SMS print names.',
+        'Voucher & Receipt — voucher repeat, CD, cash sale, challan link.',
+        'Interest — G_DAYS, G_EDAYS, Bombay Dhara, auto interest transfer.',
+        'GST / TCS / TDS — tax codes, HSN limits, TCS/TDS percentages and dates.',
+        'Export — export stock type and e-invoice options.',
+        'Folders & System — backup folders, FTP, audit trail, default2 Google Drive / ledger format.',
+      ]),
+      section('Toolbar', [
+        'Get Data — reload DEFVALUE for current COMP_CODE.',
+        'Edit — enable fields; Save — UPDATE DEFVALUE (same as VFP Proceed).',
+        'Fields tagged default2 came from the second VFP form when default ran out of space.',
+        'Code fields — press F1 or click ? to search MASTER (Name, City, Code).',
+        'Printing tab image paths (Default Picture, Sale Bill Logo, Signature, Bank QR Logo, Logo 2) — F1 or ? browses \\\\GFASORCL\\\\LOGO; drive letters (D:/E:/F:) are removed on save.',
+      ]),
+    ],
+  },
+
+  'set-task-scheduler': {
+    title: 'Set Task Scheduler',
+    summary: 'VFP DO FORM schtask WITH 1 — register ORABACK hourly Windows backup task.',
+    sections: [
+      section('Access', [
+        'Desktop only — Utilities → Installation → Set Task Scheduler.',
+        'Uses Master F5 rights — Edit required to Proceed.',
+        'API must run on Windows (uses schtasks.exe).',
+      ]),
+      section('Fields', [
+        'Package Folder — drive letter saved to DEFVALUE.PKG_FOLDER.',
+        'Backup Folder — drive letter saved to DEFVALUE.BACK_FOLDER; Proceed creates X:\\BACKUP if missing.',
+        'Repeat Backup Every (hours) — ORABACK task interval (/SC HOURLY /MO n), start 10:30.',
+      ]),
+      section('Proceed', [
+        'Deletes existing ORABACK task, creates new task running GFASORCL\\oraback.exe.',
+        'Updates DEFVALUE in year schema and hub (GRAIN) when present.',
+        'Shows TASK CREATED on success (same as VFP).',
+      ]),
+    ],
+  },
+
   'opening-bills-detail': {
     title: 'Opening Bills Detail',
     summary: 'Enter opening bill headers and payment schedule lines (VFP DO FORM OPDET).',
@@ -1081,6 +1286,8 @@ export const REPORT_HELP = {
 const PDF_ORDER = [
   'reports-menu',
   'trial-balance',
+  'trial-balance-summary',
+  'trial-date-wise',
   'ledger',
   'ledger-interest',
   'customer-ledger',

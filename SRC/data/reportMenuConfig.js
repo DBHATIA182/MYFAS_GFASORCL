@@ -2,6 +2,7 @@
 
 import { masterMenuItemsForReportConfig } from './masterModuleConfig';
 import { utilitiesMenuItemsForReportConfig } from './utilitiesModuleConfig';
+import { incomeTaxMenuItemsForReportConfig } from './incomeTaxModuleConfig';
 
 export const REPORT_MENU = [
   {
@@ -14,6 +15,8 @@ export const REPORT_MENU = [
     tileColor: '#2a4fa8',
     items: [
       { id: 'trial-balance', title: 'Trial Balance', shortTitle: 'Trial Balance', description: 'Balances as of date' },
+      { id: 'trial-balance-summary', title: 'Trial Balance Summary', shortTitle: 'TB Summary', description: 'Annexure-wise totals' },
+      { id: 'trial-date-wise', title: 'Trial Balance Date Wise', shortTitle: 'TB Date Wise', description: 'Opening, movement, closing' },
       { id: 'trading-ac', title: 'Trading A/C', shortTitle: 'Trading A/C', description: 'Trading account' },
       { id: 'pl-profit-loss', title: 'Profit & Loss', shortTitle: 'P & L', description: 'Profit & loss account' },
       { id: 'balance-sheet', title: 'Balance Sheet', shortTitle: 'Balance Sheet', description: 'Assets & liabilities' },
@@ -137,6 +140,18 @@ export const REPORT_MENU = [
     itemsSectionTitle: 'Options',
     entry: true,
     items: utilitiesMenuItemsForReportConfig(),
+  },
+  {
+    id: 'income-tax-reports',
+    index: 10,
+    sidebarLabel: 'Income Tax',
+    sidebarIcon: '📑',
+    title: 'Income Tax Reports',
+    subtitle: 'Party, item, monthly, cash & payment reports (VFP incometaxr menu)',
+    tileColor: '#0f766e',
+    itemsSectionTitle: 'Reports',
+    entry: true,
+    items: incomeTaxMenuItemsForReportConfig(),
   },
 ];
 
