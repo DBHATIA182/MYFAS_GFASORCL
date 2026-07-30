@@ -1,10 +1,12 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SessionToolbarChrome from './SessionToolbarChrome';
+import ReportExportMenu from './ReportExportMenu';
 import { mountLedgerFullBleedLayout } from '../utils/ledgerFullBleedLayout';
 import {
   filterLedgerMobileRows,
   ledgerFilterIsActive,
   collectLedgerVrTypes,
+  collectLedgerDcCodes,
   formatBalanceDrCr,
   formatIndianLedgerAmount,
   formatLedgerMobileShortDate,
@@ -61,6 +63,11 @@ function LedgerMobileTxnCard({ row, onVoucherClick, onLedgerSaleBillClick }) {
               {meta.label}
             </span>
           ) : null}
+          {String(row.DC_CODE ?? row.dc_code ?? '').trim() ? (
+            <span className="ledger-new-mobile__chip ledger-new-mobile__chip--dc">
+              DC: {String(row.DC_CODE ?? row.dc_code).trim()}
+            </span>
+          ) : null}
         </span>
       </span>
       <span className="ledger-new-mobile__card-right">
@@ -103,27 +110,28 @@ export default function LedgerMobileView({
   const [search, setSearch] = useState('');
   const [amountSideFilter, setAmountSideFilter] = useState('all');
   const [vrTypeFilter, setVrTypeFilter] = useState('all');
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [dcCodeFilter, setDcCodeFilter] = useState('all');
   const listRef = useRef(null);
 
   useLayoutEffect(() => mountLedgerFullBleedLayout(), []);
 
   const vrTypeOptions = useMemo(() => collectLedgerVrTypes(rows), [rows]);
+  const dcCodeOptions = useMemo(() => collectLedgerDcCodes(rows), [rows]);
   const { openingRows, txnRows } = useMemo(() => splitLedgerMobileRows(rows), [rows]);
 
   const { visibleTxn, filterStats, filterActive } = useMemo(() => {
     const txn = txnRows.map((t) => t.row);
-    const filters = { amountSide: amountSideFilter, vrType: vrTypeFilter };
-    const active = ledgerFilterIsActive(search, filters.amountSide, filters.vrType);
+    const filters = { amountSide: amountSideFilter, vrType: vrTypeFilter, dcCode: dcCodeFilter };
+    const active = ledgerFilterIsActive(search, filters.amountSide, filters.vrType, filters.dcCode);
     const visible = filterLedgerMobileRows(txn, search, filters);
     return {
       visibleTxn: visible,
       filterStats: { shown: visible.length, total: txn.length },
       filterActive: active,
     };
-  }, [txnRows, search, amountSideFilter, vrTypeFilter]);
+  }, [txnRows, search, amountSideFilter, vrTypeFilter, dcCodeFilter]);
 
-  const listFilterKey = `${search}|${amountSideFilter}|${vrTypeFilter}`;
+  const listFilterKey = `${search}|${amountSideFilter}|${vrTypeFilter}|${dcCodeFilter}`;
 
   useLayoutEffect(() => {
     if (listRef.current) listRef.current.scrollTop = 0;
@@ -158,60 +166,14 @@ export default function LedgerMobileView({
         </div>
         <div className="ledger-new-mobile__header-actions">
           <SessionToolbarChrome helpReportId={helpReportId} helpCompanyName={helpCompanyName} />
-          <div className="ledger-new-mobile__menu-wrap">
-            <button
-              type="button"
-              className="ledger-new-mobile__menu-btn"
-              aria-label="Export options"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              ⋮
-            </button>
-            {menuOpen ? (
-              <div className="ledger-new-mobile__menu" role="menu">
-                {showPdf && onExportPdf ? (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="ledger-new-mobile__menu-item"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onExportPdf();
-                    }}
-                  >
-                    📄 PDF
-                  </button>
-                ) : null}
-                {onExportExcel ? (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="ledger-new-mobile__menu-item"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onExportExcel();
-                    }}
-                  >
-                    📊 Excel
-                  </button>
-                ) : null}
-                {showWhatsApp && onExportWhatsApp ? (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="ledger-new-mobile__menu-item"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onExportWhatsApp();
-                    }}
-                  >
-                    💬 WhatsApp
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+          <ReportExportMenu
+            variant="dark"
+            onPdf={onExportPdf}
+            onExcel={onExportExcel}
+            onWhatsApp={onExportWhatsApp}
+            showPdf={showPdf}
+            showWhatsApp={showWhatsApp}
+          />
         </div>
       </header>
 
@@ -276,6 +238,25 @@ export default function LedgerMobileView({
           </label>
         ) : null}
 
+        {dcCodeOptions.length > 0 ? (
+          <label className="ledger-new-mobile__vr-type">
+            <span className="ledger-new-mobile__vr-type-label">DC Code</span>
+            <select
+              className="ledger-new-mobile__vr-type-select"
+              value={dcCodeFilter}
+              onChange={(e) => setDcCodeFilter(e.target.value)}
+              aria-label="Filter by DC code"
+            >
+              <option value="all">All DC codes</option>
+              {dcCodeOptions.map(({ code, name }) => (
+                <option key={code} value={code}>
+                  {name ? `${code} — ${name}` : code}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         <div className="ledger-new-mobile__amount-sides" role="group" aria-label="Filter by amount type">
           {[
             { id: 'all', label: 'All' },
@@ -300,6 +281,7 @@ export default function LedgerMobileView({
           <p className="ledger-new-mobile__filter-count">
             Showing {filterStats.shown} of {filterStats.total} entries
             {vrTypeFilter !== 'all' ? ` · Vr ${vrTypeFilter}` : ''}
+            {dcCodeFilter !== 'all' ? ` · DC ${dcCodeFilter}` : ''}
             {amountSideFilter === 'dr' ? ' · Dr only' : amountSideFilter === 'cr' ? ' · Cr only' : ''}
           </p>
         ) : null}

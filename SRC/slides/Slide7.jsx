@@ -16,6 +16,7 @@ import {
   focusNextReportField,
   handleReportDateEnter,
 } from '../utils/reportFormFocus';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 
 const DEFAULT_HISTORY_START_DATE = '2001-04-01';
 
@@ -357,47 +358,20 @@ export default function Slide7({ apiBase, onPrev, onReset, formData }) {
         <SessionInfoLine formData={formData} helpReportId="broker-os" />
         <div className="report-toolbar">
           <h2>Broker outstanding</h2>
-          <div className="toolbar-actions">
-            <button
-              type="button"
-              className="btn btn-toolbar-back"
-              aria-label="Back"
-              onClick={() => setShowReport(false)}
-            >
-              <span className="report-toolbar-back-full">← Back</span>
-              <span className="report-toolbar-back-short" aria-hidden="true">
-                ←
-              </span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-export"
-              onClick={() => downloadPDF().catch((err) => alert(err?.message || String(err)))}
-            >
-              Pdf
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  downloadExcelRows(brokerOsFilteredReportData, 'BrokerOS', `${compName}_BrokerOutstanding`);
-                } catch (e) {
-                  alert(String(e?.message || e));
-                }
-              }}
-            >
-              📊 Excel
-            </button>
-            <button
-              type="button"
-              className="btn btn-whatsapp"
-              disabled={whatsAppBusy}
-              onClick={() => shareWhatsApp().catch((err) => alert(err?.message || String(err)))}
-            >
-              {whatsAppBusy ? 'Preparing…' : '💬 WhatsApp'}
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="broker-os"
+            onBack={() => setShowReport(false)}
+            onPdf={() => downloadPDF().catch((err) => alert(err?.message || String(err)))}
+            onExcel={() => {
+              try {
+                downloadExcelRows(brokerOsFilteredReportData, 'BrokerOS', `${compName}_BrokerOutstanding`);
+              } catch (e) {
+                alert(String(e?.message || e));
+              }
+            }}
+            onWhatsApp={() => shareWhatsApp().catch((err) => alert(err?.message || String(err)))}
+            whatsAppDisabled={whatsAppBusy}
+          />
         </div>
 
         <div className="report-info">

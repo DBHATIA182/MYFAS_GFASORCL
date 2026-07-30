@@ -7,7 +7,7 @@ import { toDisplayDate, toInputDateString, toOracleDate } from '../utils/dateFor
 import { downloadExcelWorkbook, downloadExcelRows } from '../utils/excelExport';
 import { generatePDF, sharePdfWithWhatsApp, buildLedgerStatementPdfMetadata } from '../utils/pdfgenerator';
 import { formatLedgerVoucherApiError } from '../utils/apiLabel';
-import ReportHelpButton from '../components/ReportHelpButton';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 
 function num(v) {
   const n = Number(v);
@@ -890,22 +890,16 @@ export default function Slide17TradingAc({ apiBase, formData = {}, onPrev, onRes
       <div className="slide slide-report slide-17">
         <div className="report-toolbar">
           <h2>Trading A/C</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="trading-ac" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen('form')}>
-              ← Back
-            </button>
-            <button type="button" className="btn btn-export" onClick={exportTradingPdf} disabled={!rows.length}>
-              Pdf
-            </button>
-            <button type="button" className="btn btn-excel" onClick={exportTradingExcel} disabled={!rows.length}>
-              📊 Excel
-            </button>
-            <button type="button" className="btn btn-whatsapp" onClick={shareTradingWhatsapp} disabled={!rows.length}>
-              WhatsApp
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="trading-ac"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={() => setScreen('form')}
+            onPdf={exportTradingPdf}
+            onExcel={exportTradingExcel}
+            onWhatsApp={shareTradingWhatsapp}
+            pdfDisabled={!rows.length}
+            whatsAppDisabled={!rows.length}
+          />
         </div>
         <div className="report-info">
           <p>
@@ -1100,45 +1094,43 @@ export default function Slide17TradingAc({ apiBase, formData = {}, onPrev, onRes
       <div className="slide slide-report slide-17">
         <div className="report-toolbar">
           <h2>Trading Ledger</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="trading-ac" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className={`btn btn-secondary ${ledgerView === 'entry' ? 'is-active' : ''}`} onClick={() => setLedgerView('entry')}>
-              Entry Wise
-            </button>
-            <button
-              type="button"
-              className={`btn btn-secondary ${ledgerView === 'date' ? 'is-active' : ''}`}
-              onClick={() => {
-                setLedgerEntryFilter({ kind: 'all', value: '' });
-                setLedgerView('date');
-              }}
-            >
-              Date Wise
-            </button>
-            <button
-              type="button"
-              className={`btn btn-secondary ${ledgerView === 'month' ? 'is-active' : ''}`}
-              onClick={() => {
-                setLedgerEntryFilter({ kind: 'all', value: '' });
-                setLedgerView('month');
-              }}
-            >
-              Month Wise
-            </button>
-            <button type="button" className="btn btn-excel" onClick={exportLedgerExcel} disabled={!ledgerRows.length}>
-              📊 Excel
-            </button>
-            <button type="button" className="btn btn-export" onClick={exportLedgerPdf} disabled={!ledgerRows.length}>
-              Pdf
-            </button>
-            <button type="button" className="btn btn-whatsapp" onClick={shareLedgerWhatsapp} disabled={!ledgerRows.length}>
-              💬 WhatsApp
-            </button>
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen('report')}>
-              ← Back
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="trading-ac"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={() => setScreen('report')}
+            onPdf={exportLedgerPdf}
+            onExcel={exportLedgerExcel}
+            onWhatsApp={shareLedgerWhatsapp}
+            pdfDisabled={!ledgerRows.length}
+            whatsAppDisabled={!ledgerRows.length}
+            extra={
+              <>
+                <button type="button" className={`btn btn-secondary ${ledgerView === 'entry' ? 'is-active' : ''}`} onClick={() => setLedgerView('entry')}>
+                  Entry Wise
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-secondary ${ledgerView === 'date' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setLedgerEntryFilter({ kind: 'all', value: '' });
+                    setLedgerView('date');
+                  }}
+                >
+                  Date Wise
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-secondary ${ledgerView === 'month' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setLedgerEntryFilter({ kind: 'all', value: '' });
+                    setLedgerView('month');
+                  }}
+                >
+                  Month Wise
+                </button>
+              </>
+            }
+          />
         </div>
         <div className="report-info">
           <p><strong>{ledgerTitle}</strong></p>
@@ -1162,7 +1154,7 @@ export default function Slide17TradingAc({ apiBase, formData = {}, onPrev, onRes
                         ? 'trading-ledger-row trading-ledger-row--pu'
                         : String(row?.VR_TYPE || '').trim().toUpperCase() === 'SL'
                           ? 'trading-ledger-row trading-ledger-row--sl'
-                          : String(row?.VR_TYPE || '').trim().toUpperCase() === 'CN'
+                          : ['CN', 'ER'].includes(String(row?.VR_TYPE || '').trim().toUpperCase())
                             ? 'trading-ledger-row trading-ledger-row--cn'
                             : 'trading-ledger-row';
                 const rowClass = `${baseClass}${selectedLedgerRowKey === rowKey ? ' trading-ledger-row--active' : ''}`;
@@ -1247,13 +1239,12 @@ export default function Slide17TradingAc({ apiBase, formData = {}, onPrev, onRes
       <div className="slide slide-report slide-17">
         <div className="report-toolbar">
           <h2>Trading Voucher Detail</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="trading-ac" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen('ledger')}>
-              ← Back to Ledger
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="trading-ac"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={() => setScreen('ledger')}
+            backLabel="← Back to Ledger"
+          />
         </div>
         <div className="report-info">
           <p><strong>{ledgerTitle}</strong></p>
@@ -1317,27 +1308,22 @@ export default function Slide17TradingAc({ apiBase, formData = {}, onPrev, onRes
         <div className="slide slide-report slide-17">
           <div className="report-toolbar">
             <h2>Voucher entries</h2>
-            <div className="toolbar-actions">
-            <ReportHelpButton reportId="trading-ac" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-              <button type="button" className="btn btn-toolbar-back" onClick={() => setGlVoucherRows(null)}>
-                ← Back to ledger
-              </button>
-              <button
-                type="button"
-                className="btn btn-excel"
-                onClick={() => {
-                  try {
-                    const tag = String(glVoucherTitle || 'voucher').replace(/\s+/g, '_');
-                    downloadExcelRows(glVoucherRows, 'Voucher', `${compName}_${tag}`);
-                  } catch (e) {
-                    alert(String(e?.message || e));
-                  }
-                }}
-              >
-                📊 Excel
-              </button>
-            </div>
+            <ReportToolbarActions
+              reportId="trading-ac"
+              helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+              onBack={() => setGlVoucherRows(null)}
+              backLabel="← Back to ledger"
+              showPdf={false}
+              showWhatsApp={false}
+              onExcel={() => {
+                try {
+                  const tag = String(glVoucherTitle || 'voucher').replace(/\s+/g, '_');
+                  downloadExcelRows(glVoucherRows, 'Voucher', `${compName}_${tag}`);
+                } catch (e) {
+                  alert(String(e?.message || e));
+                }
+              }}
+            />
           </div>
 
           <LedgerReportHeader
@@ -1373,50 +1359,30 @@ export default function Slide17TradingAc({ apiBase, formData = {}, onPrev, onRes
       <div className="slide slide-report slide-17">
         <div className="report-toolbar">
           <h2>Ledger Report</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="trading-ac" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={backFromGlLedger}>
-              ← Back to Trading A/C
-            </button>
-            <button
-              type="button"
-              className="btn btn-export"
-              onClick={() => generatePDF('ledger', glLedgerRows, glLedgerPdfMeta()).catch((e) => alert(e?.message || String(e)))}
-              disabled={!glLedgerRows.length}
-            >
-              Pdf
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  downloadExcelRows(glLedgerRows, 'Ledger', `${compName}_Ledger_${glLedgerCode || 'account'}`);
-                } catch (e) {
-                  alert(String(e?.message || e));
-                }
-              }}
-              disabled={!glLedgerRows.length}
-            >
-              📊 Excel
-            </button>
-            <button
-              type="button"
-              className="btn btn-whatsapp"
-              onClick={() =>
-                sharePdfWithWhatsApp(
-                  'ledger',
-                  glLedgerRows,
-                  glLedgerPdfMeta(),
-                  [`Ledger Report — ${compName}`, `${compYear} | ${glLedgerTitle} (${glLedgerCode})`, `${toDisplayDate(glLedgerStart)} → ${toDisplayDate(glLedgerEnd)}`].join('\n')
-                ).catch((e) => alert(String(e?.message || e)))
+          <ReportToolbarActions
+            reportId="trading-ac"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={backFromGlLedger}
+            backLabel="← Back to Trading A/C"
+            onPdf={() => generatePDF('ledger', glLedgerRows, glLedgerPdfMeta()).catch((e) => alert(e?.message || String(e)))}
+            onExcel={() => {
+              try {
+                downloadExcelRows(glLedgerRows, 'Ledger', `${compName}_Ledger_${glLedgerCode || 'account'}`);
+              } catch (e) {
+                alert(String(e?.message || e));
               }
-              disabled={!glLedgerRows.length}
-            >
-              💬 WhatsApp
-            </button>
-          </div>
+            }}
+            onWhatsApp={() =>
+              sharePdfWithWhatsApp(
+                'ledger',
+                glLedgerRows,
+                glLedgerPdfMeta(),
+                [`Ledger Report — ${compName}`, `${compYear} | ${glLedgerTitle} (${glLedgerCode})`, `${toDisplayDate(glLedgerStart)} → ${toDisplayDate(glLedgerEnd)}`].join('\n')
+              ).catch((e) => alert(String(e?.message || e)))
+            }
+            pdfDisabled={!glLedgerRows.length}
+            whatsAppDisabled={!glLedgerRows.length}
+          />
         </div>
 
         <LedgerReportHeader

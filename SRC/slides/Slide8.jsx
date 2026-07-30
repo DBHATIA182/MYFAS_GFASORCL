@@ -7,6 +7,7 @@ import { downloadExcelRows } from '../utils/excelExport';
 import { toInputDateString, toOracleDate, toDisplayDate } from '../utils/dateFormat';
 import { formatApiOrigin } from '../utils/apiLabel';
 import ReportHelpButton from '../components/ReportHelpButton';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 import FasReportHeader from '../components/FasReportHeader';
 import TrialBalanceSessionCard from '../components/TrialBalanceSessionCard';
 import {
@@ -362,39 +363,20 @@ export default function Slide8({ apiBase, formData, onPrev, onReset, viewMode = 
         />
         <div className="report-toolbar">
           <h2>Sale list</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="sale-list" includeSalesEntry={false} includeStockLot={true} appName="GRAINFAS" />
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setShowReport(false)}>
-              ← Back
-            </button>
-            <button
-              type="button"
-              className="btn btn-export"
-              onClick={() => downloadPDF().catch((err) => alert(err?.message || String(err)))}
-            >
-              Pdf
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  downloadExcelRows(reportData, 'SaleList', `${compName}_SaleList`);
-                } catch (e) {
-                  alert(String(e?.message || e));
-                }
-              }}
-            >
-              📊 Excel
-            </button>
-            <button
-              type="button"
-              className="btn btn-whatsapp"
-              onClick={() => shareWhatsApp().catch((err) => alert(err?.message || String(err)))}
-            >
-              💬 WhatsApp
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="sale-list"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GRAINFAS' }}
+            onBack={() => setShowReport(false)}
+            onPdf={() => downloadPDF().catch((err) => alert(err?.message || String(err)))}
+            onExcel={() => {
+              try {
+                downloadExcelRows(reportData, 'SaleList', `${compName}_SaleList`);
+              } catch (e) {
+                alert(String(e?.message || e));
+              }
+            }}
+            onWhatsApp={() => shareWhatsApp().catch((err) => alert(err?.message || String(err)))}
+          />
         </div>
 
         <div className="report-sort-switch" role="group" aria-label="Sale list sort">

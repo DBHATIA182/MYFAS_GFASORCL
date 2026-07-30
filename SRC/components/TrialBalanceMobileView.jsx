@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useMemo, useState } from 'react';
 import SessionToolbarChrome from './SessionToolbarChrome';
+import ReportExportMenu from './ReportExportMenu';
 import { mountLedgerFullBleedLayout } from '../utils/ledgerFullBleedLayout';
 import {
   buildTrialMobileGroups,
@@ -60,7 +61,6 @@ export default function TrialBalanceMobileView({
   const [listMode, setListMode] = useState('cards');
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [expandedAmountKey, setExpandedAmountKey] = useState(null);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useLayoutEffect(() => mountLedgerFullBleedLayout(), []);
 
@@ -112,56 +112,14 @@ export default function TrialBalanceMobileView({
         </div>
         <div className="tb-mobile__header-actions">
           <SessionToolbarChrome helpReportId={helpReportId} helpCompanyName={compName} />
-          <div className="tb-mobile__menu-wrap">
-            <button
-              type="button"
-              className="tb-mobile__menu-btn"
-              aria-label="Export options"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              ⋮
-            </button>
-            {menuOpen ? (
-              <div className="tb-mobile__menu" role="menu">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="tb-mobile__menu-item"
-                  disabled={pdfBusy}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onExportPdf?.();
-                  }}
-                >
-                  PDF
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="tb-mobile__menu-item"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onExportExcel?.();
-                  }}
-                >
-                  Excel
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="tb-mobile__menu-item"
-                  disabled={pdfBusy}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onExportWhatsApp?.();
-                  }}
-                >
-                  WhatsApp
-                </button>
-              </div>
-            ) : null}
-          </div>
+          <ReportExportMenu
+            variant="dark"
+            onPdf={onExportPdf}
+            onExcel={onExportExcel}
+            onWhatsApp={onExportWhatsApp}
+            pdfDisabled={pdfBusy}
+            whatsAppDisabled={pdfBusy}
+          />
         </div>
       </header>
 

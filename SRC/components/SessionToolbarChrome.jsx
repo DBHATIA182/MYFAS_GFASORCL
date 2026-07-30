@@ -7,6 +7,7 @@ export default function SessionToolbarChrome({
   helpReportId,
   helpViewKey = null,
   helpLabel = 'Help',
+  helpIconOnly = true,
   helpCompanyName = '',
   helpShowFullGuidePdf = false,
   helpIncludeSalesEntry = true,
@@ -22,11 +23,11 @@ export default function SessionToolbarChrome({
           reportId={helpReportId}
           viewKey={helpViewKey}
           label={helpLabel}
+          iconOnly={helpIconOnly}
           companyName={helpCompanyName}
           showFullGuidePdf={helpShowFullGuidePdf}
           includeSalesEntry={helpIncludeSalesEntry}
           includeStockLot={helpIncludeStockLot}
-          iconOnly
         />
       ) : null}
       {extraActions}

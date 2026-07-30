@@ -109,7 +109,8 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '40mb' }));
+app.use(express.urlencoded({ extended: true, limit: '40mb' }));
 
 app.get('/api/client-identity', (req, res) => {
   res.json({
@@ -563,7 +564,121 @@ async function runQuery(sql, binds = {}, schema = null, executeExtra = {}) {
 }
 
 const { createIncomeTaxReports } = require('./server/incomeTaxReports.cjs');
+const { createOtherReports } = require('./server/otherReports.cjs');
+const { createLedgerReports, fetchLedgerDrCrDateRows } = require('./server/ledgerReports.cjs');
+const { createVoucherBooks } = require('./server/voucherBooks.cjs');
+const { createVoucherEntry } = require('./server/voucherEntry.cjs');
+const { createPurchaseOrder } = require('./server/purchaseOrder.cjs');
+const { createSalesOrder } = require('./server/salesOrder.cjs');
+const { createDispatchChallan } = require('./server/dispatchChallan.cjs');
+const { createGoodsInward } = require('./server/goodsInward.cjs');
+const { createPurchaseBill } = require('./server/purchaseBill.cjs');
+const { createSaleBillEntry } = require('./server/saleBillEntry.cjs');
+const { createExpVoucher } = require('./server/expVoucher.cjs');
+const { createDcNote } = require('./server/dcNote.cjs');
+const { createConsignmentStock } = require('./server/consignmentStock.cjs');
+const { createPurchaseTdsReports } = require('./server/purchaseTdsReports.cjs');
 const { buildIncomeTaxReport } = createIncomeTaxReports(runQuery);
+const { buildOtherReport } = createOtherReports(runQuery);
+const { buildLedgerReport } = createLedgerReports(runQuery);
+const { buildVoucherBook } = createVoucherBooks(runQuery);
+async function withCompTransaction(comp_uid, fn) {
+  const schema = isEffectiveCompUid(comp_uid) ? String(comp_uid).trim() : '';
+  if (!schema || typeof fn !== 'function') {
+    return fn(null);
+  }
+  let conn;
+  try {
+    conn = await oracledb.getConnection({
+      user: schema,
+      password: schema,
+      connectString: activeDbConfig.connectString,
+    });
+    const exec = async (sql, binds = {}, opts = {}) => {
+      const result = await conn.execute(sql, binds, {
+        outFormat: oracledb.OUT_FORMAT_OBJECT,
+        autoCommit: false,
+        ...opts,
+      });
+      return { rows: result.rows, rowsAffected: result.rowsAffected || 0 };
+    };
+    const out = await fn(exec);
+    await conn.commit();
+    return out;
+  } catch (err) {
+    if (conn) {
+      try {
+        await conn.rollback();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    throw err;
+  } finally {
+    if (conn) {
+      try {
+        await conn.close();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+}
+
+const voucherEntryApi = createVoucherEntry({ runQuery, parseDateOnly, withCompTransaction });
+const purchaseOrderApi = createPurchaseOrder({
+  runQuery,
+  parseDateOnly,
+  withCompTransaction,
+  runHubQuery: runGrainfasHubQuery,
+});
+const salesOrderApi = createSalesOrder({
+  runQuery,
+  parseDateOnly,
+  withCompTransaction,
+  runHubQuery: runGrainfasHubQuery,
+});
+const goodsInwardApi = createGoodsInward({
+  runQuery,
+  parseDateOnly,
+  withCompTransaction,
+  runHubQuery: runGrainfasHubQuery,
+});
+const dispatchChallanApi = createDispatchChallan({
+  runQuery,
+  parseDateOnly,
+  withCompTransaction,
+  runHubQuery: runGrainfasHubQuery,
+});
+const purchaseBillApi = createPurchaseBill({
+  runQuery,
+  parseDateOnly,
+  withCompTransaction,
+  runHubQuery: runGrainfasHubQuery,
+});
+const saleBillEntryApi = createSaleBillEntry({
+  runQuery,
+  parseDateOnly,
+  withCompTransaction,
+  runHubQuery: runGrainfasHubQuery,
+  fetchSaleFormGstRows,
+});
+const expVoucherApi = createExpVoucher({
+  runQuery,
+  parseDateOnly,
+  withCompTransaction,
+});
+const dcNoteApi = createDcNote({
+  runQuery,
+  parseDateOnly,
+  withCompTransaction,
+});
+const consignmentStockApi = createConsignmentStock({
+  runQuery,
+  parseDateOnly,
+  withCompTransaction,
+});
+const purchaseTdsReportsApi = createPurchaseTdsReports(runQuery);
 
 /** DML / DDL — returns { rows, rowsAffected }. Hub default = activeDbConfig; pass hubOverride: DB_PRIMARY for GRAINFAS.COMPANY. */
 async function runExecute(sql, binds = {}, schema = null, executeExtra = {}) {
@@ -797,7 +912,24 @@ function appendMasterListTokenSearch(sql, binds, qTrim, fieldExprs, bindPrefix =
   return `${sql} AND (${parts.join(' AND ')})`;
 }
 
-/** Optional MASTER code prefix: single letter (B) or CS = C+S parties, ST = S+T suppliers. */
+function appendMasterScheduleListFilter(sql, binds, schedulesStr, bindPrefix = 'sched') {
+  const list = String(schedulesStr ?? '')
+    .split(/[,;|]/)
+    .map((s) => masterPartyScheduleBind(s.trim()))
+    .filter((s) => s !== 0);
+  if (!list.length) return sql;
+  if (list.length === 1) {
+    binds.schedule = list[0];
+    return `${sql} AND ROUND(NVL(M.SCHEDULE, 0), 2) = :schedule`;
+  }
+  const parts = list.map((s, i) => {
+    const key = `${bindPrefix}_${i}`;
+    binds[key] = s;
+    return `ROUND(NVL(M.SCHEDULE, 0), 2) = :${key}`;
+  });
+  return `${sql} AND (${parts.join(' OR ')})`;
+}
+
 function appendMasterCodePrefixFilter(sql, codePrefix) {
   const p = String(codePrefix ?? '').trim().toUpperCase();
   if (!p) return sql;
@@ -4472,9 +4604,10 @@ app.get('/api/ledger', async (req, res) => {
       : `
         SELECT A.CODE, B.NAME, B.CITY, B.GST_NO, B.PAN, B.ADD1, B.ADD2, B.TEL_NO_O,
                A.VR_DATE, A.V_DATE, A.VR_NO, A.VR_TYPE, A.TYPE, A.TRN_NO,
-               A.DETAIL, A.DR_AMT, A.CR_AMT, A.DC_CODE, NULL AS DC_NAME
+               A.DETAIL, A.DR_AMT, A.CR_AMT, A.DC_CODE, D.NAME AS DC_NAME
         FROM LEDGER A
         LEFT JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.CODE = B.CODE
+        LEFT JOIN MASTER D ON A.COMP_CODE = D.COMP_CODE AND A.DC_CODE = D.CODE
         WHERE A.COMP_CODE = :comp_code
           AND A.CODE = :code
           AND A.VR_DATE BETWEEN TO_DATE(:s_date, 'DD-MM-YYYY') AND TO_DATE(:e_date, 'DD-MM-YYYY')
@@ -4522,6 +4655,38 @@ app.get('/api/ledger', async (req, res) => {
   } catch (err) {
     console.error("❌ Ledger Query Error:", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Ledger Dr/Cr Date — VFP MYLEGER (separate debit/credit date ranges, full ledger layout)
+app.get('/api/ledger-dr-cr-date', async (req, res) => {
+  try {
+    const { comp_code, code, s_date, e_date, cs_date, ce_date, comp_uid, voucher_wise_total } = req.query;
+    const codeKey = normalizeLedgerAccountCode(code);
+    if (!comp_code || !codeKey) {
+      return res.status(400).json({ error: 'comp_code and code are required' });
+    }
+    if (!s_date || !e_date || !cs_date || !ce_date) {
+      return res.status(400).json({ error: 's_date, e_date, cs_date, and ce_date are required' });
+    }
+    if (comp_uid == null) {
+      return res.status(400).json({ error: 'comp_uid is required' });
+    }
+    const rows = await fetchLedgerDrCrDateRows(
+      runQuery,
+      comp_code,
+      comp_uid,
+      codeKey,
+      s_date,
+      e_date,
+      cs_date,
+      ce_date,
+      voucher_wise_total
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('❌ Ledger Dr/Cr Date Query Error:', err.message);
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 
@@ -4574,9 +4739,10 @@ async function fetchLedgerAccountRows(comp_code, comp_uid, code, s_date, e_date,
     : `
         SELECT A.CODE, B.NAME, B.CITY, B.GST_NO, B.PAN, B.ADD1, B.ADD2, B.TEL_NO_O,
                A.VR_DATE, A.V_DATE, A.VR_NO, A.VR_TYPE, A.TYPE, A.TRN_NO,
-               A.DETAIL, A.DR_AMT, A.CR_AMT, A.DC_CODE, NULL AS DC_NAME
+               A.DETAIL, A.DR_AMT, A.CR_AMT, A.DC_CODE, D.NAME AS DC_NAME
         FROM LEDGER A
         LEFT JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.CODE = B.CODE
+        LEFT JOIN MASTER D ON A.COMP_CODE = D.COMP_CODE AND A.DC_CODE = D.CODE
         WHERE A.COMP_CODE = :comp_code
           AND A.CODE = :code
           AND A.VR_DATE BETWEEN TO_DATE(:s_date, 'DD-MM-YYYY') AND TO_DATE(:e_date, 'DD-MM-YYYY')
@@ -4950,11 +5116,12 @@ app.get('/api/accounts', async (req, res) => {
   try {
     const { comp_code, comp_uid } = req.query;
     
-    // Your exact query optimized for the helper
+    const binds = { comp_code: comp_code };
     const sql = `
       SELECT MAX(A.NAME) AS NAME,
              MAX(A.CITY) AS CITY,
              A.CODE,
+             MAX(NVL(A.SCHEDULE, 0)) AS SCHEDULE,
              MAX(A.ADD1) AS ADD1,
              MAX(A.ADD2) AS ADD2,
              MAX(A.GST_NO) AS GST_NO,
@@ -4968,7 +5135,7 @@ app.get('/api/accounts', async (req, res) => {
       GROUP BY A.CODE
       ORDER BY MAX(A.NAME), MAX(A.CITY)`;
 
-    const rows = await runQuery(sql, { comp_code: comp_code }, comp_uid);
+    const rows = await runQuery(sql, binds, comp_uid);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -5688,9 +5855,11 @@ app.get('/api/salelist-parties', async (req, res) => {
   try {
     const { comp_code, comp_uid } = req.query;
     const sql = `
-      SELECT NAME, CITY, CODE
+      SELECT NAME, CITY, CODE, NVL(PAN, '') AS PAN, NVL(GST_NO, '') AS GST_NO,
+             TRIM(NVL(L_C, 'L')) AS L_C
       FROM MASTER
       WHERE COMP_CODE = :comp_code
+        AND SUBSTR(TRIM(CODE), 1, 1) = 'C'
       ORDER BY NAME, CITY, CODE`;
     const binds = { comp_code };
     const rows = await runQuery(sql, binds, comp_uid);
@@ -6037,6 +6206,13 @@ app.get('/api/compdet-ledger-header', async (req, res) => {
       COMP_ADD1: textVal('comp_add1'),
       COMP_ADD2: textVal('comp_add2'),
       GST_NO: gst,
+      EMAIL: textVal('email'),
+      COMP_TEL1: textVal('comp_tel1'),
+      COMP_TEL2: textVal('comp_tel2'),
+      COMP_TEL3: textVal('comp_tel3'),
+      CIN_NO: textVal('cin_no'),
+      COMP_PAN: textVal('comp_pan'),
+      FSSAI_NO: textVal('fssai_no'),
     });
   } catch (err) {
     console.error('❌ compdet ledger header error:', err.message);
@@ -6469,7 +6645,8 @@ app.get('/api/purchaselist-items', async (req, res) => {
   try {
     const { comp_code, comp_uid } = req.query;
     const rows = await runQuery(
-      `SELECT ITEM_NAME, ITEM_CODE FROM ITEMMAST WHERE COMP_CODE = :comp_code ORDER BY ITEM_NAME`,
+      `SELECT ITEM_NAME, ITEM_CODE, NVL(P_CODE, '') AS P_CODE, NVL(S_CODE, '') AS S_CODE
+       FROM ITEMMAST WHERE COMP_CODE = :comp_code ORDER BY ITEM_NAME`,
       { comp_code },
       comp_uid
     );
@@ -6484,7 +6661,7 @@ app.get('/api/purchaselist-purcodes', async (req, res) => {
   try {
     const { comp_code, comp_uid } = req.query;
     const rows = await runQuery(
-      `SELECT NAME, CITY, CODE FROM MASTER WHERE COMP_CODE = :comp_code ORDER BY NAME, CITY, CODE`,
+      `SELECT NAME, CITY, CODE, GST_NO, PAN FROM MASTER WHERE COMP_CODE = :comp_code ORDER BY NAME, CITY, CODE`,
       { comp_code },
       comp_uid
     );
@@ -6510,14 +6687,20 @@ app.get('/api/purchaselist-godowns', async (req, res) => {
   }
 });
 
-/** Purchase list (PU / DN) */
+/** Purchase list (PU / DN by default; pass type=PB for bardana only) */
 app.get('/api/purchase-list', async (req, res) => {
   try {
-    const { comp_code, comp_uid, s_date, e_date, code, item_code, pur_code, god_code } = req.query;
+    const { comp_code, comp_uid, s_date, e_date, code, item_code, pur_code, god_code, type } = req.query;
     const item = String(item_code ?? '').trim();
     const sup = String(code ?? '').trim();
     const pur = String(pur_code ?? '').trim();
     const god = String(god_code ?? '').trim();
+    const typeFilter = String(type ?? '').trim().toUpperCase();
+    let typeClause = `A.TYPE IN ('PU', 'DN')`;
+    if (typeFilter === 'PB') typeClause = `A.TYPE = 'PB'`;
+    else if (typeFilter === 'PU') typeClause = `A.TYPE = 'PU'`;
+    else if (typeFilter === 'DN') typeClause = `A.TYPE = 'DN'`;
+    else if (typeFilter === 'EV') typeClause = `A.TYPE = 'EV'`;
     const sql = `
       SELECT
         A.TYPE,
@@ -6554,7 +6737,7 @@ app.get('/api/purchase-list', async (req, res) => {
       JOIN ITEMMAST C ON A.COMP_CODE = C.COMP_CODE AND A.ITEM_CODE = C.ITEM_CODE
       LEFT JOIN MASTER D ON A.COMP_CODE = D.COMP_CODE AND A.PUR_CODE = D.CODE
       WHERE A.COMP_CODE = :comp_code
-        AND A.TYPE IN ('PU', 'DN')
+        AND ${typeClause}
         AND A.R_DATE BETWEEN TRUNC(TO_DATE(:s_date, 'DD-MM-YYYY')) AND TRUNC(TO_DATE(:e_date, 'DD-MM-YYYY'))
         AND (:item_all = 1 OR A.ITEM_CODE = :item_code)
         AND (:sup_all = 1 OR NVL(A.CODE, '') = :code)
@@ -6657,6 +6840,13 @@ app.get('/api/purchase-bill-print', async (req, res) => {
     if (!comp_code || !typ || !r_date || !rno) {
       return res.status(400).json({ error: 'comp_code, type, r_date, and r_no are required' });
     }
+    // VFP purbpnt.SCT — avoid ANSI multi-MASTER joins (ORA-01445 when MASTER is a join view).
+    // Party / names via scalar subqueries; lines from PURCHASE + ITEMMAST only.
+    const masterName = (codeExpr) =>
+      `(SELECT M.NAME FROM MASTER M WHERE M.COMP_CODE = A.COMP_CODE AND M.CODE = ${codeExpr} AND ROWNUM = 1)`;
+    const masterCol = (col, codeExpr) =>
+      `(SELECT M.${col} FROM MASTER M WHERE M.COMP_CODE = A.COMP_CODE AND M.CODE = ${codeExpr} AND ROWNUM = 1)`;
+    const partyCode = `NVL(A.SUP_CODE, A.CODE)`;
     const sql = `
       SELECT
         A.R_DATE,
@@ -6664,34 +6854,45 @@ app.get('/api/purchase-bill-print', async (req, res) => {
         A.TYPE,
         A.BILL_DATE,
         A.BILL_NO,
+        A.DUE,
+        A.V_DATE,
         A.CODE,
-        PRT.NAME,
-        PRT.ADD1,
-        PRT.ADD2,
-        PRT.ADD3,
-        PRT.CITY,
-        PRT.GST_NO,
-        PRT.STATE,
-        PRT.STATE_CODE,
-        PRT.PAN,
-        PRT.TEL_NO_O,
-        PRT.TEL_NO_R,
-        BK.NAME AS BK_NAME,
+        A.SUP_CODE,
+        NVL(${masterCol('NAME', partyCode)}, '') AS NAME,
+        NVL(${masterCol('ADD1', partyCode)}, '') AS ADD1,
+        NVL(${masterCol('ADD2', partyCode)}, '') AS ADD2,
+        NVL(${masterCol('ADD3', partyCode)}, '') AS ADD3,
+        NVL(${masterCol('CITY', partyCode)}, '') AS CITY,
+        NVL(${masterCol('GST_NO', partyCode)}, '') AS GST_NO,
+        NVL(${masterCol('STATE', partyCode)}, '') AS STATE,
+        NVL(${masterCol('STATE_CODE', partyCode)}, '') AS STATE_CODE,
+        NVL(${masterCol('PAN', partyCode)}, '') AS PAN,
+        NVL(${masterCol('TEL_NO_O', partyCode)}, '') AS TEL_NO_O,
+        NVL(${masterCol('TEL_NO_R', partyCode)}, '') AS TEL_NO_R,
+        NVL(${masterName('A.B_CODE')}, '') AS BK_NAME,
         A.B_CODE,
         A.TRN_NO,
-        IT.ITEM_CODE,
+        A.STATUS,
+        A.ITEM_CODE,
         IT.ITEM_NAME,
         IT.HSN_CODE,
-        PURM.NAME AS PUR_NAME,
+        NVL(${masterName('A.PUR_CODE')}, '') AS PUR_NAME,
+        A.PUR_CODE,
         A.GOD_CODE,
         A.QNTY,
+        A.G_WEIGHT,
+        A.D_WEIGHT,
         A.WEIGHT,
         A.RATE,
         A.AMOUNT,
+        A.DIS_PER,
         A.DIS_AMT,
         A.TAXABLE,
+        A.CGST_PER,
         A.CGST_AMT,
+        A.SGST_PER,
         A.SGST_AMT,
+        A.IGST_PER,
         A.IGST_AMT,
         A.OTH_EXP_1,
         A.OTH_EXP_2,
@@ -6701,31 +6902,92 @@ app.get('/api/purchase-bill-print', async (req, res) => {
         A.OTH_EXP_6,
         A.OTH_EXP_7,
         A.OTH_EXP_8,
+        A.OTH_CD_1,
+        A.OTH_CD_2,
+        A.OTH_CD_3,
+        A.OTH_CD_4,
+        A.OTH_CD_5,
+        A.OTH_CD_6,
+        A.OTH_CD_7,
+        A.OTH_CD_8,
+        NVL(${masterName('A.OTH_CD_1')}, '') AS OTH_NAME1,
+        NVL(${masterName('A.OTH_CD_2')}, '') AS OTH_NAME2,
+        NVL(${masterName('A.OTH_CD_3')}, '') AS OTH_NAME3,
+        NVL(${masterName('A.OTH_CD_4')}, '') AS OTH_NAME4,
+        NVL(${masterName('A.OTH_CD_5')}, '') AS OTH_NAME5,
+        NVL(${masterName('A.OTH_CD_6')}, '') AS OTH_NAME6,
+        NVL(${masterName('A.OTH_CD_7')}, '') AS OTH_NAME7,
+        NVL(${masterName('A.OTH_CD_8')}, '') AS OTH_NAME8,
+        A.COMM_AMT,
+        A.MUD_AMT,
+        A.BROK_AMT,
         A.BROK_PAID,
         A.MANDI_EXP,
-        A.LABOUR AS LABOUR_EXP,
+        A.LABOUR_EXP,
         A.BARDANA_EXP,
-        A.FREIGHT AS FREIGHT_PAID,
+        A.FREIGHT,
+        A.FREIGHT_PAID,
         A.CD_AMOUNT,
         A.DHARAM_KANTA AS DHARM_KANTA,
         A.TULWAI_EXP,
         A.ROUND_OFF,
+        A.NTDS_PER,
+        A.NTDS_AMT,
+        A.NTDS_ON_AMT,
+        A.TCS_PER,
+        A.TCS_AMT,
         A.BILL_AMT,
         A.TRUCK,
         A.GR_NO,
         A.TPT,
-        A.COST_CODE
+        A.COST_CODE,
+        A.REMARKS,
+        A.IRN_NO,
+        A.ACK_NO,
+        A.SIGNED_QR_CODE
       FROM PURCHASE A
       JOIN ITEMMAST IT ON A.COMP_CODE = IT.COMP_CODE AND A.ITEM_CODE = IT.ITEM_CODE
-      JOIN MASTER PRT ON A.COMP_CODE = PRT.COMP_CODE AND A.CODE = PRT.CODE
-      LEFT JOIN MASTER PURM ON A.COMP_CODE = PURM.COMP_CODE AND A.PUR_CODE = PURM.CODE
-      LEFT JOIN MASTER BK ON A.COMP_CODE = BK.COMP_CODE AND A.B_CODE = BK.CODE
       WHERE A.COMP_CODE = :comp_code
         AND TRIM(A.TYPE) = TRIM(:type)
         AND TRUNC(A.R_DATE) = TRUNC(TO_DATE(:r_date, 'DD-MM-YYYY'))
         AND TRIM(TO_CHAR(A.R_NO)) = TRIM(TO_CHAR(:r_no))
       ORDER BY A.R_DATE, A.R_NO, A.TRN_NO`;
-    const rows = await runQuery(sql, { comp_code, type: typ, r_date, r_no: rno }, comp_uid);
+    const binds = { comp_code, type: typ, r_date, r_no: rno };
+    let rows;
+    try {
+      rows = await runQuery(sql, binds, comp_uid);
+    } catch (err) {
+      // Retry without expense/TDS extras if an optional column is missing
+      const msg = String(err?.message || '');
+      if (!/ORA-00904|invalid identifier/i.test(msg)) throw err;
+      const fallbackSql = `
+        SELECT
+          A.R_DATE, A.R_NO, A.TYPE, A.BILL_DATE, A.BILL_NO, A.CODE, A.SUP_CODE,
+          NVL(${masterCol('NAME', partyCode)}, '') AS NAME,
+          NVL(${masterCol('ADD1', partyCode)}, '') AS ADD1,
+          NVL(${masterCol('ADD2', partyCode)}, '') AS ADD2,
+          NVL(${masterCol('ADD3', partyCode)}, '') AS ADD3,
+          NVL(${masterCol('CITY', partyCode)}, '') AS CITY,
+          NVL(${masterCol('GST_NO', partyCode)}, '') AS GST_NO,
+          NVL(${masterCol('PAN', partyCode)}, '') AS PAN,
+          NVL(${masterName('A.B_CODE')}, '') AS BK_NAME,
+          A.B_CODE, A.TRN_NO, A.ITEM_CODE, IT.ITEM_NAME, IT.HSN_CODE,
+          A.QNTY, A.WEIGHT, A.RATE, A.AMOUNT, A.DIS_AMT, A.FREIGHT, A.TAXABLE,
+          A.CGST_AMT, A.SGST_AMT, A.IGST_AMT, A.BILL_AMT,
+          A.TRUCK, A.GR_NO, A.TPT, A.REMARKS
+        FROM PURCHASE A
+        JOIN ITEMMAST IT ON A.COMP_CODE = IT.COMP_CODE AND A.ITEM_CODE = IT.ITEM_CODE
+        WHERE A.COMP_CODE = :comp_code
+          AND TRIM(A.TYPE) = TRIM(:type)
+          AND TRUNC(A.R_DATE) = TRUNC(TO_DATE(:r_date, 'DD-MM-YYYY'))
+          AND TRIM(TO_CHAR(A.R_NO)) = TRIM(TO_CHAR(:r_no))
+        ORDER BY A.R_DATE, A.R_NO, A.TRN_NO`;
+      rows = await runQuery(fallbackSql, binds, comp_uid);
+    }
+    for (const row of rows || []) {
+      normalizeRowBuffers(row);
+      normalizeSignedQrColumn(row);
+    }
     res.json(rows || []);
   } catch (err) {
     console.error('❌ Purchase bill print error:', err.message);
@@ -8209,7 +8471,7 @@ app.get('/api/trading-ac', async (req, res) => {
     const cnRows = await runQuery(
       `SELECT TRIM(SUP_CODE) AS CODE, SUM(NVL(QNTY,0)) AS SQTY, SUM(NVL(WEIGHT,0)) AS SWGT
        FROM SALE
-       WHERE COMP_CODE = :comp_code AND BILL_DATE <= :e_date AND TYPE = 'CN'
+       WHERE COMP_CODE = :comp_code AND BILL_DATE <= :e_date AND TYPE IN ('CN', 'ER')
        GROUP BY TRIM(SUP_CODE)`,
       { comp_code, e_date: eDate },
       comp_uid
@@ -9126,7 +9388,10 @@ app.get('/api/trading-ac-ledger', async (req, res) => {
     const eDate = parseDateOnly(edt);
     if (!sDate || !eDate) return res.status(400).json({ error: 'Invalid dates' });
 
-    const saleTypes = String(mcb || 'C').trim().toUpperCase() === 'C' ? ['SL', 'SE', 'CH', 'CN'] : ['SL', 'SE', 'CN'];
+    const saleTypes =
+      String(mcb || 'C').trim().toUpperCase() === 'C'
+        ? ['SL', 'SE', 'CH', 'CN', 'ER']
+        : ['SL', 'SE', 'CN', 'ER'];
 
     const [purchaseRows, saleRows, ledgerRows] = await Promise.all([
       runQuery(
@@ -9156,15 +9421,15 @@ app.get('/api/trading-ac-ledger', async (req, res) => {
                0 AS R_QNTY,
                0 AS R_WEIGHT,
                0 AS DR_AMOUNT,
-               SUM(CASE WHEN TRIM(TYPE)='CN' THEN NVL(QNTY,0)*-1 ELSE NVL(QNTY,0) END) AS S_QNTY,
+               SUM(CASE WHEN TRIM(TYPE) IN ('CN', 'ER') THEN NVL(QNTY,0)*-1 ELSE NVL(QNTY,0) END) AS S_QNTY,
                SUM(
                  CASE
-                   WHEN TRIM(TYPE)='CN'
+                   WHEN TRIM(TYPE) IN ('CN', 'ER')
                      THEN (NVL(WEIGHT,0) - (NVL(DANE_WGT,0)+NVL(PAPLOO3,0))) * -1
                    ELSE (NVL(WEIGHT,0) - (NVL(DANE_WGT,0)+NVL(PAPLOO3,0)))
                  END
                ) AS S_WEIGHT,
-               SUM(CASE WHEN TRIM(TYPE)='CN' THEN NVL(BILL_AMT,0)*-1 ELSE NVL(BILL_AMT,0) END) AS CR_AMOUNT
+               SUM(CASE WHEN TRIM(TYPE) IN ('CN', 'ER') THEN NVL(BILL_AMT,0)*-1 ELSE NVL(BILL_AMT,0) END) AS CR_AMOUNT
         FROM SALE
         WHERE COMP_CODE = :comp_code
           AND TRIM(SUP_CODE) = TRIM(:code)
@@ -9267,7 +9532,7 @@ app.get('/api/trading-ac-ledger-entry-detail', async (req, res) => {
     }
     const vrDateIso = String(vr_date || '').trim();
     const typeVal = String(type || '').trim();
-    const saleTypes = ['SL', 'SE', 'CH', 'CN'];
+    const saleTypes = ['SL', 'SE', 'CH', 'CN', 'ER'];
     const purchaseTypes = ['PU', 'DN', 'DX', 'CX', 'PB'];
 
     if (saleTypes.includes(vrType)) {
@@ -10733,12 +10998,14 @@ app.post('/api/master-party', async (req, res) => {
 
 app.get('/api/master-accounts', async (req, res) => {
   try {
-    const { comp_code, comp_uid, schedule, q, code_prefix } = req.query;
+    const { comp_code, comp_uid, schedule, q, code_prefix, schedules } = req.query;
     if (!comp_code || comp_uid == null) {
       return res.status(400).json({ error: 'comp_code and comp_uid are required' });
     }
     const schedRaw = schedule != null && String(schedule).trim() !== '' ? masterPartyScheduleBind(schedule) : null;
     const qTrim = String(q ?? '').trim();
+    const sortByName = String(req.query.sort ?? '').toLowerCase() === 'name';
+    const sortByNameCity = String(req.query.sort ?? '').toLowerCase() === 'name_city';
     const binds = { comp_code };
     let sql = `
       SELECT TRIM(M.CODE) AS CODE, M.NAME, M.SCHEDULE, M.ADD1, M.ADD2, M.ADD3, M.CITY,
@@ -10746,7 +11013,9 @@ app.get('/api/master-accounts', async (req, res) => {
       FROM MASTER M
       WHERE M.COMP_CODE = :comp_code`;
     sql = appendMasterCodePrefixFilter(sql, code_prefix);
-    if (schedRaw) {
+    if (schedules != null && String(schedules).trim() !== '') {
+      sql = appendMasterScheduleListFilter(sql, binds, schedules);
+    } else if (schedRaw) {
       binds.schedule = schedRaw;
       sql += ` AND ROUND(NVL(M.SCHEDULE, 0), 2) = :schedule`;
     }
@@ -10759,7 +11028,11 @@ app.get('/api/master-accounts', async (req, res) => {
         'acq'
       );
     }
-    sql += ` ORDER BY M.SCHEDULE, M.NAME, TRIM(M.CODE)`;
+    sql += sortByNameCity
+      ? ` ORDER BY M.NAME, M.CITY, TRIM(M.CODE)`
+      : sortByName
+        ? ` ORDER BY M.NAME, TRIM(M.CODE)`
+        : ` ORDER BY M.SCHEDULE, M.NAME, TRIM(M.CODE)`;
     const rows = await runQuery(sql, binds, comp_uid);
     res.json(rows || []);
   } catch (err) {
@@ -22945,6 +23218,65 @@ app.post('/api/income-tax-report', async (req, res) => {
   }
 });
 
+app.post('/api/other-report', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const report_id = String(body.report_id ?? body.reportType ?? body.report_type ?? '').trim().toLowerCase();
+    const comp_code = String(body.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid;
+    if (!report_id) return res.status(400).json({ error: 'report_id is required' });
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const out = await buildOtherReport(report_id, comp_code, comp_uid, body);
+    res.json({ ok: true, ...out, total: (out.rows || []).length });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ other-report error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/ledger-report', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const report_id = String(body.report_id ?? body.reportType ?? body.report_type ?? '').trim().toLowerCase();
+    const comp_code = String(body.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid;
+    if (!report_id) return res.status(400).json({ error: 'report_id is required' });
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const out = await buildLedgerReport(report_id, comp_code, comp_uid, body);
+    res.json({ ok: true, ...out, total: (out.rows || []).length });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ ledger-report error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.post('/api/voucher-book', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const report_id = String(body.report_id ?? body.reportType ?? body.report_type ?? '').trim().toLowerCase();
+    const comp_code = String(body.comp_code ?? '').trim();
+    const comp_uid = body.comp_uid;
+    if (!report_id) return res.status(400).json({ error: 'report_id is required' });
+    if (!comp_code || comp_uid == null) {
+      return res.status(400).json({ error: 'comp_code and comp_uid are required' });
+    }
+    const out = await buildVoucherBook(report_id, comp_code, comp_uid, body, {
+      fy_s_date: body.fy_s_date ?? body.FY_S_DATE,
+    });
+    res.json({ ok: true, ...out, total: (out.rows || []).length });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ voucher-book error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
 app.post('/api/loaner-list', async (req, res) => {
   try {
     const body = req.body || {};
@@ -23873,6 +24205,27 @@ app.post('/api/gst-profile-verify-password', async (req, res) => {
   } catch (err) {
     const status = err.status || 500;
     if (status >= 500) console.error('❌ gst-profile-verify-password error:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+/** VFP toolbar — GST_PROFILE.GST_NO must be set for Direct E.Inv / EinvPnt (no APW gate). */
+app.get('/api/gst-profile/direct-einv-status', async (req, res) => {
+  try {
+    const comp_code = String(req.query.comp_code ?? '').trim();
+    if (!comp_code) {
+      return res.status(400).json({ error: 'comp_code is required' });
+    }
+    const row = await loadGstProfileRow(comp_code);
+    const gst_no = gstProfileRowValue(row, 'GST_NO');
+    res.json({
+      ok: true,
+      gst_no,
+      activated: Boolean(gst_no),
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error('❌ gst-profile direct-einv-status error:', err.message);
     res.status(status).json({ error: err.message });
   }
 });
@@ -27992,6 +28345,18 @@ app.delete('/api/item-master', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+voucherEntryApi.registerRoutes(app);
+purchaseOrderApi.registerRoutes(app);
+salesOrderApi.registerRoutes(app);
+dispatchChallanApi.registerRoutes(app);
+goodsInwardApi.registerRoutes(app);
+purchaseBillApi.registerRoutes(app);
+expVoucherApi.registerRoutes(app);
+dcNoteApi.registerRoutes(app);
+consignmentStockApi.registerRoutes(app);
+purchaseTdsReportsApi.registerRoutes(app);
+saleBillEntryApi.registerRoutes(app);
 
 resolveActiveDbConfig()
   .then((cfg) => {

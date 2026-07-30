@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import SessionInfoLine, { SessionLineText } from '../components/SessionInfoLine';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 import SaleBillPrintModal from '../components/SaleBillPrintModal';
 import PurchaseBillPrintModal from '../components/PurchaseBillPrintModal';
 import { downloadExcelRows } from '../utils/excelExport';
@@ -117,21 +118,6 @@ function grandTotalExportRow(totals) {
   };
 }
 
-function ExportToolbar({ pdfBusy, onPdf, onPrint, onExcel, printDisabled, excelDisabled }) {
-  return (
-    <>
-      <button type="button" className="btn btn-export" disabled={pdfBusy || excelDisabled} onClick={onPdf}>
-        {pdfBusy ? 'Preparing PDF…' : 'Pdf'}
-      </button>
-      <button type="button" className="btn btn-secondary" disabled={printDisabled} onClick={onPrint}>
-        Print
-      </button>
-      <button type="button" className="btn btn-excel" disabled={excelDisabled} onClick={onExcel}>
-        📊 Excel
-      </button>
-    </>
-  );
-}
 
 function GrandTotalRow({ totals, labelColSpan = 3 }) {
   return (
@@ -489,19 +475,16 @@ export default function SlideStateWiseReport({ apiBase, formData, onPrev, onRese
           <SessionInfoLine formData={formData} helpReportId={cfg.helpId} />
           <div className="report-toolbar">
             <h2>{cfg.title} — Detail</h2>
-            <div className="toolbar-actions">
-              <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen('main')}>
-                ← Back
-              </button>
-              <ExportToolbar
-                pdfBusy={pdfBusy}
-                onPdf={() => exportDetailPdf()}
-                onPrint={exportDetailPrint}
-                onExcel={exportDetailExcel}
-                printDisabled={!detailRows.length}
-                excelDisabled={!detailRows.length}
-              />
-            </div>
+            <ReportToolbarActions
+              reportId={cfg.helpId}
+              onBack={() => setScreen('main')}
+              onPdf={() => exportDetailPdf()}
+              onPrint={exportDetailPrint}
+              showPrint
+              printDisabled={!detailRows.length}
+              onExcel={exportDetailExcel}
+              pdfDisabled={pdfBusy || !detailRows.length}
+            />
           </div>
           <div className="report-info">
             <p>
@@ -574,19 +557,16 @@ export default function SlideStateWiseReport({ apiBase, formData, onPrev, onRese
           <SessionInfoLine formData={formData} helpReportId={cfg.helpId} />
           <div className="report-toolbar">
             <h2>{cfg.title}</h2>
-            <div className="toolbar-actions">
-              <button type="button" className="btn btn-toolbar-back" onClick={() => setRows(null)}>
-                ← Back
-              </button>
-              <ExportToolbar
-                pdfBusy={pdfBusy}
-                onPdf={() => exportSummaryPdf()}
-                onPrint={exportSummaryPrint}
-                onExcel={exportExcel}
-                printDisabled={!summaryExportRows.length}
-                excelDisabled={!summaryExportRows.length}
-              />
-            </div>
+            <ReportToolbarActions
+              reportId={cfg.helpId}
+              onBack={() => setRows(null)}
+              onPdf={() => exportSummaryPdf()}
+              onPrint={exportSummaryPrint}
+              showPrint
+              printDisabled={!summaryExportRows.length}
+              onExcel={exportExcel}
+              pdfDisabled={pdfBusy || !summaryExportRows.length}
+            />
           </div>
           <div className="report-info">
             <p>
@@ -662,11 +642,7 @@ export default function SlideStateWiseReport({ apiBase, formData, onPrev, onRese
         <SessionInfoLine formData={formData} helpReportId={cfg.helpId} />
         <div className="report-toolbar">
           <h2>{cfg.title}</h2>
-          <div className="toolbar-actions">
-            <button type="button" className="btn btn-toolbar-back" onClick={onPrev}>
-              ← Back
-            </button>
-          </div>
+          <ReportToolbarActions reportId={cfg.helpId} onBack={onPrev} />
         </div>
         <form className="report-form" onSubmit={runReport}>
           <div className="form-row-broker form-row-broker--dates">

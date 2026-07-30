@@ -1,0 +1,123 @@
+.app--fas-flow .slide.slide-report.slide-23-purchase-tds-detail > .report-form,
+.app--fas-flow .slide.slide-report.slide-24-purchase-tds-summary > .report-form,
+.app--fas-flow .slide.slide-report.slide-25-sale-tds-detail > .report-form,
+.app--fas-flow .slide.slide-report.slide-26-sale-tds-summary > .report-form {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.slide-23-purchase-tds-detail .purchase-tds-form,
+.slide-24-purchase-tds-summary .purchase-tds-form,
+.slide-25-sale-tds-detail .purchase-tds-form,
+.slide-26-sale-tds-summary .purchase-tds-form {
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.purchase-tds-screen .report-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.purchase-tds-screen__meta,
+.purchase-tds-screen__hint {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.purchase-tds-screen__table-wrap {
+  overflow-x: auto;
+}
+
+.purchase-tds-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.purchase-tds-table th,
+.purchase-tds-table td {
+  border: 1px solid #d0d7de;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+.purchase-tds-table th.num,
+.purchase-tds-table td.num {
+  text-align: right;
+}
+
+.purchase-tds-table tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.purchase-tds-row-clickable {
+  cursor: pointer;
+}
+
+.purchase-tds-row-clickable:hover td {
+  background: #e8f0fe !important;
+}
+
+.purchase-tds-total-row td {
+  background: #eef2ff;
+  border-top: 2px solid #94a3b8;
+}
+
+.purchase-tds-party-total-row td {
+  background: #fef3c7;
+  border-top: 1px solid #f59e0b;
+  border-bottom: 1px solid #f59e0b;
+}
+
+.purchase-tds-form .form-row-broker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  margin-bottom: 0;
+}
+
+.purchase-tds-form__party {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.purchase-tds-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.purchase-tds-form .form-input {
+  min-height: 36px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.purchase-tds-form .form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 720px) {
+  .purchase-tds-form .form-row-broker {
+    grid-template-columns: 1fr;
+  }
+
+  .purchase-tds-form__party {
+    grid-column: auto;
+  }
+}

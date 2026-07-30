@@ -202,6 +202,8 @@ export function buildLedgerRowSearchText(row, { includeInterest = false } = {}) 
     fieldStr(row.VR_TYPE ?? row.vr_type),
     fieldStr(row.TYPE ?? row.type),
     fieldStr(row.DETAIL ?? row.detail),
+    fieldStr(row.DC_CODE ?? row.dc_code),
+    fieldStr(row.DC_NAME ?? row.dc_name),
     ...amtSearchParts(row.DR_AMT ?? row.dr_amt),
     ...amtSearchParts(row.CR_AMT ?? row.cr_amt),
     ...amtSearchParts(clBal),
@@ -294,66 +296,100 @@ export function collectLedgerVrTypes(rows) {
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
+/** Unique DC codes on ledger lines (excludes OP), sorted by code. */
+export function collectLedgerDcCodes(rows) {
+  const map = new Map();
+  (rows || []).forEach((row) => {
+    if (isLedgerOpeningRow(row)) return;
+    const code = String(row?.DC_CODE ?? row?.dc_code ?? '')
+      .trim()
+      .toUpperCase();
+    if (!code) return;
+    const name = String(row?.DC_NAME ?? row?.dc_name ?? '').trim();
+    if (!map.has(code)) map.set(code, name);
+  });
+  return Array.from(map.entries())
+    .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
+    .map(([code, name]) => ({ code, name }));
+}
+
 export function ledgerRowMatchesVrType(row, vrTypeFilter) {
   if (!vrTypeFilter || vrTypeFilter === 'all') return true;
   return ledgerRowVrTypeCode(row) === String(vrTypeFilter).trim().toUpperCase();
 }
 
+export function ledgerRowMatchesDcCode(row, dcCodeFilter) {
+  if (!dcCodeFilter || dcCodeFilter === 'all') return true;
+  const dc = String(row?.DC_CODE ?? row?.dc_code ?? '')
+    .trim()
+    .toUpperCase();
+  return dc === String(dcCodeFilter).trim().toUpperCase();
+}
+
 export function ledgerRowMatchesFilters(
   row,
   query,
-  { includeInterest = false, amountSide = 'all', vrType = 'all' } = {}
+  { includeInterest = false, amountSide = 'all', vrType = 'all', dcCode = 'all' } = {}
 ) {
   if (!ledgerRowMatchesAmountSide(row, amountSide)) return false;
   if (!ledgerRowMatchesVrType(row, vrType)) return false;
+  if (!ledgerRowMatchesDcCode(row, dcCode)) return false;
   return ledgerRowMatchesFilter(row, query, { includeInterest });
 }
 
 export function filterLedgerMobileRows(rows, query, options = {}) {
   const amountSide = normalizeLedgerAmountSide(options.amountSide);
   const vrType = options.vrType ?? 'all';
-  const { amountSide: _dropSide, vrType: _dropVr, ...rest } = options;
-  if (!ledgerFilterIsActive(query, amountSide, vrType)) return rows || [];
+  const dcCode = options.dcCode ?? 'all';
+  const { amountSide: _dropSide, vrType: _dropVr, dcCode: _dropDc, ...rest } = options;
+  if (!ledgerFilterIsActive(query, amountSide, vrType, dcCode)) return rows || [];
   return (rows || []).filter((row) =>
-    ledgerRowMatchesFilters(row, query, { ...rest, amountSide, vrType })
+    ledgerRowMatchesFilters(row, query, { ...rest, amountSide, vrType, dcCode })
   );
 }
 
-export function ledgerFilterIsActive(query, amountSide = 'all', vrType = 'all') {
+export function ledgerFilterIsActive(query, amountSide = 'all', vrType = 'all', dcCode = 'all') {
   const side = normalizeLedgerAmountSide(amountSide);
   return (
     Boolean(String(query ?? '').trim()) ||
     side === 'dr' ||
     side === 'cr' ||
-    (vrType && vrType !== 'all')
+    (vrType && vrType !== 'all') ||
+    (dcCode && dcCode !== 'all')
   );
 }
 
-/** Filter ledger rows; opening (OP) rows stay visible when keepOpening is true. */
+/** Filter ledger rows; opening (OP) rows stay visible when keepOpening is true (unless DC filter is on). */
 export function filterLedgerRows(
   rows,
   query,
-  { keepOpening = true, includeInterest = false, amountSide = 'all', vrType = 'all' } = {}
+  { keepOpening = true, includeInterest = false, amountSide = 'all', vrType = 'all', dcCode = 'all' } = {}
 ) {
   const side = normalizeLedgerAmountSide(amountSide);
-  if (!ledgerFilterIsActive(query, side, vrType)) return rows || [];
+  const dcActive = dcCode && dcCode !== 'all';
+  if (!ledgerFilterIsActive(query, side, vrType, dcCode)) return rows || [];
 
   const list = rows || [];
-  const opening = keepOpening ? list.filter(isLedgerOpeningRow) : [];
-  const txn = keepOpening ? list.filter((r) => !isLedgerOpeningRow(r)) : list;
+  const keepOp = keepOpening && !dcActive;
+  const opening = keepOp ? list.filter(isLedgerOpeningRow) : [];
+  const txn = keepOp ? list.filter((r) => !isLedgerOpeningRow(r)) : list;
   const filteredTxn = txn.filter((row) =>
-    ledgerRowMatchesFilters(row, query, { includeInterest, amountSide: side, vrType })
+    ledgerRowMatchesFilters(row, query, { includeInterest, amountSide: side, vrType, dcCode })
   );
   return [...opening, ...filteredTxn];
 }
 
-export function countLedgerFilterStats(rows, query, { includeInterest = false, amountSide = 'all', vrType = 'all' } = {}) {
+export function countLedgerFilterStats(
+  rows,
+  query,
+  { includeInterest = false, amountSide = 'all', vrType = 'all', dcCode = 'all' } = {}
+) {
   const side = normalizeLedgerAmountSide(amountSide);
   const list = rows || [];
   const txn = list.filter((r) => !isLedgerOpeningRow(r));
-  if (!ledgerFilterIsActive(query, side, vrType)) return { shown: txn.length, total: txn.length };
+  if (!ledgerFilterIsActive(query, side, vrType, dcCode)) return { shown: txn.length, total: txn.length };
   const shown = txn.filter((row) =>
-    ledgerRowMatchesFilters(row, query, { includeInterest, amountSide: side, vrType })
+    ledgerRowMatchesFilters(row, query, { includeInterest, amountSide: side, vrType, dcCode })
   ).length;
   return { shown, total: txn.length };
 }

@@ -66,6 +66,23 @@
   gap: 2px;
 }
 
+.tb-mobile__header-actions .btn-report-help--icon-only {
+  border: none;
+  background: transparent;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+}
+
+.tb-mobile__header-actions .btn-report-help--icon-only .btn-report-help__icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
 .tb-mobile__menu-wrap {
   position: relative;
 }

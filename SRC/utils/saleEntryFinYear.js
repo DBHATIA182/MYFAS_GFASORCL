@@ -31,3 +31,19 @@ export function finYearRangeLabel(fyMinYmd, fyMaxYmd) {
   if (fyMinYmd) return `from ${toDisplayDate(fyMinYmd)}`;
   return `to ${toDisplayDate(fyMaxYmd)}`;
 }
+
+export function isYmdInFinYear(ymd, fyMinYmd, fyMaxYmd) {
+  const s = String(ymd ?? '').trim();
+  if (!s) return false;
+  if (fyMinYmd && s < fyMinYmd) return false;
+  if (fyMaxYmd && s > fyMaxYmd) return false;
+  return true;
+}
+
+export function finYearDateErrorMessage(ymd, fyMinYmd, fyMaxYmd, label = 'Date') {
+  if (!fyMinYmd && !fyMaxYmd) return '';
+  if (!isYmdInFinYear(ymd, fyMinYmd, fyMaxYmd)) {
+    return `${label} must be between ${finYearRangeLabel(fyMinYmd, fyMaxYmd)} (financial year).`;
+  }
+  return '';
+}

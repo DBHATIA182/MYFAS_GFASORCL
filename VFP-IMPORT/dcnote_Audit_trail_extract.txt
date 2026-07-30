@@ -1,0 +1,51 @@
+
+DO CASE
+ CASE THISFORM.SAVEBtn='new'
+  m_mod_type='N'
+  vtp=RTRIM(thisform.type.Value)
+  vdt=THISFORM.R_date.VALUE
+  vno=THISFORM.R_NO.VALUE
+ CASE THISFORM.SAVEBtn='edit' 
+  M_MOD_TYPE='E'
+  vtp=RTRIM(thisform.type.Value)
+  vdt=thisform.mrdt
+  vno=thisform.mrno
+ CASE thisform.savebtn='del'
+  M_MOD_TYPE='D'
+  vtp=RTRIM(thisform.type.Value)
+  vdt=thisform.mrdt
+  vno=thisform.mrno
+endcase 
+*
+**********************************************AUDTI TABLE LEDGER
+EDATE=DATE()
+ETIME=RTRIM(TIME())
+M_MOD_REASON=RTRIM(THISFORM.MOD_reason.Value)
+*
+MVAR='SELECT MAX(MOD_DEL_NO) MOD_DEL_NO FROM AUDIT_LEDGER where comp_code=?g_compcode and vr_type=?vtp '+;
+     'and vr_Date=?vdt and vr_no=?vno'
+If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+ENDIF	 
+SELECT NVL(MOD_DEL_NO,0)+1 MOD_DEL_NO FROM X0 INTO CURSOR X1
+*
+M_MOD_DEL_NO=MOD_DEL_NO
+*	 
+MVAR='INSERT INTO AUDIT_LEDGER SELECT * FROM ledger where comp_code=?g_compcode and vr_type=?vtp '+;
+     'and vr_Date=?vdt and vr_no=?vno'
+If SQLExec(GNCONNHANDLE,Mvar) <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+ENDIF	 
+*
+
+MVAR='UPDATE AUDIT_LEDGER SET MOD_DEL_USER_NAME=?G_USERNAME,MOD_DEL_ENT_DATE=?EDATE,MOD_DEL_NO=?M_MOD_DEL_NO,MOD_DEL_TYPE=?M_MOD_TYPE,'+;
+     'MOD_DEL_ENT_TIME=?ETIME,MOD_DEL_REASON=?M_MOD_REASON WHERE comp_code=?g_compcode and vr_type=?vtp '+;
+     'and vr_Date=?vdt and vr_no=?vno AND NVL(MOD_DEL_NO,0)=0'
+If SQLExec(GNCONNHANDLE,Mvar) <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+ENDIF	 
+***********************************************************************************
+

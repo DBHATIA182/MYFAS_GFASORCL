@@ -1,0 +1,98 @@
+/* Voucher checklist — form + report (slide 14) */
+
+.app-main:has(> .voucher-checklist-screen) {
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  min-width: 0;
+  width: 100%;
+}
+
+.voucher-checklist-screen.slide {
+  flex: 1 1 auto !important;
+  align-self: stretch !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: #f4f6fb;
+  box-sizing: border-box;
+}
+
+.voucher-checklist-screen .fas-flow-body {
+  padding: 0.75rem 1rem 1rem;
+  box-sizing: border-box;
+}
+
+.voucher-checklist-screen.fas-tb-host--form .fas-flow-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.voucher-checklist-form {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.voucher-checklist-form__filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.voucher-checklist-form__filters .fas-field-group--span {
+  grid-column: 1 / -1;
+}
+
+.voucher-checklist-screen--report .fas-flow-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+
+.voucher-checklist-screen--report .report-info {
+  flex-shrink: 0;
+  margin: 0.35rem 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.voucher-checklist-screen--report .table-responsive--voucher-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.voucher-checklist-screen--report .button-group {
+  flex-shrink: 0;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .voucher-checklist-form__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .voucher-checklist-form {
+    max-width: none;
+  }
+}

@@ -3,12 +3,52 @@ import axios from 'axios';
 import { downloadExcelRows } from '../utils/excelExport';
 import { formatLedgerDateDisplay, toDisplayDate, toInputDateString, toOracleDate } from '../utils/dateFormat';
 import ReportTable from '../components/ReportTable';
+import ReportToolbarActions from '../components/ReportToolbarActions';
+import FasReportHeader from '../components/FasReportHeader';
+import TrialBalanceSessionCard from '../components/TrialBalanceSessionCard';
 import ReportHelpButton from '../components/ReportHelpButton';
+import '../styles/voucherChecklistScreen.css';
 
 function fmtAmt(v) {
   const n = parseFloat(v);
   if (!Number.isFinite(n) || n === 0) return '-';
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function voucherChecklistTitle(vrTypeFilter) {
+  const vt = String(vrTypeFilter ?? '').trim().toUpperCase();
+  if (vt === 'CV') return 'Cash Voucher Checklist';
+  if (vt === 'BV') return 'Bank Voucher Checklist';
+  if (vt === 'JV') return 'Journal Voucher Checklist';
+  return 'Voucher Checklist';
+}
+
+function VoucherChecklistShell({ className = '', header, footer = null, children, report = false }) {
+  const isForm = className.includes('fas-tb-host--form');
+  return (
+    <div
+      className={`slide slide-14 voucher-checklist-screen fas-tb-host${report ? ' voucher-checklist-screen--report' : ''}${className ? ` ${className}` : ''}`}
+    >
+      <div className={`fas-flow fas-tb-flow${isForm ? ' fas-tb-flow--form-app' : ''}`}>
+        <div className="fas-ledger-sticky-top">{header}</div>
+        <div className={`fas-flow-body fas-tb-body${isForm ? ' fas-tb-body--form-scroll' : ''}`}>{children}</div>
+        {isForm && footer ? <div className="fas-tb-form-footer-bar">{footer}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function useDesktopView() {
+  const [isDesktopView, setIsDesktopView] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 769px)').matches : true
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 769px)');
+    const onChange = () => setIsDesktopView(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return isDesktopView;
 }
 
 export default function Slide14({ apiBase, formData, onPrev, onReset }) {
@@ -33,13 +73,17 @@ export default function Slide14({ apiBase, formData, onPrev, onReset }) {
   const compUid = formData.comp_uid ?? formData.COMP_UID;
   const compName = formData.comp_name ?? formData.COMP_NAME ?? '';
   const compYear = formData.comp_year ?? formData.COMP_YEAR ?? '';
+  const screenTitle = useMemo(() => voucherChecklistTitle(vrType), [vrType]);
+  const isDesktopView = useDesktopView();
 
   useEffect(() => {
     const s = toInputDateString(formData.comp_s_dt ?? formData.COMP_S_DT);
     const e = toInputDateString(new Date());
     if (s) setStartDate(s);
     if (e) setEndDate(e);
-  }, [formData.comp_s_dt, formData.comp_e_dt, formData.COMP_S_DT, formData.COMP_E_DT]);
+    const presetVr = String(formData.voucherVrType ?? '').trim().toUpperCase();
+    if (presetVr) setVrType(presetVr);
+  }, [formData.comp_s_dt, formData.comp_e_dt, formData.COMP_S_DT, formData.COMP_E_DT, formData.voucherVrType]);
 
   useEffect(() => {
     if (!compCode || !compUid) return;
@@ -175,74 +219,67 @@ export default function Slide14({ apiBase, formData, onPrev, onReset }) {
   if (showReport) {
     if (voucherRows != null) {
       return (
-        <div className="slide slide-report">
-          <div className="report-toolbar">
-            <h2>Voucher entries</h2>
-            <div className="toolbar-actions">
-            <ReportHelpButton reportId="voucher-list" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-              <button type="button" className="btn btn-toolbar-back" onClick={() => setVoucherRows(null)}>
-                ← Back to list
-              </button>
-              <button
-                type="button"
-                className="btn btn-excel"
-                onClick={() => {
-                  try {
-                    const tag = String(voucherTitle || 'voucher').replace(/\s+/g, '_');
-                    downloadExcelRows(voucherRows, 'Voucher', `${compName || 'Company'}_${tag}`);
-                  } catch (e) {
-                    alert(String(e?.message || e));
-                  }
-                }}
-              >
-                📊 Excel
-              </button>
-            </div>
-          </div>
+        <VoucherChecklistShell
+          report
+          header={
+            <FasReportHeader
+              title="Voucher entries"
+              onBack={() => setVoucherRows(null)}
+              backLabel="← Back to list"
+              rightSlot={
+                <ReportToolbarActions
+                  reportId="voucher-list"
+                  helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+                  showPdf={false}
+                  showWhatsApp={false}
+                  onExcel={() => {
+                    try {
+                      const tag = String(voucherTitle || 'voucher').replace(/\s+/g, '_');
+                      downloadExcelRows(voucherRows, 'Voucher', `${compName || 'Company'}_${tag}`);
+                    } catch (e) {
+                      alert(String(e?.message || e));
+                    }
+                  }}
+                />
+              }
+            />
+          }
+        >
           <p className="ledger-report-voucher-ref">
             Voucher: <strong>{voucherTitle}</strong>
           </p>
           <div className="report-display">
             <ReportTable data={voucherRows} type="ledger-voucher" />
           </div>
-          <div className="button-group">
-            <button type="button" className="btn btn-secondary" onClick={() => setVoucherRows(null)}>
-              ← Back to list
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setShowReport(false)}>
-              ← Back
-            </button>
-          </div>
-        </div>
+        </VoucherChecklistShell>
       );
     }
 
     return (
-      <div className="slide slide-report">
-        <div className="report-toolbar">
-          <h2>Cash/Bank/Journal Voucher List</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="voucher-list" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setShowReport(false)}>
-              ← Back
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  downloadExcelRows(rows, 'VoucherList', `${compName}_VoucherList_${vrType || 'ALL'}`);
-                } catch (e) {
-                  alert(String(e?.message || e));
-                }
-              }}
-            >
-              📊 Excel
-            </button>
-          </div>
-        </div>
+      <VoucherChecklistShell
+        report
+        header={
+          <FasReportHeader
+            title={screenTitle}
+            onBack={() => setShowReport(false)}
+            rightSlot={
+              <ReportToolbarActions
+                reportId="voucher-list"
+                helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+                showPdf={false}
+                showWhatsApp={false}
+                onExcel={() => {
+                  try {
+                    downloadExcelRows(rows, 'VoucherList', `${compName}_VoucherList_${vrType || 'ALL'}`);
+                  } catch (e) {
+                    alert(String(e?.message || e));
+                  }
+                }}
+              />
+            }
+          />
+        }
+      >
 
         <div className="report-info">
           <p>
@@ -332,83 +369,120 @@ export default function Slide14({ apiBase, formData, onPrev, onReset }) {
             </tbody>
           </table>
         </div>
-
-        <div className="button-group">
-          <button type="button" className="btn btn-secondary" onClick={() => setShowReport(false)}>
-            ← Back
-          </button>
-        </div>
-      </div>
+      </VoucherChecklistShell>
     );
   }
 
+  const runHeaderSlot = isDesktopView ? (
+    <ReportHelpButton
+      reportId="voucher-list"
+      includeSalesEntry={false}
+      includeStockLot={true}
+      appName="GFASORCL Accounting"
+    />
+  ) : (
+    <button type="submit" form="voucher-checklist-form" className="fas-report-header__run" disabled={loading}>
+      {loading ? 'Loading…' : '▶ Run'}
+    </button>
+  );
+
   return (
-    <div className="slide slide-14">
-      <h2>Cash/Bank/Journal Voucher List</h2>
-      <p className="company-info">
-        {compName} | FY {compYear}
-      </p>
-      <form className="report-form" onSubmit={handleSubmit}>
-        <div className="button-group button-group--form-top">
-          <button type="button" className="btn btn-secondary" onClick={onPrev}>
-            ← Back
+    <VoucherChecklistShell
+      className="fas-tb-host--form"
+      footer={
+        isDesktopView ? (
+          <button type="submit" form="voucher-checklist-form" className="fas-btn fas-btn-primary fas-tb-run-bottom" disabled={loading}>
+            {loading ? 'Loading…' : '▶ Run Report'}
           </button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Loading...' : 'Run'}
-          </button>
+        ) : null
+      }
+      header={<FasReportHeader title={screenTitle} onBack={onPrev} rightSlot={runHeaderSlot} />}
+    >
+      <form id="voucher-checklist-form" className="fas-tb-form-shell voucher-checklist-form" onSubmit={handleSubmit}>
+        <TrialBalanceSessionCard compact formData={formData} helpReportId="voucher-list" />
+
+        <div className="fas-tb-form__date-grid">
+          <div className="fas-field-group">
+            <div className="fas-field-label">Starting date</div>
+            <div className="fas-field-input fas-tb-date-field">
+              <span className="fas-field-icon" aria-hidden="true">
+                📅
+              </span>
+              <input
+                id="vcl-start"
+                type="date"
+                lang="en-GB"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <div className="fas-field-group">
+            <div className="fas-field-label">Ending date</div>
+            <div className="fas-field-input fas-tb-date-field">
+              <span className="fas-field-icon" aria-hidden="true">
+                📅
+              </span>
+              <input
+                id="vcl-end"
+                type="date"
+                lang="en-GB"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                required
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="form-row-broker">
-          <div className="form-group">
-            <label>Starting date</label>
-            <input className="form-input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        <div className="voucher-checklist-form__filters">
+          <div className="fas-field-group">
+            <div className="fas-field-label">Voucher type</div>
+            <div className="fas-field-input fas-select-wrap">
+              <select id="vcl-vrtype" value={vrType} onChange={(e) => setVrType(e.target.value)}>
+                <option value="">All</option>
+                <option value="JV">JV (Journal)</option>
+                <option value="BV">BV (Bank)</option>
+                <option value="CV">CV (Cash)</option>
+              </select>
+            </div>
           </div>
-          <div className="form-group">
-            <label>Ending date</label>
-            <input className="form-input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <div className="fas-field-group">
+            <div className="fas-field-label">Entries</div>
+            <div className="fas-field-input fas-select-wrap">
+              <select id="vcl-drcr" value={drcrFlag} onChange={(e) => setDrcrFlag(e.target.value)}>
+                <option value="">Both</option>
+                <option value="D">Debit entries</option>
+                <option value="C">Credit entries</option>
+              </select>
+            </div>
           </div>
-        </div>
-
-        <div className="form-row-broker">
-          <div className="form-group">
-            <label>Voucher type</label>
-            <select className="form-select" value={vrType} onChange={(e) => setVrType(e.target.value)}>
-              <option value="">All</option>
-              <option value="JV">JV (Journal)</option>
-              <option value="BV">BV (Bank)</option>
-              <option value="CV">CV (Cash)</option>
-            </select>
+          <div className="fas-field-group">
+            <div className="fas-field-label">Specific party (DC_CODE)</div>
+            <div className="fas-field-input">
+              <input
+                id="vcl-party"
+                list="voucher-party-codes"
+                value={partyCode}
+                onChange={(e) => setPartyCode(e.target.value.toUpperCase())}
+                placeholder="Blank = all"
+                autoComplete="off"
+              />
+            </div>
           </div>
-          <div className="form-group">
-            <label>Entries</label>
-            <select className="form-select" value={drcrFlag} onChange={(e) => setDrcrFlag(e.target.value)}>
-              <option value="">Both (blank)</option>
-              <option value="D">Debit entries</option>
-              <option value="C">Credit entries</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="form-row-broker">
-          <div className="form-group">
-            <label>Specific party (DC_CODE)</label>
-            <input
-              className="form-input"
-              list="voucher-party-codes"
-              value={partyCode}
-              onChange={(e) => setPartyCode(e.target.value.toUpperCase())}
-              placeholder="Blank = all"
-            />
-          </div>
-          <div className="form-group">
-            <label>Specific cash/bank code</label>
-            <input
-              className="form-input"
-              list="voucher-cashbank-codes"
-              value={cashBankCode}
-              onChange={(e) => setCashBankCode(e.target.value.toUpperCase())}
-              placeholder="Blank = all"
-            />
+          <div className="fas-field-group">
+            <div className="fas-field-label">Specific cash/bank code</div>
+            <div className="fas-field-input">
+              <input
+                id="vcl-cashbank"
+                list="voucher-cashbank-codes"
+                value={cashBankCode}
+                onChange={(e) => setCashBankCode(e.target.value.toUpperCase())}
+                placeholder="Blank = all"
+                autoComplete="off"
+              />
+            </div>
           </div>
         </div>
 
@@ -427,12 +501,24 @@ export default function Slide14({ apiBase, formData, onPrev, onReset }) {
           ))}
         </datalist>
 
+        <div className="fas-info-tip">
+          Set filters and run the checklist. Click any row in the result to open voucher detail lines.
+        </div>
+
         {error ? (
-          <p className="form-api-error">
+          <p className="form-api-error" role="alert">
             <strong>Could not load voucher list.</strong> {error}
           </p>
         ) : null}
+
+        {!isDesktopView ? (
+          <div className="fas-tb-form-footer">
+            <button type="submit" className="fas-btn fas-btn-primary fas-tb-run-bottom" disabled={loading}>
+              {loading ? 'Loading…' : '▶ Run Report'}
+            </button>
+          </div>
+        ) : null}
       </form>
-    </div>
+    </VoucherChecklistShell>
   );
 }

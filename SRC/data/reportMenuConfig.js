@@ -3,6 +3,15 @@
 import { masterMenuItemsForReportConfig } from './masterModuleConfig';
 import { utilitiesMenuItemsForReportConfig } from './utilitiesModuleConfig';
 import { incomeTaxMenuItemsForReportConfig } from './incomeTaxModuleConfig';
+import { otherReportsMenuItemsForReportConfig } from './otherReportsModuleConfig';
+import {
+  transactionMenuItemsForReportConfig,
+  voucherTransactionMenuItemsForReportConfig,
+  purchaseTransactionMenuItemsForReportConfig,
+  salesRootMenuItemsForReportConfig,
+  saleTransactionMenuItemsForReportConfig,
+} from './transactionModuleConfig';
+import { voucherBooksMenuItemsForReportConfig } from './voucherBooksModuleConfig';
 
 export const REPORT_MENU = [
   {
@@ -44,6 +53,12 @@ export const REPORT_MENU = [
       { id: 'supplier-ledger', title: 'Supplier Ledger', shortTitle: 'Supplier Ledger', description: 'Supplier bills' },
       { id: 'broker-os', title: 'Broker OS', shortTitle: 'Broker OS', description: 'Broker outstanding' },
       { id: 'ageing', title: 'Ageing Report', shortTitle: 'Ageing', description: 'Outstanding by days' },
+      {
+        id: 'ledger-dr-cr-date',
+        title: 'Ledger Dr/Cr Date',
+        shortTitle: 'Ledger Dr/Cr',
+        description: 'Ledger with separate debit and credit date ranges',
+      },
     ],
   },
   {
@@ -73,6 +88,30 @@ export const REPORT_MENU = [
       { id: 'hsn-purchase', title: 'HSN Purchase', shortTitle: 'HSN Purchase', description: 'HSN-wise purchase' },
       { id: 'state-wise-sales', title: 'State Wise Sales', shortTitle: 'State Sales', description: 'Sales by party state & GST%' },
       { id: 'state-wise-purchase', title: 'State Wise Purchase', shortTitle: 'State Purchase', description: 'Purchase by party state & GST%' },
+      {
+        id: 'purchase-tds-detail',
+        title: 'Party Wise Purchase Detail (TDS)',
+        shortTitle: 'Pur. TDS Detail',
+        description: 'Bill-wise purchase TDS (NTDS) by party',
+      },
+      {
+        id: 'purchase-tds-summary',
+        title: 'Party Wise Purchase Summary (TDS)',
+        shortTitle: 'Pur. TDS Summary',
+        description: 'Party-wise purchase TDS totals for the period',
+      },
+      {
+        id: 'sale-tds-detail',
+        title: 'Party Wise Sale Detail (TDS)',
+        shortTitle: 'Sale TDS Detail',
+        description: 'Bill-wise sale TDS by party',
+      },
+      {
+        id: 'sale-tds-summary',
+        title: 'Party Wise Sale Summary (TDS)',
+        shortTitle: 'Sale TDS Summary',
+        description: 'Party-wise sale TDS totals for the period',
+      },
     ],
   },
   {
@@ -81,18 +120,10 @@ export const REPORT_MENU = [
     sidebarLabel: 'Sales',
     sidebarIcon: '🛒',
     title: 'Sales',
-    subtitle: 'Bills, list & chart',
+    subtitle: 'Sale bills, orders, dispatch & export (VFP salerecord menu)',
     tileColor: '#7c3aed',
-    items: [
-      { id: 'sale-bill-printing', title: 'Sale Bill Printing', shortTitle: 'Sale Print', description: 'Print sale bills' },
-      { id: 'sale-list', title: 'Sale Bill List', shortTitle: 'Sale List', description: 'List & filters' },
-      {
-        id: 'sale-chart',
-        title: 'Sale Chart',
-        shortTitle: 'Sale Chart',
-        description: 'Month-wise weight & amount by item',
-      },
-    ],
+    itemsSectionTitle: 'Screens',
+    items: salesRootMenuItemsForReportConfig(),
   },
   {
     id: 'purchase-module',
@@ -100,10 +131,12 @@ export const REPORT_MENU = [
     sidebarLabel: 'Purchase',
     sidebarIcon: '🧾',
     title: 'Purchase',
-    subtitle: 'Purchase list',
+    subtitle: 'Purchase bills, orders, inward & notes (VFP purchasere menu)',
     tileColor: '#e74c3c',
+    itemsSectionTitle: 'Screens',
     items: [
-      { id: 'purchase-list', title: 'Purchase List', shortTitle: 'Purchase List', description: 'List & filters' },
+      { id: 'purchase-list', title: 'Purchase List', shortTitle: 'Purchase List', description: 'Purchase bill checklist' },
+      ...purchaseTransactionMenuItemsForReportConfig(),
     ],
   },
   {
@@ -112,15 +145,30 @@ export const REPORT_MENU = [
     sidebarLabel: 'Vouchers',
     sidebarIcon: '💵',
     title: 'Vouchers',
-    subtitle: 'Voucher list',
+    subtitle: 'Cash, bank & journal vouchers (VFP transactio voucher menus)',
     tileColor: '#374151',
+    itemsSectionTitle: 'Screens',
     items: [
-      { id: 'voucher-list', title: 'Voucher List', shortTitle: 'Voucher List', description: 'Find vouchers' },
+      { id: 'voucher-list', title: 'Voucher Checklist', shortTitle: 'Voucher Checklist', description: 'Find vouchers — all types' },
+      ...voucherBooksMenuItemsForReportConfig(),
+      ...voucherTransactionMenuItemsForReportConfig(),
     ],
   },
   {
-    id: 'master-module',
+    id: 'transaction-module',
     index: 8,
+    sidebarLabel: 'Transaction',
+    sidebarIcon: '💳',
+    title: 'Transaction',
+    subtitle: 'Production, bikri, TDS, bank recon & freight (VFP transactio menu)',
+    tileColor: '#c2410c',
+    itemsSectionTitle: 'Screens',
+    entry: true,
+    items: transactionMenuItemsForReportConfig(),
+  },
+  {
+    id: 'master-module',
+    index: 9,
     sidebarLabel: 'Master',
     sidebarIcon: '🗂️',
     title: 'Master Module',
@@ -131,7 +179,7 @@ export const REPORT_MENU = [
   },
   {
     id: 'utilities-module',
-    index: 9,
+    index: 10,
     sidebarLabel: 'Utilities',
     sidebarIcon: '🔧',
     title: 'Utilities',
@@ -143,7 +191,7 @@ export const REPORT_MENU = [
   },
   {
     id: 'income-tax-reports',
-    index: 10,
+    index: 11,
     sidebarLabel: 'Income Tax',
     sidebarIcon: '📑',
     title: 'Income Tax Reports',
@@ -152,6 +200,18 @@ export const REPORT_MENU = [
     itemsSectionTitle: 'Reports',
     entry: true,
     items: incomeTaxMenuItemsForReportConfig(),
+  },
+  {
+    id: 'other-reports',
+    index: 12,
+    sidebarLabel: 'Other',
+    sidebarIcon: '📂',
+    title: 'Other Reports',
+    subtitle: 'Labour, brokerage, chant, ledgers & outstanding (VFP otherreports menu)',
+    tileColor: '#b45309',
+    itemsSectionTitle: 'Reports',
+    entry: true,
+    items: otherReportsMenuItemsForReportConfig(),
   },
 ];
 
@@ -175,9 +235,13 @@ export const QUICK_ACCESS = [
 
 export const FLAT_REPORT_ORDER = REPORT_MENU.flatMap((c) => c.items.map((i) => i.id));
 
-export const REPORT_TO_CATEGORY = Object.fromEntries(
-  REPORT_MENU.flatMap((cat) => cat.items.map((item) => [item.id, cat.id]))
-);
+export const REPORT_TO_CATEGORY = {
+  ...Object.fromEntries(REPORT_MENU.flatMap((cat) => cat.items.map((item) => [item.id, cat.id]))),
+  ...Object.fromEntries(
+    ['sale-bill-printing', 'sale-list', 'sale-chart', ...saleTransactionMenuItemsForReportConfig().map((item) => item.id)]
+      .map((id) => [id, 'sales-module'])
+  ),
+};
 
 export function categoryForReport(reportId) {
   return REPORT_TO_CATEGORY[reportId] || REPORT_MENU[0].id;

@@ -119,6 +119,83 @@ export function IconToolbarDelete() {
   );
 }
 
+export function IconToolbarSave() {
+  return (
+    <Svg>
+      <path
+        fill="currentColor"
+        d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"
+      />
+    </Svg>
+  );
+}
+
+export function IconToolbarClose() {
+  return (
+    <Svg>
+      <path
+        fill="currentColor"
+        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"
+      />
+    </Svg>
+  );
+}
+
+export function IconToolbarPrint() {
+  return (
+    <Svg>
+      <path
+        fill="currentColor"
+        d="M19 8H5a3 3 0 0 0-3 3v6h4v4h12v-4h4v-6a3 3 0 0 0-3-3zm-3 11H8v-5h8v5zm3-7a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm-1-9H7v4h10V3z"
+      />
+    </Svg>
+  );
+}
+
+export function IconToolbarVoucher() {
+  return (
+    <Svg>
+      <path
+        fill="currentColor"
+        d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm1 7V3.5L18.5 9H15zM8 13h8v2H8v-2zm0 4h5v2H8v-2z"
+      />
+    </Svg>
+  );
+}
+
+export function IconToolbarChecklist() {
+  return (
+    <Svg>
+      <path
+        fill="currentColor"
+        d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-8 14-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"
+      />
+    </Svg>
+  );
+}
+
+export function IconToolbarFolderOpen() {
+  return (
+    <Svg>
+      <path
+        fill="currentColor"
+        d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2zm0 12H4V6h5.17l2 2H20v10zm-6.5-1 3.5-4.5-3.5-4.5v9z"
+      />
+    </Svg>
+  );
+}
+
+export function IconToolbarAccess() {
+  return (
+    <Svg>
+      <path
+        fill="currentColor"
+        d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"
+      />
+    </Svg>
+  );
+}
+
 const TOOLBAR_ICON_MAP = {
   back: IconToolbarBack,
   home: IconToolbarHome,
@@ -130,6 +207,13 @@ const TOOLBAR_ICON_MAP = {
   add: IconToolbarAdd,
   edit: IconToolbarEdit,
   delete: IconToolbarDelete,
+  save: IconToolbarSave,
+  close: IconToolbarClose,
+  print: IconToolbarPrint,
+  voucher: IconToolbarVoucher,
+  checklist: IconToolbarChecklist,
+  folder: IconToolbarFolderOpen,
+  access: IconToolbarAccess,
 };
 
 export function ToolbarIconByName(name) {

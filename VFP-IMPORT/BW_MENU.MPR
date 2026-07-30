@@ -38,7 +38,7 @@ DEFINE PAD _7hw0oor75 OF _MSYSMENU PROMPT "Stock Reports" COLOR SCHEME 3 ;
 	KEY ALT+S, ""
 DEFINE PAD _7hw0oor76 OF _MSYSMENU PROMPT "Final Reports" COLOR SCHEME 3 ;
 	KEY ALT+F, ""
-DEFINE PAD _7hw0oor77 OF _MSYSMENU PROMPT "Others" COLOR SCHEME 3 ;
+DEFINE PAD _7hw0oor77 OF _MSYSMENU PROMPT "Other Reports" COLOR SCHEME 3 ;
 	KEY ALT+O, ""
 DEFINE PAD _7hw0oor78 OF _MSYSMENU PROMPT "Saletax Reports" COLOR SCHEME 3 ;
 	KEY ALT+S, ""
@@ -56,7 +56,7 @@ ON PAD _7hw0oor73 OF _MSYSMENU ACTIVATE POPUP books
 ON PAD _7hw0oor74 OF _MSYSMENU ACTIVATE POPUP ledgers
 ON PAD _7hw0oor75 OF _MSYSMENU ACTIVATE POPUP stockrepor
 ON PAD _7hw0oor76 OF _MSYSMENU ACTIVATE POPUP finalrepor
-ON PAD _7hw0oor77 OF _MSYSMENU ACTIVATE POPUP others
+ON PAD _7hw0oor77 OF _MSYSMENU ACTIVATE POPUP otherreports
 ON PAD _7hw0oor78 OF _MSYSMENU ACTIVATE POPUP saletaxrep
 ON PAD _7hw0oor79 OF _MSYSMENU ACTIVATE POPUP incometaxr
 ON PAD _7hw0oor7a OF _MSYSMENU ACTIVATE POPUP gsttdstcsr
@@ -861,59 +861,59 @@ ON SELECTION BAR 15 OF finalrepor do form TDGLEG with 'A'
 ON SELECTION BAR 16 OF finalrepor do form strial
 ON SELECTION BAR 17 OF finalrepor do form scrleg with '','',g_sdate,g_edate
 
-DEFINE POPUP others MARGIN RELATIVE SHADOW COLOR SCHEME 4
-DEFINE BAR 1 OF others PROMPT "Labour Report"
-DEFINE BAR 2 OF others PROMPT "Brokerage Report Date Wise"
-DEFINE BAR 3 OF others PROMPT "Brokerage Report Item Wise"
-DEFINE BAR 4 OF others PROMPT "Insurance Report"
-DEFINE BAR 5 OF others PROMPT "Brokerage Report Item Cat Wise"
-DEFINE BAR 6 OF others PROMPT "Brokerage Summary Item Cat Wise"
-DEFINE BAR 7 OF others PROMPT "Broker Summary"
-DEFINE BAR 8 OF others PROMPT "Trading Exp."
-DEFINE BAR 9 OF others PROMPT "Broker Ledger"
-DEFINE BAR 10 OF others PROMPT "Broker Trial"
-DEFINE BAR 11 OF others PROMPT "Paploo Report"
-DEFINE BAR 12 OF others PROMPT "Brokerage Report Purchase"
-DEFINE BAR 13 OF others PROMPT "Voucher List Adv.Payment Revd."
-DEFINE BAR 14 OF others PROMPT "Chant Format 1"
-DEFINE BAR 15 OF others PROMPT "Chant Format 2"
-DEFINE BAR 16 OF others PROMPT "Chant  Format 3"
-DEFINE BAR 17 OF others PROMPT "Chant Summary"
-DEFINE BAR 18 OF others PROMPT "Broker Wise Scheme"
-DEFINE BAR 19 OF others PROMPT "Broker Wise Dalali Less Freight"
-DEFINE BAR 20 OF others PROMPT "Freight Party Ledger"
-DEFINE BAR 21 OF others PROMPT "Indent Party Ledger"
-DEFINE BAR 22 OF others PROMPT "Month wise Purchase/OutStanding"
-DEFINE BAR 23 OF others PROMPT "Month Wise Sale/OutStanding"
-DEFINE BAR 24 OF others PROMPT "Ledger Dr/Cr Date"
-DEFINE BAR 25 OF others PROMPT "Bill Wise Dalali Report Excel"
-DEFINE BAR 26 OF others PROMPT "Combind Report Sale/Purchase"
-ON SELECTION BAR 1 OF others do form LABRPT
-ON SELECTION BAR 2 OF others do form brokrpt WITH 4
-ON SELECTION BAR 3 OF others do form brokrpt WITH 1
-ON SELECTION BAR 4 OF others do form INS_RPT WITH 1
-ON SELECTION BAR 5 OF others DO FORM BROKRPT WITH 2
-ON SELECTION BAR 6 OF others do form brokrpt with 3
-ON SELECTION BAR 7 OF others do form brokrpt with 5
-ON SELECTION BAR 8 OF others do form tdgexp
-ON SELECTION BAR 9 OF others do form brokleg
-ON SELECTION BAR 10 OF others do form broktrl
-ON SELECTION BAR 11 OF others do form paploo
-ON SELECTION BAR 12 OF others do form brokrpt with 6
-ON SELECTION BAR 13 OF others do form std with 'H'
-ON SELECTION BAR 14 OF others do form chant with 1
-ON SELECTION BAR 15 OF others do form chant with 2
-ON SELECTION BAR 16 OF others do form chant with 3
-ON SELECTION BAR 17 OF others do form chant with 4
-ON SELECTION BAR 18 OF others do form brokrpt1 with 1
-ON SELECTION BAR 19 OF others do form brokrpt with 7
-ON SELECTION BAR 20 OF others do form cleger with 11
-ON SELECTION BAR 21 OF others do form cleger with 10
-ON SELECTION BAR 22 OF others do forM totout with 3
-ON SELECTION BAR 23 OF others do form totout with 2
-ON SELECTION BAR 24 OF others DO FORM MYLEGER WITH 1
-ON SELECTION BAR 25 OF others do form BROKRPT WITH 9
-ON SELECTION BAR 26 OF others do form combind_report with 1
+DEFINE POPUP otherreports MARGIN RELATIVE SHADOW COLOR SCHEME 4
+DEFINE BAR 1 OF otherreports PROMPT "Labour Report"
+DEFINE BAR 2 OF otherreports PROMPT "Brokerage Report Date Wise"
+DEFINE BAR 3 OF otherreports PROMPT "Brokerage Report Item Wise"
+DEFINE BAR 4 OF otherreports PROMPT "Insurance Report"
+DEFINE BAR 5 OF otherreports PROMPT "Brokerage Report Item Cat Wise"
+DEFINE BAR 6 OF otherreports PROMPT "Brokerage Summary Item Cat Wise"
+DEFINE BAR 7 OF otherreports PROMPT "Broker Summary"
+DEFINE BAR 8 OF otherreports PROMPT "Trading Exp."
+DEFINE BAR 9 OF otherreports PROMPT "Broker Ledger"
+DEFINE BAR 10 OF otherreports PROMPT "Broker Trial"
+DEFINE BAR 11 OF otherreports PROMPT "Paploo Report"
+DEFINE BAR 12 OF otherreports PROMPT "Brokerage Report Purchase"
+DEFINE BAR 13 OF otherreports PROMPT "Voucher List Adv.Payment Revd."
+DEFINE BAR 14 OF otherreports PROMPT "Chant Format 1"
+DEFINE BAR 15 OF otherreports PROMPT "Chant Format 2"
+DEFINE BAR 16 OF otherreports PROMPT "Chant  Format 3"
+DEFINE BAR 17 OF otherreports PROMPT "Chant Summary"
+DEFINE BAR 18 OF otherreports PROMPT "Broker Wise Scheme"
+DEFINE BAR 19 OF otherreports PROMPT "Broker Wise Dalali Less Freight"
+DEFINE BAR 20 OF otherreports PROMPT "Freight Party Ledger"
+DEFINE BAR 21 OF otherreports PROMPT "Indent Party Ledger"
+DEFINE BAR 22 OF otherreports PROMPT "Month wise Purchase/OutStanding"
+DEFINE BAR 23 OF otherreports PROMPT "Month Wise Sale/OutStanding"
+DEFINE BAR 24 OF otherreports PROMPT "Ledger Dr/Cr Date"
+DEFINE BAR 25 OF otherreports PROMPT "Bill Wise Dalali Report Excel"
+DEFINE BAR 26 OF otherreports PROMPT "Combind Report Sale/Purchase"
+ON SELECTION BAR 1 OF otherreports DO OTHER_RPT WITH 'A'
+ON SELECTION BAR 2 OF otherreports DO OTHER_RPT WITH 'B'
+ON SELECTION BAR 3 OF otherreports DO OTHER_RPT WITH 'C'
+ON SELECTION BAR 4 OF otherreports DO OTHER_RPT WITH 'D'
+ON SELECTION BAR 5 OF otherreports DO OTHER_RPT WITH 'E'
+ON SELECTION BAR 6 OF otherreports DO OTHER_RPT WITH 'F'
+ON SELECTION BAR 7 OF otherreports DO OTHER_RPT WITH 'G'
+ON SELECTION BAR 8 OF otherreports DO OTHER_RPT WITH 'H'
+ON SELECTION BAR 9 OF otherreports DO OTHER_RPT WITH 'I'
+ON SELECTION BAR 10 OF otherreports DO OTHER_RPT WITH 'J'
+ON SELECTION BAR 11 OF otherreports DO OTHER_RPT WITH 'K'
+ON SELECTION BAR 12 OF otherreports DO OTHER_RPT WITH 'L'
+ON SELECTION BAR 13 OF otherreports DO OTHER_RPT WITH 'M'
+ON SELECTION BAR 14 OF otherreports DO OTHER_RPT WITH 'N'
+ON SELECTION BAR 15 OF otherreports DO OTHER_RPT WITH 'O'
+ON SELECTION BAR 16 OF otherreports DO OTHER_RPT WITH 'P'
+ON SELECTION BAR 17 OF otherreports DO OTHER_RPT WITH 'Q'
+ON SELECTION BAR 18 OF otherreports DO OTHER_RPT WITH 'R'
+ON SELECTION BAR 19 OF otherreports DO OTHER_RPT WITH 'S'
+ON SELECTION BAR 20 OF otherreports DO OTHER_RPT WITH 'T'
+ON SELECTION BAR 21 OF otherreports DO OTHER_RPT WITH 'U'
+ON SELECTION BAR 22 OF otherreports DO OTHER_RPT WITH 'V'
+ON SELECTION BAR 23 OF otherreports DO OTHER_RPT WITH 'W'
+ON SELECTION BAR 24 OF otherreports DO OTHER_RPT WITH 'X'
+ON SELECTION BAR 25 OF otherreports DO OTHER_RPT WITH 'Y'
+ON SELECTION BAR 26 OF otherreports DO OTHER_RPT WITH 'Z'
 
 DEFINE POPUP saletaxrep MARGIN RELATIVE SHADOW COLOR SCHEME 4
 DEFINE BAR 1 OF saletaxrep PROMPT "DVAT 30"

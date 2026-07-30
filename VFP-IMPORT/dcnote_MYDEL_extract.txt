@@ -1,0 +1,43 @@
+
+PARAMETERS MODTYPE
+M_MODTYPE=MODTYPE
+vtp=thisform.type.Value
+vdt=thisform.mrdt
+vno=thisform.mrno
+*
+**********************************************AUDTI TABLE LEDGER
+mvar='insert into hi_pur SELECT * from purchase where comp_code=?g_compcode and '+;
+     'type=?VTP and r_date=?Vdt and r_no=?Vno'
+If SQLExec(GNCONNHANDLE,Mvar) <=0
+					=Aerror(laArr)
+					Messagebox(MVAR+' '+laArr(2))
+Endif  	  
+USER_NAME=G_USERNAME
+ENT_DATE=DATE()
+mvar='UPDATE hi_pur SET MOD_TYPE=?M_MODTYPE WHERE comp_code=?g_compcode and '+;
+     'type=?VTP and r_date=?Vdt and r_no=?Vno'
+If SQLExec(GNCONNHANDLE,Mvar) <=0
+					=Aerror(laArr)
+					Messagebox(MVAR+' '+laArr(2))
+ENDIF	
+*
+mvar='Delete from ledger where comp_code=?g_compcode and vr_type=?vtp '+;
+     'and vr_Date=?vdt and vr_no=?vno' 
+If SQLExec(GNCONNHANDLE,Mvar) <=0
+					=Aerror(laArr)
+					Messagebox(MVAR+' '+laArr(2))
+Endif         
+mvar='Delete from bills where comp_code=?g_compcode and vr_type=?vtp '+;
+	 'and vr_Date=?vdt and vr_no=?vno'
+If SQLExec(GNCONNHANDLE,Mvar) <=0
+					=Aerror(laArr)
+					Messagebox(MVAR+' '+laArr(2))
+Endif  
+*       
+mvar='Delete from purchase where comp_code=?g_compcode and type=?vtp  and '+;
+	 'r_date=?vdt and r_no=?vno'
+If SQLExec(GNCONNHANDLE,Mvar) <=0
+					=Aerror(laArr)
+					Messagebox(MVAR+' '+laArr(2))
+Endif         
+

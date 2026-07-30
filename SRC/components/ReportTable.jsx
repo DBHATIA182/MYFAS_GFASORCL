@@ -14,6 +14,13 @@ import { ageingCurBalDisplay } from '../utils/ageingDisplay';
 
 const LEDGER_SALE_VR_TYPES = new Set(['SL', 'SE', 'CN']);
 
+function formatLedgerDcLabel(row) {
+  const dc = String(row?.DC_CODE ?? row?.dc_code ?? '').trim();
+  if (!dc) return '—';
+  const name = String(row?.DC_NAME ?? row?.dc_name ?? '').trim();
+  return name ? `${dc} — ${name}` : dc;
+}
+
 /** GFASORCL sale list: 27 columns (InvDate, Name, Bk, Lot, Status, Dis amt, etc.) */
 const SALE_LIST_COL_COUNT = 27;
 const SALE_LIST_LEAD_COL_SPAN = 16;
@@ -270,6 +277,8 @@ export default function ReportTable({
   // --- LEDGER VIEW ---
   if (type === 'ledger' || type === 'ledger-interest') {
     const showInterestCols = type === 'ledger-interest';
+    const showDcCol = type === 'ledger';
+    const labelColSpan = showDcCol ? 7 : 6;
     const txnRows = data.filter(
       (row) =>
         String(row.VR_TYPE ?? row.vr_type ?? '')
@@ -319,6 +328,7 @@ export default function ReportTable({
               <th className="col-ledger-type">Vr.Type</th>
               <th className="col-ledger-line-type">Type</th>
               <th className="ledger-detail col-ledger-detail-narrow">Detail</th>
+              {showDcCol ? <th className="col-ledger-dc">DC Code</th> : null}
               <th className="text-right col-ledger-amt">Dr.Amount</th>
               <th className="text-right col-ledger-amt">Cr.Amount</th>
               <th className="text-right col-ledger-amt col-ledger-cl-bal">Cl.Balance</th>
@@ -387,6 +397,11 @@ export default function ReportTable({
                   <td className="ledger-detail col-ledger-detail-narrow" title={String(row.DETAIL ?? row.detail ?? '')}>
                     {clampText(row.DETAIL ?? row.detail, 36)}
                   </td>
+                  {showDcCol ? (
+                    <td className="col-ledger-dc" title={formatLedgerDcLabel(row)}>
+                      {clampText(formatLedgerDcLabel(row), 28)}
+                    </td>
+                  ) : null}
                   <td className="text-right dr-amt col-ledger-amt">{fmt(row.DR_AMT ?? row.dr_amt)}</td>
                   <td className="text-right cr-amt col-ledger-amt">{fmt(row.CR_AMT ?? row.cr_amt)}</td>
                   <td
@@ -427,7 +442,7 @@ export default function ReportTable({
                 .join(' ')}
               onClick={() => setLedgerSelectedKey('ledger-footer-total')}
             >
-              <td colSpan={6}>
+              <td colSpan={labelColSpan}>
                 <strong>GRAND TOTAL</strong>
               </td>
               <td className="text-right col-ledger-amt">
@@ -469,7 +484,7 @@ export default function ReportTable({
                   .join(' ')}
                 onClick={() => setLedgerSelectedKey('ledger-footer-net-int')}
               >
-                <td colSpan={9}>
+                <td colSpan={showInterestCols ? (showDcCol ? 10 : 9) : labelColSpan}>
                   <strong>NET INTEREST</strong>
                 </td>
                 <td className="text-right col-ledger-amt col-ledger-int">

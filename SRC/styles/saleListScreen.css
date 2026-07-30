@@ -1,6 +1,7 @@
 /* Sale list — fit viewport (no position:absolute; avoids blank screen) */
 
-.app-main:has(> .sale-list-screen) {
+.app-main:has(> .sale-list-screen:not(.fas-tb-host--form)),
+.app-main:has(> .purchase-list-screen:not(.fas-tb-host--form)) {
   align-items: stretch !important;
   justify-content: flex-start !important;
   padding: 0 !important;
@@ -9,8 +10,11 @@
   width: 100%;
 }
 
-.sale-list-screen.slide,
-.sale-list-screen.slide.slide-8,
+.sale-list-screen.slide:not(.fas-tb-host--form),
+.sale-list-screen.slide.slide-8:not(.fas-tb-host--form),
+.sale-list-screen.slide.slide-11:not(.fas-tb-host--form),
+.purchase-list-screen.slide:not(.fas-tb-host--form),
+.purchase-list-screen.slide.slide-11:not(.fas-tb-host--form),
 .sale-list-screen.slide.slide-report {
   flex: 1 1 auto !important;
   align-self: stretch !important;

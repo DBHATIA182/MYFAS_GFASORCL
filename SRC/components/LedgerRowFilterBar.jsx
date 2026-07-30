@@ -6,7 +6,7 @@ const AMOUNT_SIDES = [
   { id: 'cr', label: 'Cr only' },
 ];
 
-/** Search/filter bar for ledger — text, Vr.Type, Dr/Cr toggles. */
+/** Search/filter bar for ledger — text, Vr.Type, DC Code, Dr/Cr toggles. */
 export default function LedgerRowFilterBar({
   value,
   onChange,
@@ -15,6 +15,9 @@ export default function LedgerRowFilterBar({
   vrType = 'all',
   vrTypeOptions = [],
   onVrTypeChange,
+  dcCode = 'all',
+  dcCodeOptions = [],
+  onDcCodeChange,
   shownCount,
   totalCount,
   className = '',
@@ -23,10 +26,12 @@ export default function LedgerRowFilterBar({
   const textActive = String(value ?? '').trim().length > 0;
   const amountActive = amountSide === 'dr' || amountSide === 'cr';
   const vrTypeActive = vrType && vrType !== 'all';
-  const filterActive = textActive || amountActive || vrTypeActive;
+  const dcCodeActive = dcCode && dcCode !== 'all';
+  const filterActive = textActive || amountActive || vrTypeActive || dcCodeActive;
 
   const filterHints = [];
   if (vrTypeActive) filterHints.push(`Vr ${vrType}`);
+  if (dcCodeActive) filterHints.push(`DC ${dcCode}`);
   if (amountActive) filterHints.push(amountSide === 'dr' ? 'Dr only' : 'Cr only');
 
   return (
@@ -70,6 +75,25 @@ export default function LedgerRowFilterBar({
               {vrTypeOptions.map((code) => (
                 <option key={code} value={code}>
                   {code}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
+        {onDcCodeChange && dcCodeOptions.length > 0 ? (
+          <label className="fas-ledger-filter__vr-type">
+            <span className="fas-ledger-filter__vr-type-label">DC Code</span>
+            <select
+              className="fas-ledger-filter__vr-type-select"
+              value={dcCode}
+              onChange={(e) => onDcCodeChange(e.target.value)}
+              aria-label="Filter by DC code"
+            >
+              <option value="all">All DC codes</option>
+              {dcCodeOptions.map(({ code, name }) => (
+                <option key={code} value={code}>
+                  {name ? `${code} — ${name}` : code}
                 </option>
               ))}
             </select>

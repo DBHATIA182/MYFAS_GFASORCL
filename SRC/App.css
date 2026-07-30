@@ -304,6 +304,29 @@ body {
   align-items: center;
 }
 
+/* Icon-only help — ? in circle (default app-wide) */
+.btn-report-help--icon-only {
+  gap: 0;
+  padding: 0;
+  min-height: 28px;
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+
+.btn-report-help--icon-only .btn-report-help__icon {
+  width: 1.65rem;
+  height: 1.65rem;
+  font-size: 0.82rem;
+}
+
+.btn-report-help--icon-only .btn-report-help__label {
+  display: none;
+}
+
 .btn-report-help {
   display: inline-flex;
   align-items: center;
@@ -1781,6 +1804,15 @@ body {
   padding-right: 2px !important;
 }
 
+.report-table--ledger-compact .col-ledger-dc {
+  width: 6.5rem;
+  max-width: 6.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.62rem;
+}
+
 .report-table--ledger .ledger-cl-balance {
   font-weight: 700;
   color: #2c7a7b;
@@ -2396,7 +2428,7 @@ body {
   }
 
   /* Bill ledger / Broker OS: Back + Pdf + Excel + WhatsApp on one row */
-  .slide-report--mobile-toolbar-row .toolbar-actions {
+  .slide-report--mobile-toolbar-row .toolbar-actions:not(.toolbar-actions--export-menu) {
     display: grid;
     grid-template-columns: minmax(2.35rem, 0.42fr) repeat(3, minmax(0, 1fr));
     gap: 0.28rem;
@@ -17441,9 +17473,61 @@ body.force-desktop-view .app--desktop {
   cursor: pointer;
 }
 
+.itax-table tbody tr.itax-row--broker-ledger {
+  cursor: pointer;
+}
+
+.itax-table tbody tr.itax-row--month-drill {
+  cursor: pointer;
+}
+
 .itax-table tbody tr.itax-row--ledger:hover td,
-.itax-table tbody tr.itax-row--ledger:focus-visible td {
+.itax-table tbody tr.itax-row--ledger:focus-visible td,
+.itax-table tbody tr.itax-row--broker-ledger:hover td,
+.itax-table tbody tr.itax-row--broker-ledger:focus-visible td,
+.itax-table tbody tr.itax-row--month-drill:hover td,
+.itax-table tbody tr.itax-row--month-drill:focus-visible td {
   background: #eff6ff;
+}
+
+.itax-table tbody tr.itax-party-group--ledger td {
+  cursor: pointer;
+}
+
+.itax-table tbody tr.itax-party-group--ledger:hover td {
+  background: #dbeafe;
+}
+
+.itax-table td.itax-cell--ledger {
+  cursor: pointer;
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.itax-table td.itax-cell--ledger:hover,
+.itax-table td.itax-cell--ledger:focus-visible {
+  background: #eff6ff;
+}
+
+.itax-party-block--ledger-btn {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.itax-party-block--ledger-btn:hover .itax-party-block__name,
+.itax-party-block--ledger-btn:focus-visible .itax-party-block__name {
+  color: #1d4ed8;
+  text-decoration: underline;
 }
 
 .itax-table td.num,
@@ -17497,6 +17581,326 @@ body.force-desktop-view .app--desktop {
   width: 4.75rem;
 }
 
+.itax-screen--compact-table .itax-col-qty-sm {
+  width: 4.25rem;
+  min-width: 4.25rem;
+}
+
+.itax-screen--compact-table .itax-col-mth {
+  width: 5.75rem;
+  min-width: 5.75rem;
+  max-width: 6.5rem;
+  white-space: nowrap;
+}
+
+.itax-screen--compact-table .itax-col-date {
+  width: 5.5rem;
+  min-width: 5.5rem;
+  white-space: nowrap;
+}
+
+/* Month-wise purchase/sale outstanding — narrow month, wider amounts */
+.itax-screen--month-outstanding.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow-x: auto;
+}
+
+.itax-screen--month-outstanding.itax-screen--compact-table .itax-table {
+  min-width: 44rem;
+}
+
+.itax-screen--month-outstanding.itax-screen--compact-table .itax-col-mth {
+  width: 5.25rem;
+  min-width: 5.25rem;
+  max-width: 5.5rem;
+}
+
+.itax-screen--month-outstanding.itax-screen--compact-table .itax-col-amt {
+  width: 9.5rem;
+  min-width: 8.5rem;
+}
+
+.itax-screen--month-outstanding.itax-screen--compact-table .itax-table td.num,
+.itax-screen--month-outstanding.itax-screen--compact-table .itax-table th.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.itax-screen--compact-table .itax-col-broker-code {
+  width: 5.25rem;
+  min-width: 5.25rem;
+}
+
+.itax-screen--compact-table .itax-col-bname {
+  width: 11rem;
+  min-width: 11rem;
+  max-width: 16rem;
+}
+
+/* Brokerage summary — broker-wise totals (no column overlap) */
+.itax-screen--broker-summary .itax-screen__table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.itax-screen--broker-summary.itax-screen--compact-table .itax-table,
+.itax-screen--broker-summary .broker-summary-table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.78rem;
+}
+
+.itax-screen--broker-summary .broker-summary-table th,
+.itax-screen--broker-summary .broker-summary-table td {
+  padding: 0.28rem 0.5rem;
+  white-space: nowrap;
+}
+
+.itax-screen--broker-summary .broker-summary-table td.broker-summary-cell--name {
+  white-space: normal;
+  word-break: break-word;
+  min-width: 11rem;
+  max-width: 16rem;
+  overflow: hidden;
+}
+
+.itax-screen--broker-summary .broker-summary-table td.num,
+.itax-screen--broker-summary .broker-summary-table th.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.broker-summary-col--bk_code { width: 5.5rem; min-width: 5.5rem; }
+.broker-summary-col--bname { width: 12rem; min-width: 12rem; }
+.broker-summary-col--bags,
+.broker-summary-col--katta,
+.broker-summary-col--hkatta { width: 4.5rem; min-width: 4.5rem; }
+.broker-summary-col--weight,
+.broker-summary-col--amount,
+.broker-summary-col--brokerage,
+.broker-summary-col--dane_amt,
+.broker-summary-col--p_amt,
+.broker-summary-col--line_tot,
+.broker-summary-col--freight { width: 7.75rem; min-width: 7.75rem; }
+
+/* Broker summary drill — bill detail table (horizontal scroll, no column overlap) */
+.itax-screen--broker-summary.itax-screen--broker-drill.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.itax-screen--broker-summary.itax-screen--broker-drill.itax-screen--compact-table .itax-table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+}
+
+.itax-screen--broker-summary.itax-screen--broker-drill.itax-screen--compact-table .itax-col-date {
+  width: 5.5rem;
+  min-width: 5.5rem;
+}
+
+.itax-screen--broker-summary.itax-screen--broker-drill.itax-screen--compact-table .itax-col-mth {
+  width: 5rem;
+  min-width: 5rem;
+}
+
+.itax-screen--broker-summary.itax-screen--broker-drill.itax-screen--compact-table .itax-col-name {
+  width: 14rem;
+  min-width: 14rem;
+  max-width: 22ch;
+}
+
+.itax-screen--broker-summary.itax-screen--broker-drill.itax-screen--compact-table .itax-table td.itax-cell--text-clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22ch;
+}
+
+/* Trading exp voucher drill — all ledger lines for one voucher */
+.itax-screen--voucher-drill.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.itax-screen--voucher-drill.itax-screen--compact-table .itax-table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+}
+
+.itax-screen--voucher-drill.itax-screen--compact-table .itax-col-code {
+  width: 5.5rem;
+  min-width: 5.5rem;
+}
+
+.itax-screen--voucher-drill.itax-screen--compact-table .itax-col-name {
+  width: 14rem;
+  min-width: 14rem;
+  max-width: 24ch;
+}
+
+.itax-row--voucher-drill,
+.itax-row--voucher-entry {
+  cursor: pointer;
+}
+
+.broker-summary-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.broker-summary-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+}
+
+.broker-summary-card--drill {
+  cursor: pointer;
+}
+
+.broker-summary-card--drill:hover,
+.broker-summary-card--drill:focus-visible {
+  border-color: #86efac;
+  background: #f0fdf4;
+  outline: none;
+}
+
+.broker-summary-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.4rem;
+}
+
+.broker-summary-card__code {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #0f172a;
+}
+
+.broker-summary-card__name {
+  font-size: 0.76rem;
+  color: #475569;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.broker-summary-card__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.55rem;
+}
+
+.broker-summary-card__metric-label {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.broker-summary-card__metric-val {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+}
+
+.broker-summary-card--grand {
+  background: #1e3a5f;
+  border-color: #1e3a5f;
+}
+
+.broker-summary-card--grand .broker-summary-card__code,
+.broker-summary-card--grand .broker-summary-card__metric-label,
+.broker-summary-card--grand .broker-summary-card__metric-val {
+  color: #fff;
+}
+
+.itax-screen--broker-item.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.itax-screen--broker-item.itax-screen--compact-table .itax-table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+}
+
+.itax-screen--broker-item-summary.itax-screen--compact-table .itax-table col.itax-col-code {
+  width: 4.5rem;
+  min-width: 4.5rem;
+}
+
+.itax-screen--broker-item-summary.itax-screen--compact-table .itax-table col.itax-col-name {
+  width: 11rem;
+  min-width: 11rem;
+}
+
+.itax-screen--insurance.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.itax-screen--insurance.itax-screen--compact-table .itax-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+}
+
+.itax-screen--insurance.itax-screen--compact-table .itax-table col.itax-col-date {
+  width: 5.25rem;
+  min-width: 5.25rem;
+  max-width: 5.25rem;
+}
+
+.itax-screen--insurance.itax-screen--compact-table .itax-table td.itax-col-date,
+.itax-screen--insurance.itax-screen--compact-table .itax-table th.itax-col-date {
+  width: 5.25rem;
+  max-width: 5.25rem;
+  white-space: nowrap;
+}
+
+.itax-screen--insurance.itax-screen--compact-table .itax-table col.itax-col-qty-sm,
+.itax-screen--insurance.itax-screen--compact-table .itax-table col.itax-col-qty {
+  width: 4.5rem;
+  min-width: 4.5rem;
+}
+
+.itax-screen--insurance.itax-screen--compact-table .itax-table col.itax-col-amt {
+  width: 7rem;
+  min-width: 7rem;
+}
+
+.itax-table tbody tr.itax-broker-total td {
+  background: #ecfdf5;
+  font-weight: 700;
+}
+
+.itax-mobile-card--broker-total {
+  background: #ecfdf5;
+  border-color: #86efac;
+}
+
+.broker-summary-card--grand .broker-summary-card__metric-label {
+  color: #cbd5e1;
+}
+
 .itax-screen--month-pivot .itax-table {
   font-size: 0.7rem;
 }
@@ -17525,7 +17929,9 @@ body.force-desktop-view .app--desktop {
 }
 
 .itax-screen--month-pivot .itax-table td.itax-cell--name-short,
-.itax-screen--month-pivot .itax-table tbody tr:not(.itax-schedule-group) td.itax-cell--name-short {
+.itax-screen--month-pivot .itax-table td.itax-cell--text-clip,
+.itax-screen--month-pivot .itax-table tbody tr:not(.itax-schedule-group) td.itax-cell--name-short,
+.itax-screen--month-pivot .itax-table tbody tr:not(.itax-schedule-group) td.itax-cell--text-clip {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -17553,8 +17959,322 @@ body.force-desktop-view .app--desktop {
   border-top: none;
 }
 
+/* Item-wise grouped reports — compact table, item name in group header */
+.itax-screen--item-groups.itax-screen--compact-table .itax-screen__table-wrap {
+  max-width: 44rem;
+}
+
+.itax-screen--item-groups.itax-screen--compact-table .itax-table {
+  width: 100%;
+  table-layout: fixed;
+  font-size: 0.78rem;
+}
+
+.itax-screen--item-groups.itax-screen--compact-table .itax-table th,
+.itax-screen--item-groups.itax-screen--compact-table .itax-table td {
+  padding: 0.22rem 0.35rem;
+}
+
+.itax-screen--item-groups.itax-screen--compact-table .itax-col-mth {
+  width: 5.25rem;
+}
+
+.itax-screen--item-groups.itax-screen--compact-table .itax-col-amt {
+  width: 6.25rem;
+}
+
+/* Item → party breakdown (e.g. item-wise sales party-wise) */
+.itax-screen--item-party.itax-screen--compact-table .itax-screen__table-wrap {
+  max-width: 62rem;
+  overflow-x: auto;
+}
+
+.itax-screen--item-party.itax-screen--compact-table .itax-table {
+  width: auto;
+  max-width: 100%;
+  min-width: 54rem;
+}
+
+.itax-screen--item-party.itax-screen--compact-table .itax-col-code {
+  width: 5.25rem;
+}
+
+.itax-screen--item-party.itax-screen--compact-table .itax-col-name {
+  width: 28ch;
+  max-width: 28ch;
+}
+
+.itax-screen--item-party.itax-screen--compact-table .itax-col-city {
+  width: 12ch;
+  max-width: 12ch;
+}
+
+.itax-screen--item-party.itax-screen--compact-table .itax-col-pan {
+  width: 10ch;
+  max-width: 10ch;
+}
+
+.itax-screen--item-party.itax-screen--compact-table .itax-table td.itax-cell--text-clip,
+.itax-screen--party-groups.itax-screen--compact-table .itax-table td.itax-cell--text-clip {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itax-screen--item-groups .itax-table tbody tr.itax-schedule-group td {
+  font-size: 0.82rem;
+  line-height: 1.3;
+  padding: 0.3rem 0.45rem;
+}
+
+.itax-mobile-group--item {
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.itax-table tbody tr.itax-grand-total td {
+  background: #1e3a5f;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.5rem;
+  border-top: 2px solid #0f172a;
+}
+
+.itax-table tbody tr.itax-grand-total td.num {
+  color: #fff;
+}
+
+.itax-table tbody tr.itax-item-total td {
+  background: #e2e8f0;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
+  border-top: 1px solid #94a3b8;
+}
+
+.itax-table tbody tr.itax-item-total td.num {
+  color: #1e293b;
+}
+
+.itax-table tbody tr.itax-party-total td {
+  background: #dbeafe;
+  color: #1e3a5f;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
+  border-top: 1px solid #93c5fd;
+}
+
+.itax-table tbody tr.itax-party-total td.num {
+  color: #1e3a5f;
+}
+
+.itax-table tbody tr.itax-book-day-open td {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.itax-table tbody tr.itax-book-day-total td {
+  background: #e2e8f0;
+  font-weight: 700;
+  border-top: 1px solid #94a3b8;
+}
+
+.itax-table tbody tr.itax-book-day-close td {
+  background: #f1f5f9;
+  font-weight: 800;
+  border-top: 1px solid #64748b;
+}
+
+.itax-table tbody tr.itax-book-day-close td.num {
+  font-weight: 800;
+}
+
+.itax-table tbody tr.itax-party-group td {
+  background: #e8eef5;
+  color: #1e3a5f;
+  font-weight: 700;
+  padding: 0.4rem 0.5rem;
+  border-top: 2px solid #9ca3af;
+  white-space: normal;
+}
+
+.itax-party-block--group .itax-party-block__name {
+  font-size: 0.88rem;
+}
+
+.itax-screen--party-groups.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow-x: auto;
+  max-width: 58rem;
+}
+
+.itax-screen--party-groups.itax-screen--compact-table .itax-table {
+  width: auto;
+  max-width: 100%;
+  font-size: 0.78rem;
+}
+
+.itax-screen--party-groups.itax-screen--compact-table .itax-table th,
+.itax-screen--party-groups.itax-screen--compact-table .itax-table td {
+  padding: 0.22rem 0.35rem;
+}
+
+.itax-screen--party-groups.itax-screen--compact-table .itax-col-name {
+  width: 50ch;
+  max-width: 50ch;
+}
+
+.itax-screen--party-groups.itax-screen--compact-table .itax-table td.itax-cell--name-short,
+.itax-screen--party-groups.itax-screen--compact-table .itax-table td.itax-cell--text-clip {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50ch;
+}
+
+/* Brokerage date-wise — wide broker-grouped table (VFP brokrpt1.frx) */
+.itax-screen--broker-date.itax-screen--party-groups.itax-screen--compact-table .itax-screen__table-wrap {
+  max-width: 100%;
+}
+
+.itax-screen--broker-date.itax-screen--party-groups.itax-screen--compact-table .itax-col-name {
+  width: 28ch;
+  max-width: 28ch;
+}
+
+.itax-screen--broker-date.itax-screen--party-groups.itax-screen--compact-table .itax-table td.itax-cell--name-short,
+.itax-screen--broker-date.itax-screen--party-groups.itax-screen--compact-table .itax-table td.itax-cell--text-clip {
+  max-width: 28ch;
+}
+
+/* B.No grouped reports (lot-wise purchase/sale) — wide scrollable table */
+.itax-screen--bill-groups.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-table {
+  width: auto;
+  min-width: 100rem;
+  max-width: none;
+  font-size: 0.76rem;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-table th,
+.itax-screen--bill-groups.itax-screen--compact-table .itax-table td {
+  padding: 0.2rem 0.3rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-table th {
+  white-space: nowrap;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-col-mth {
+  width: 3.25rem;
+  min-width: 3.25rem;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-col-code {
+  width: 5rem;
+  min-width: 5rem;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-col-name {
+  width: 20ch;
+  max-width: 20ch;
+  min-width: 12ch;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-col-text {
+  width: 4.5rem;
+  min-width: 4rem;
+  white-space: nowrap;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-col-date {
+  width: 5.25rem;
+  min-width: 5.25rem;
+  white-space: nowrap;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-col-qty {
+  width: 4.25rem;
+  min-width: 4.25rem;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-col-amt {
+  width: 6.25rem;
+  min-width: 6.25rem;
+}
+
+.itax-screen--bill-groups.itax-screen--compact-table .itax-table td.itax-cell--text-clip {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 20ch;
+}
+
+.itax-screen--party-bill-cards .itax-screen__table-wrap {
+  overflow-x: visible;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.itax-mobile-group--party {
+  margin-top: 0.5rem;
+}
+
+.itax-mobile-group--party .itax-party-block--group,
+.itax-mobile-group--party .itax-party-block--ledger-btn {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  background: #e8eef5;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.35rem;
+  box-sizing: border-box;
+}
+
+.itax-mobile-group--party .itax-party-block__name {
+  font-weight: 700;
+  color: #1e3a5f;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.itax-mobile-card__attr--full {
+  grid-column: 1 / -1;
+}
+
+.itax-party-block--mobile-subs .itax-party-block__sub {
+  font-size: 0.78rem;
+  color: #475569;
+  line-height: 1.3;
+}
+
+.itax-mobile-card--party-total {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e3a5f;
+}
+
+.itax-mobile-card--party-total .itax-mobile-card__code,
+.itax-mobile-card--party-total .itax-mobile-card__attr-val {
+  color: #1e3a5f;
+}
+
+.itax-mobile-card--party-total .itax-mobile-card__attr-label {
+  color: #475569;
+}
+
 /* Income tax — mobile party-wise cards */
-.itax-screen--party-cards .itax-screen__table-wrap {
+.itax-screen--party-cards .itax-screen__table-wrap,
+.itax-screen--month-cards .itax-screen__table-wrap,
+.itax-screen--month-summary-cards .itax-screen__table-wrap {
   overflow-x: visible;
   border: none;
   background: transparent;
@@ -17651,9 +18371,270 @@ body.force-desktop-view .app--desktop {
   font-variant-numeric: tabular-nums;
 }
 
+/* Top Party Sales — mobile ranking cards */
+.itax-top-sales {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.itax-top-sales__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: #0d9488;
+  color: #fff;
+}
+
+.itax-top-sales__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.itax-top-sales__sub {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+.itax-top-sales__header-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.itax-top-sales__total-amt {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.itax-top-sales__total-qty {
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+  opacity: 0.92;
+  font-variant-numeric: tabular-nums;
+}
+
+.itax-top-sales__list {
+  margin: 0;
+  padding: 0;
+}
+
+.itax-top-sales__row {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+  border: 0;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.itax-top-sales__row:last-child {
+  border-bottom: 0;
+}
+
+.itax-top-sales__row--ledger {
+  cursor: pointer;
+}
+
+.itax-top-sales__row--ledger:active,
+.itax-top-sales__row--ledger:focus-visible {
+  background: #f0fdfa;
+  outline: none;
+}
+
+.itax-top-sales__row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.itax-top-sales__rank {
+  flex-shrink: 0;
+  min-width: 1.25rem;
+  color: #0f766e;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.itax-top-sales__name {
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.itax-top-sales__vals {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.itax-top-sales__amt {
+  display: block;
+  font-weight: 700;
+  color: #111827;
+  font-variant-numeric: tabular-nums;
+}
+
+.itax-top-sales__qty {
+  display: block;
+  margin-top: 0.15rem;
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 641px) {
+  .itax-screen--report .itax-top-sales {
+    max-width: 42rem;
+  }
+}
+
+.itax-mobile-card__head-sub {
+  display: block;
+  font-size: 0.82rem;
+  color: #374151;
+  margin-top: 0.15rem;
+}
+
+.itax-mobile-card__head-month {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-top: 0.2rem;
+}
+
+.itax-mobile-card--grand-total .itax-mobile-card__head-sub,
+.itax-mobile-card--grand-total .itax-mobile-card__head-month {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.itax-mobile-card--grand-total {
+  background: #1e3a5f;
+  border-color: #0f172a;
+  color: #fff;
+}
+
+.itax-mobile-card--grand-total .itax-mobile-card__code {
+  color: #fff;
+  font-size: 0.92rem;
+}
+
+.itax-mobile-card--grand-total .itax-mobile-card__grid {
+  border-top-color: rgba(255, 255, 255, 0.2);
+}
+
+.itax-mobile-card--grand-total .itax-mobile-card__attr-label {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.itax-mobile-card--grand-total .itax-mobile-card__attr-val {
+  color: #fff;
+}
+
+.itax-mobile-card--item-total {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+.itax-mobile-card--item-total .itax-mobile-card__code {
+  color: #1e293b;
+  font-size: 0.88rem;
+}
+
+.itax-mobile-card--item-total .itax-mobile-card__grid {
+  border-top-color: #cbd5e1;
+}
+
+.itax-mobile-card--item-total .itax-mobile-card__attr-label {
+  color: #64748b;
+}
+
+.itax-mobile-card--item-total .itax-mobile-card__attr-val {
+  color: #1e293b;
+}
+
+.itax-mobile-group {
+  margin: 0.65rem 0 0.35rem;
+  padding: 0.4rem 0.55rem;
+  background: #e8eef5;
+  border-radius: 6px;
+  color: #1e3a5f;
+  font-weight: 700;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.itax-mobile-group:first-child {
+  margin-top: 0;
+}
+
+.itax-mobile-card--month .itax-mobile-card__head--month {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  margin-bottom: 0.35rem;
+}
+
+.itax-mobile-card__name-inline {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #111827;
+  line-height: 1.3;
+  text-align: left;
+  word-break: break-word;
+}
+
+.itax-mobile-card__grid--summary {
+  grid-template-columns: 1fr 1fr;
+  border-top: none;
+  padding-top: 0;
+}
+
+.itax-mobile-card__months {
+  margin-top: 0.35rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.itax-mobile-card__months-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  margin-bottom: 0.35rem;
+}
+
+.itax-mobile-card__grid--months {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem 0.5rem;
+  padding-top: 0;
+  border-top: none;
+}
+
+.app--mobile .itax-screen--month-cards .itax-screen__table-wrap {
+  overflow-x: visible;
+}
+
 /* Income tax — mobile table horizontal scroll (month pivot etc.) */
 .app--mobile .itax-screen--mobile-scroll .itax-screen__table-wrap,
-.app--mobile .itax-screen--month-pivot .itax-screen__table-wrap {
+.app--mobile .itax-screen--month-pivot:not(.itax-screen--month-cards) .itax-screen__table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -17673,6 +18654,182 @@ body.force-desktop-view .app--desktop {
   min-width: 52rem;
 }
 
+.itax-cell--month-drill {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.itax-cell--month-drill:hover,
+.itax-cell--month-drill:focus-visible {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.itax-mobile-list--expense-month .itax-mobile-card--expense-head {
+  border-left: 3px solid #2563eb;
+}
+
+.itax-mobile-card__month-drill {
+  cursor: pointer;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.06);
+  padding: 0.35rem 0.45rem;
+  text-align: left;
+}
+
+.itax-mobile-card__month-drill:hover,
+.itax-mobile-card__month-drill:focus-visible {
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.itax-screen__table-wrap--loading {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+/* Cash/non-cash expense month drill — compact, no inner scroll trap */
+.itax-screen--expense-drill .itax-screen__scroll {
+  overflow-y: auto;
+}
+
+.itax-screen--expense-drill .itax-screen__meta {
+  margin-bottom: 0.35rem;
+  font-size: 0.76rem;
+  line-height: 1.25;
+}
+
+.itax-screen--expense-drill .itax-screen__table-wrap {
+  flex: 0 1 auto;
+  overflow: visible;
+  max-height: none;
+  max-width: none;
+  border: none;
+  border-radius: 0;
+}
+
+.itax-screen--expense-drill.itax-screen--party-groups.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow: visible;
+  max-width: none;
+}
+
+.itax-screen--expense-drill.itax-screen--month-pivot.itax-screen--compact-table .itax-screen__table-wrap {
+  overflow: visible;
+}
+
+.itax-screen--expense-drill .itax-table,
+.itax-screen--expense-drill.itax-screen--party-groups.itax-screen--compact-table .itax-table,
+.itax-screen--expense-drill.itax-screen--month-pivot.itax-screen--compact-table .itax-table {
+  width: auto;
+  min-width: 0;
+  max-width: min(100%, 38rem);
+  table-layout: fixed;
+  font-size: 0.72rem;
+}
+
+.itax-screen--expense-drill .itax-table th,
+.itax-screen--expense-drill .itax-table td {
+  padding: 0.06rem 0.18rem;
+  line-height: 1.15;
+}
+
+.itax-screen--expense-drill.itax-screen--party-groups.itax-screen--compact-table .itax-table th,
+.itax-screen--expense-drill.itax-screen--party-groups.itax-screen--compact-table .itax-table td {
+  padding: 0.06rem 0.18rem;
+}
+
+.itax-screen--expense-drill .itax-table col:nth-child(1) {
+  width: 4.25rem;
+}
+
+.itax-screen--expense-drill .itax-table col:nth-child(2) {
+  width: auto;
+  min-width: 9rem;
+}
+
+.itax-screen--expense-drill .itax-table col:nth-child(3) {
+  width: 4.35rem;
+}
+
+.itax-screen--expense-drill .itax-table col:nth-child(4) {
+  width: 1.55rem;
+}
+
+.itax-screen--expense-drill .itax-table col:nth-child(5) {
+  width: 1.75rem;
+}
+
+.itax-screen--expense-drill .itax-table col:nth-child(6) {
+  width: 5.75rem;
+}
+
+.itax-screen--expense-drill .itax-table td:nth-child(2),
+.itax-screen--expense-drill .itax-table th:nth-child(2) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14rem;
+}
+
+.itax-screen--expense-drill .itax-table tbody tr.itax-party-total td:nth-child(2) {
+  font-weight: 700;
+}
+
+.itax-screen--expense-drill .itax-table td.num,
+.itax-screen--expense-drill .itax-table th.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.itax-screen--expense-drill .itax-table tbody tr.itax-party-group td {
+  padding: 0.1rem 0.16rem;
+  font-size: 0.74rem;
+  border-top-width: 1px;
+  white-space: normal;
+}
+
+.itax-screen--expense-drill .itax-table tbody tr.itax-party-total td {
+  padding: 0.08rem 0.14rem;
+  font-size: 0.72rem;
+  border-top-width: 1px;
+}
+
+.itax-screen--expense-drill .itax-table tbody tr.itax-grand-total td {
+  padding: 0.1rem 0.14rem;
+  font-size: 0.74rem;
+}
+
+.itax-screen--expense-drill .itax-party-block--group .itax-party-block__name {
+  font-size: 0.76rem;
+}
+
+.app--mobile .itax-screen--expense-month-cards .itax-screen__table-wrap,
+.app--mobile .itax-screen--expense-drill-cards .itax-screen__table-wrap {
+  flex: 1 1 auto;
+  overflow: visible;
+  min-height: 0;
+}
+
+.app--mobile .itax-screen--expense-month-cards .itax-screen__scroll,
+.app--mobile .itax-screen--expense-drill-cards .itax-screen__scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app--mobile .itax-screen--expense-drill-cards .itax-mobile-card {
+  padding: 0.4rem 0.55rem;
+}
+
+.app--mobile .itax-screen--expense-drill-cards .itax-mobile-card__grid {
+  gap: 0.25rem 0.4rem;
+}
+
+.app--mobile .itax-screen--expense-drill-cards .itax-mobile-group {
+  padding: 0.2rem 0.35rem;
+  font-size: 0.76rem;
+}
+
 .app--mobile .itax-screen--compact-table .itax-col-name {
   min-width: 9rem;
   max-width: 14rem;
@@ -17683,41 +18840,11 @@ body.force-desktop-view .app--desktop {
   line-height: 1.4;
 }
 
-/* Party-wise purchase/sales — dedicated mobile toolbar */
-.slide-89-itax.itax-screen--party-cards .itax-party-toolbar {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.35rem;
-  width: 100%;
-}
-
-.slide-89-itax.itax-screen--party-cards .itax-party-toolbar .btn,
-.slide-89-itax.itax-screen--party-cards .itax-party-toolbar .btn-report-help {
-  min-width: 0 !important;
-  width: 100%;
-  max-width: none;
-  padding: 0.5rem 0.15rem !important;
-  font-size: 0.72rem !important;
-  line-height: 1.15;
-  justify-content: center;
-  box-sizing: border-box;
-}
-
-.slide-89-itax.itax-screen--party-cards .report-toolbar {
+/* Income tax — report toolbar (⋮ export menu) */
+.slide-89-itax.itax-screen--mobile-toolbar .report-toolbar {
   flex-direction: column;
   align-items: stretch;
   gap: 0.55rem;
-}
-
-@media (max-width: 640px) {
-  .slide-89-itax.itax-screen--party-cards .itax-party-toolbar {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-
-  .slide-89-itax.itax-screen--party-cards .itax-party-toolbar .btn-export,
-  .slide-89-itax.itax-screen--party-cards .itax-party-toolbar .btn-whatsapp {
-    font-weight: 700;
-  }
 }
 
 .itax-table td.itax-cell--party {
@@ -17745,5 +18872,381 @@ body.force-desktop-view .app--desktop {
   line-height: 1.35;
   display: block;
   white-space: normal;
+}
+
+/* Labour report — grouped VFP-style table + mobile cards */
+.itax-screen--labour-report .itax-screen__table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.itax-screen--labour-report .labour-report-table {
+  min-width: 920px;
+  font-size: 0.78rem;
+}
+
+.itax-screen--labour-report .labour-report-table th,
+.itax-screen--labour-report .labour-report-table td {
+  padding: 0.28rem 0.38rem;
+  white-space: nowrap;
+}
+
+.itax-screen--labour-report .labour-report-table__group-row th {
+  background: #dbeafe;
+  color: #1e3a5f;
+  font-weight: 700;
+  text-align: center;
+  border-bottom: 1px solid #93c5fd;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.itax-screen--labour-report .labour-report-table__sub-row th {
+  background: #eff6ff;
+  color: #334155;
+  font-weight: 600;
+  font-size: 0.68rem;
+  text-align: right;
+}
+
+.itax-screen--labour-report .labour-report-table__date {
+  text-align: left;
+  min-width: 5.5rem;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #f8fafc;
+  box-shadow: 2px 0 0 #e2e8f0;
+}
+
+.itax-screen--labour-report .labour-report-table thead .labour-report-table__date {
+  z-index: 3;
+  background: #e2e8f0;
+}
+
+.itax-screen--labour-report .labour-report-table tbody .labour-report-table__date {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.itax-screen--labour-report .labour-report-table__tot,
+.itax-screen--labour-report .labour-report-table__tot-val {
+  background: #f1f5f9;
+  font-weight: 700;
+}
+
+.itax-screen--labour-report .labour-report-table__grand .labour-report-table__date--total {
+  font-weight: 800;
+}
+
+.itax-screen--labour-report .labour-report-table tbody tr.itax-grand-total td {
+  background: #1e3a5f;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.itax-screen--labour-report .labour-report-table tbody tr.itax-grand-total .labour-report-table__date {
+  background: #1e3a5f;
+  color: #fff;
+  box-shadow: none;
+}
+
+.itax-screen--labour-cards .itax-screen__table-wrap {
+  overflow-x: visible;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.labour-mobile-list {
+  gap: 0.65rem;
+}
+
+.labour-mobile-card {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.labour-mobile-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+  border-bottom: 1px solid #93c5fd;
+}
+
+.labour-mobile-card__date {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #1e3a5f;
+}
+
+.labour-mobile-card__tot {
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.labour-mobile-card__tot strong {
+  font-size: 0.88rem;
+  color: #1e40af;
+}
+
+.labour-mobile-card__section {
+  padding: 0.45rem 0.65rem 0.55rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.labour-mobile-card__section:last-child {
+  border-bottom: none;
+}
+
+.labour-mobile-card__section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+  margin-bottom: 0.35rem;
+}
+
+.labour-mobile-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.65rem;
+}
+
+.labour-mobile-card__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.labour-mobile-card__metric-label {
+  font-size: 0.66rem;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.labour-mobile-card__metric-val {
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.labour-mobile-card__metric-val.num {
+  color: #1e40af;
+}
+
+.labour-mobile-card--grand {
+  background: #1e3a5f;
+  border-color: #0f172a;
+}
+
+.labour-mobile-card--grand .labour-mobile-card__head {
+  background: transparent;
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.labour-mobile-card--grand .labour-mobile-card__date,
+.labour-mobile-card--grand .labour-mobile-card__tot,
+.labour-mobile-card--grand .labour-mobile-card__tot strong {
+  color: #fff;
+}
+
+.labour-mobile-card--grand .labour-mobile-card__section {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.labour-mobile-card--grand .labour-mobile-card__section-title {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.labour-mobile-card--grand .labour-mobile-card__metric-label {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.labour-mobile-card--grand .labour-mobile-card__metric-val,
+.labour-mobile-card--grand .labour-mobile-card__metric-val.num {
+  color: #fff;
+}
+
+.labour-report-table__row--drill {
+  cursor: pointer;
+}
+
+.labour-report-table__row--drill:hover td {
+  background: #eff6ff;
+}
+
+.labour-report-table__row--drill:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+.labour-report-table__row--selected td {
+  background: #dbeafe !important;
+}
+
+.labour-mobile-card--drill {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.labour-mobile-card--drill:hover,
+.labour-mobile-card--drill:focus-visible {
+  border-color: #93c5fd;
+  background: #f8fbff;
+  outline: none;
+}
+
+.labour-mobile-card--selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.itax-screen--labour-drill .itax-screen__table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.itax-screen--labour-drill .labour-drill-table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.78rem;
+}
+
+.itax-screen--labour-drill .labour-drill-table th,
+.itax-screen--labour-drill .labour-drill-table td {
+  white-space: nowrap;
+  padding: 0.28rem 0.45rem;
+}
+
+.labour-drill-col--section { width: 7.5rem; min-width: 7.5rem; }
+.labour-drill-col--type { width: 2.5rem; min-width: 2.5rem; }
+.labour-drill-col--lc { width: 2.25rem; min-width: 2.25rem; }
+.labour-drill-col--st { width: 2rem; min-width: 2rem; }
+.labour-drill-col--qty { width: 4.5rem; min-width: 4.5rem; }
+.labour-drill-col--amt { width: 5.5rem; min-width: 5.5rem; }
+.labour-drill-col--code { width: 5rem; min-width: 5rem; }
+.labour-drill-col--name { width: 9rem; min-width: 9rem; }
+.labour-drill-col--text { width: 4rem; min-width: 4rem; }
+
+.app--mobile .itax-screen--labour-drill .itax-screen__table-wrap {
+  overflow-x: visible;
+}
+
+.labour-drill-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.labour-drill-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.labour-drill-card__head {
+  margin-bottom: 0.35rem;
+}
+
+.labour-drill-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+}
+
+.labour-drill-card__tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  padding: 0.12rem 0.35rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  font-size: 0.74rem;
+}
+
+.labour-drill-card__tag-label {
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.03em;
+}
+
+.labour-drill-card__tag-val {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.labour-drill-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.labour-drill-card__metric-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.labour-drill-card__metric-val {
+  display: block;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.labour-drill-card__metric-val.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.labour-drill-card__detail {
+  font-size: 0.72rem;
+  color: #475569;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 0.3rem;
+}
+
+.labour-drill-card--grand {
+  background: #1e3a5f;
+  border-color: #1e3a5f;
+  color: #fff;
+}
+
+.labour-drill-card--grand .labour-drill-card__title {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.labour-drill-card--grand .labour-drill-card__metric-label {
+  color: #cbd5e1;
+}
+
+.labour-drill-card--grand .labour-drill-card__metric-val {
+  color: #fff;
+}
+
+.itax-screen--labour-drill .itax-table tbody tr.itax-grand-total td {
+  background: #1e3a5f;
+  color: #fff;
 }
 

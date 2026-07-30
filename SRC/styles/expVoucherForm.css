@@ -1,0 +1,307 @@
+.exp-voucher-form.sale-entry-desktop__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  gap: 0.35rem;
+}
+
+.exp-voucher-form__toolbar-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.65rem;
+  flex-shrink: 0;
+}
+
+.exp-voucher-form__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.4rem 0.55rem;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.exp-voucher-form__header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.35rem 0.55rem;
+}
+
+.exp-voucher-form__header-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #334155;
+  min-width: 4.5rem;
+}
+
+.exp-voucher-form__header-row label.ev-grow {
+  flex: 1 1 160px;
+  min-width: 140px;
+}
+
+.exp-voucher-form__header-row--flags label {
+  min-width: 5.5rem;
+}
+
+.exp-voucher-form__header .form-input,
+.exp-voucher-form__header select {
+  font-size: 0.78rem;
+  min-height: 26px;
+}
+
+.exp-voucher-form__header label.ev-span-2 {
+  grid-column: span 2;
+}
+
+.exp-voucher-form__header label.ev-span-3 {
+  grid-column: span 3;
+}
+
+.exp-voucher-form__lines-wrap {
+  flex: 1;
+  min-height: 0;
+  max-height: min(48vh, 480px);
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.exp-voucher-form__grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.exp-voucher-form__grid th,
+.exp-voucher-form__grid td {
+  border: 1px solid #e2e8f0;
+  padding: 0.2rem 0.3rem;
+  white-space: nowrap;
+}
+
+.exp-voucher-form__grid th {
+  position: sticky;
+  top: 0;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-weight: 700;
+  z-index: 1;
+}
+
+.exp-voucher-form__grid .ev-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.exp-voucher-form__grid .form-input {
+  width: 100%;
+  min-width: 52px;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.25rem;
+  min-height: 24px;
+}
+
+.exp-voucher-form__grid .ev-item-name {
+  min-width: 120px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exp-voucher-form__footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+  gap: 0.55rem 0.85rem;
+  padding: 0.45rem 0.65rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.exp-voucher-form__footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.exp-voucher-form__footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.35rem 0.5rem;
+}
+
+.exp-voucher-form__footer-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.exp-voucher-form__footer-row label.ev-grow {
+  flex: 1 1 140px;
+}
+
+.exp-voucher-form__footer-row .form-input {
+  font-size: 0.75rem;
+  min-height: 26px;
+}
+
+/* Right totals pane — VFP EXPVOU */
+.ev-summary-pane {
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  background: #fff;
+  padding: 0.35rem 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  font-size: 0.72rem;
+}
+
+.ev-summary-row {
+  display: grid;
+  grid-template-columns: 7.2rem minmax(0, 1fr) 5.5rem;
+  gap: 0.28rem;
+  align-items: center;
+}
+
+.ev-summary-row--tax {
+  grid-template-columns: 7.2rem 7.5rem minmax(0, 1fr) 5.5rem;
+}
+
+.ev-summary-row--tcs,
+.ev-summary-row--tds {
+  grid-template-columns: 5.2rem 3.6rem 7.5rem 5.5rem;
+}
+
+.ev-summary-row--nature {
+  grid-template-columns: 5.2rem minmax(0, 1fr);
+}
+
+.ev-summary-row__lbl {
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+}
+
+.ev-summary-row .form-input {
+  font-size: 0.72rem;
+  min-height: 24px;
+}
+
+.ev-summary-row__amt-input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-summary-row--tax .ev-help-inline,
+.ev-summary-row--tcs .ev-help-inline,
+.ev-summary-row--tds .ev-help-inline {
+  min-width: 7.5rem;
+}
+
+.ev-summary-row--tax .ev-help-inline .form-input,
+.ev-summary-row--tcs .ev-help-inline .form-input,
+.ev-summary-row--tds .ev-help-inline .form-input {
+  min-width: 5.75rem;
+  width: 5.75rem;
+  flex: 0 0 5.75rem;
+}
+
+.ev-summary-row__amt {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 5rem;
+}
+
+.ev-summary-row--net .ev-summary-row__amt {
+  font-size: 0.85rem;
+  color: #0f172a;
+}
+
+.exp-voucher-form__totals {
+  display: none;
+}
+
+.exp-voucher-form__totals strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-cost-name {
+  align-self: end;
+  flex: 1 1 160px;
+  font-size: 0.75rem;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-bottom: 0.35rem;
+  min-width: 0;
+}
+
+.ev-list-modal {
+  width: min(96vw, 920px);
+  max-height: min(88vh, 680px);
+  display: flex;
+  flex-direction: column;
+}
+
+.ev-list-modal__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: flex-end;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ev-list-modal__filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.ev-list-modal__body {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.ev-posting-modal {
+  width: min(98vw, 1000px);
+  max-height: min(90vh, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
+.ev-help-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+}
+.ev-help-inline .form-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.exp-voucher-form__header .ev-help-inline .form-input {
+  min-height: 26px;
+}

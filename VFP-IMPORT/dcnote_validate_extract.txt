@@ -1,0 +1,480 @@
+
+IF THISFORM.SAVEBTN='new' .OR. THISFORM.SAVEBTN='edit' .or. THISFORM.SAVEBTN='del'
+	thisform.SAVEDATA='Y'
+	IF  THISFORM.SAVEBTN='del'
+	 IF EMPTY(THISFORM.MOD_reason.Value) AND G_AUDIT_TRAIL='Y'
+	  MESSAGEBOX('!!! Enter Valid Reason To Delete !!!')
+	  THISFORM.SAVEDATA='N'
+	 ELSE
+      mtype=thisform.type.value
+	  mrdt=thisform.mrdt
+	  mrno=thisform.mrno
+	  THISFORM.AUdit_trail
+	  THISFORM.MYDEL('D')
+	 ENDI 
+	ENDI
+	IF THISFORM.SAVEBTN='new' .or. THISFORM.SAVEBTN='edit'
+*----------------------------- VALIDATION STARTS
+		IF THISFORM.SAVEBTN='new'
+		  mtype=thisform.type.value
+		  mrdt=thisform.r_date.Value
+		  mrno=thisform.r_no.value
+	   	  mvar='SELECT * from purchase where comp_code=?g_compcode and '+;
+				 'type=?mtype and r_date=?mrdt and r_no=?mrno'
+		  If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			 =Aerror(laArr)
+			 Messagebox(MVAR+' '+laArr(2))
+          Endif  	
+          SELECT * FROM X0 INTO CURSOR X1
+		  IF _tally<>0
+				MESSAGEBOX('!!! Purchase Already Exist !!!')
+				thisform.SAVEDATA='N'
+		  ELSE
+				thisform.SAVEDATA='Y'
+		  ENDI
+		ELSE
+			thisform.SAVEDATA='Y'
+		ENDI
+*
+		IF THISFORM.SAVEBTN='new'
+		 IF THISFORM.TYPE.Value='PU'
+		   MTYPE=RTRIM(THISFORM.TYPE.Value)
+		   MCODE=RTRIM(THISFORM.MCODE.Value)
+		   MBNO=RTRIM(THISFORM.BILL_NO.VALUE)
+		   MVAR='SELECT * from purchase where COMP_CODE=?G_COMPCODE AND TYPE=?MTYPE AND '+;
+		        'CODE=?MCODE AND BILL_NO=?MBNO'
+		   If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			 =Aerror(laArr)
+			 Messagebox(MVAR+' '+laArr(2))
+           Endif  	
+           SELECT * FROM X0 INTO CURSOR X1
+		   IF _tally<>0
+			MESSAGEBOX('!!! Purchase Bill Already Exist On Dt. '+TRANS(R_DATE,'@E')+' '+str(r_no,6)+ '!!!')
+			thisform.SAVEDATA='N'
+		   ELSE
+			thisform.SAVEDATA='Y'
+		   ENDIF
+		 ENDI 
+		ELSE
+			thisform.SAVEDATA='Y'
+		ENDI
+
+*
+		IF THISFORM.SAVEDATA='Y'
+			IF THISFORM.r_date.VALUE<G_SDATE .OR. THISFORM.r_date.VALUE>G_EDATE
+				MESSAGEBOX('!!! Invalid Date Range !!!')
+				thisform.SAVEDATA='N'
+			ELSE
+				thisform.SAVEDATA='Y'
+			ENDI
+		ENDI
+*
+  	    IF THISFORM.SAVEDATA='Y'
+		 IF G_SUPERVISOR<>'Y' AND !EMPTY(G_FDATE)
+		  IF THISFORM.R_DATE.Value<=G_FDATE
+		   MESSAGEBOX('Entries are freezed upto '+TRANSFORM(G_FDATE,'@E'))
+		   THISFORM.SAVEDATA='N'
+		  ENDI
+		 ENDI
+		ENDIF
+*		
+		IF THISFORM.SAVEDATA='Y'
+			IF THISFORM.MBAMT.VALUE=0
+				MESSAGEBOX('!!! Bill Amount Should Not Be Zero !!!')
+				thisform.SAVEDATA='N'
+			ELSE
+				thisform.SAVEDATA='Y'
+			ENDI
+		ENDI
+*
+        MVAR='SELECT CODE,NAME FROM  MASTER WHERE COMP_CODE=?G_COMPCODE AND CODE=?MCODE'
+		IF THISFORM.SAVEDATA='Y'
+		    MCODE=RTRIM(THISFORM.MCODE.VALUE)
+			If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			 =Aerror(laArr)
+			 Messagebox(MVAR+' '+laArr(2))
+            Endif  	
+            SELECT * FROM X0 INTO CURSOR X1
+			IF _TALLY=0
+				MESSAGEBOX('!!! Invalid A/c Code !!!')
+				thisform.SAVEDATA='N'
+			ELSE
+				thisform.SAVEDATA='Y'
+			ENDI
+		ENDI
+*
+*
+        IF THISFORM.SAVEDATA='Y' 
+		 IF THISFORM.CGST_AMT.VALUE<>0
+            MCODE=RTRIM(THISFORM.CGST_CODE.Value)
+            If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+            ENDIF
+            SELECT * FROM X0 INTO CURSOR X1             		    
+			IF _TALLY=0
+ 			 MESSAGEBOX('!!! Invalid CGST Code !!!')
+			 thisform.SAVEDATA='N'
+			ELSE
+			 thisform.SAVEDATA='Y'
+			ENDI
+		 ENDI	
+		ENDI
+*
+		IF THISFORM.SAVEDATA='Y' 
+		 IF THISFORM.SGST_AMT.VALUE<>0
+            MCODE=RTRIM(THISFORM.SGST_CODE.Value)
+            If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+            ENDIF
+            SELECT * FROM X0 INTO CURSOR X1             		    
+			IF _TALLY=0
+ 			 MESSAGEBOX('!!! Invalid SGST Code !!!')
+			 thisform.SAVEDATA='N'
+			ELSE
+			 thisform.SAVEDATA='Y'
+			ENDI
+		 ENDI	
+		ENDI
+*
+		IF THISFORM.SAVEDATA='Y' 
+		 IF THISFORM.IGST_AMT.VALUE<>0
+            MCODE=RTRIM(THISFORM.IGST_CODE.Value)
+            If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+            ENDIF
+            SELECT * FROM X0 INTO CURSOR X1             		    
+			IF _TALLY=0
+ 			 MESSAGEBOX('!!! Invalid IGST Code !!!')
+			 thisform.SAVEDATA='N'
+			ELSE
+			 thisform.SAVEDATA='Y'
+			ENDI
+		 ENDI	
+		ENDIF
+
+		IF THISFORM.SAVEDATA='Y'
+			IF THISFORM.ADDEXP.VALUE<>0 
+             MCODE=RTRIM(THISFORM.ADD_CODE.Value)
+             If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+             ENDIF
+             SELECT * FROM X0 INTO CURSOR X1             		    
+			 IF _TALLY=0
+					MESSAGEBOX('!!! Invalid ADD EXP Code !!!')
+					thisform.SAVEDATA='N'
+			 ELSE
+					thisform.SAVEDATA='Y'
+			 ENDIF
+			ENDI 
+		ENDI
+*
+        IF THISFORM.SAVEDATA='Y'
+		 SELECT * FROM DCTMPGRD WHERE ITEM_CODE<>0 INTO CURSOR X1
+		 GO TOP
+		 SCAN
+		  ICODE=ITEM_CODE
+		  MVAR='SELECT item_CODE FROM ITEMMAST WHERE '+;
+		       'COMP_CODE=?G_COMPCODE AND ITEM_CODE=?ICODE'
+          If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+          ENDIF
+          SELECT * FROM X0 INTO CURSOR X1             		    
+  		  IF _TALLY=0
+		   MESSAGEBOX('!!! Invalid Item Code '+ICODE+'  !!!')
+		   thisform.SAVEDATA='N'
+		   EXIT
+		  ELSE
+		   thisform.SAVEDATA='Y'
+		  ENDI
+		  SELECT X1
+		 ENDSCAN  
+		ENDI
+*
+        IF THISFORM.SAVEDATA='Y'
+         IF THISFORM.SAVEBtn='edit' AND G_AUDIT_TRAIL='Y'
+          IF EMPTY(THISFORM.MOD_reason.Value)
+           MESSAGEBOX('!!! Enter Valid Reason for Modification !!!')
+           THISFORM.SAVEDATA='N'
+          ENDI
+         endi
+        ENDIF
+        IF THISFORM.SAVEDATA='Y'
+         SELECT DCTMPGRD
+         GO TOP
+         IF ITEM_CODE=0
+          MESSAGEBOX('!!! Invalid Input In Grid !!!')
+          THISFORM.SAVEDATA='N'
+         ENDI
+        ENDI
+	IF THISFORM.SAVEDATA='Y'
+	        MVVTP=''
+	        MVVDT=G_BLNKDT
+	        MVVNO=0
+	        MCTRN_NO=0
+	        MXCLEAR=''
+			IF THISFORM.SAVEBTN='edit'
+			 M_VR_TYPE=THISFORM.TYPE.Value
+			 M_VR_dATE=THISFORM.MRDT
+			 M_VR_NO=THISFORM.MRNO
+			 THISFORM.MYDEL('E')
+			ENDIF
+			IF THISFORM.DC_bill_no.Value=0
+			 IF THISFORM.TYPE.VALUE='DX'
+			  MDETAIL='DEBIT NOTE BILL DATE '+RTRIM(THISFORM.BILL_dATE.VALUE)+' '+RTRIM(THISFORM.BILL_NO.VALUE)+' '+RTRIM(THISFORM.REMARKS.Value)			
+			 ELSE
+			  MDETAIL='CREDIT NOTE BILL DATE '+RTRIM(THISFORM.REMARKS.Value)			
+			 ENDI 
+			ELSE
+			 MDETAIL='BILL NO.:'+LTRIM(STR(THISFORM.DC_BILL_no.VALUE,6))+' DT.:'+TRANS(THISFORM.BILL_Date.VALUE)+' '+RTRIM(THISFORM.BILL_NO.VALUE)+'  '+RTRIM(THISFORM.REMARKS.Value)
+			ENDI
+			M_comp_code=THISFORM.compcode.VALUE
+			M_r_date=THISFORM.r_date.VALUE
+			M_r_no=THISFORM.r_no.VALUE
+			M_TYPE=thisform.type.value
+			M_BILL_Date=THISFORM.BILL_Date.VALUE
+			M_DC_BILL_no=THISFORM.DC_BILL_no.VALUE
+			M_DC_B_TYPE=RTRIM(THISFORM.DC_B_TYPE.Value)
+			M_CODE=RTRIM(thisform.MCODE.value)
+			M_BILL_AMT=thisform.MBAMT.value
+			M_ADDEXP=THISFORM.ADDEXP.VALUE
+			M_BILL_AMT=THISFORM.MBAMT.VALUE
+			M_USER_NAME=G_USERNAME
+			M_ENT_DATE=DATE()
+			M_REMARKS=RTRIM(THISFORM.REMARKS.Value)
+			M_CGST_CODE=RTRIM(THISFORM.CGST_CODE.Value)
+			M_SGST_CODE=RTRIM(THISFORM.SGST_CODE.Value)
+			M_IGST_CODE=RTRIM(THISFORM.IGST_CODE.VALUE)
+			M_ADD_CODE=RTRIM(THISFORM.ADD_CODE.Value)
+			M_GSTR_YN=RTRIM(THISFORM.GSTR_yn.Value)
+			M_ENT_TIME=RTRIM(TIME())
+			M_MOD_REASON=RTRIM(THISFORM.MOD_Reason.Value)
+			M_S_P=RTRIM(THISFORM.S_P.Value)
+			ETIME=RTRIM(TIME())
+			M_BILL_NO=RTRIM(THISFORM.BILL_NO.Value)
+			*
+			M_IRN_NO=RTRIM(THISFORM.IRN_NO.Value)
+			M_ACK_NO=RTRIM(THISFORM.ACK_NO.Value)
+			M_SIGNED_QR_CODE=RTRIM(THISFORM.SIGNED_QR_CODE.Value)
+			*
+			M_TCS_OTHERS=RTRIM(THISFORM.TCS_others.Value)
+			*
+			SELECT TRN_NO,ITEM_CODE,PUR_CODE,QNTY,WEIGHT,;
+			AMT_CAL,RATE,AMOUNT,;
+			CGST_PER,SGST_PER,IGST_PER,CGST_AMT,SGST_AMT,IGST_AMT;
+		    FROM DCTMPGRD WHERE ITEM_CODE<>0 ORDER BY TRN_NO INTO CURSOR MYX1
+			STORE 0 TO TQ,TW
+			GO TOP
+			ICD=ITEM_CODE
+			XSNO=1
+			SCAN
+				SCATTER MEMVAR
+				MITEM=ITEM_CODE
+				TQ=TQ+QNTY
+				TW=TW+WEIGHT
+				IF XSNO>1
+					M_BILL_AMT=0
+					M_ADDEXP=0
+              	ENDIF
+              	TRFAMT=(M.AMOUNT)
+              	IF THISFORM.TCS_others.Value<>'T'
+				 IF THISFORM.TYPE.VALUE='DX'
+					CRAMT=0 &&TRFAMT
+					DRAMT=TRFAMT*-1
+				 ELSE
+					CRAMT=TRFAMT*-1
+					DRAMT=0
+				 ENDIF
+				ELSE
+				 IF THISFORM.TYPE.VALUE='DX'
+					CRAMT=TRFAMT
+					DRAMT=0
+				 ELSE
+					DRAMT=TRFAMT
+					CRAMT=0
+				 ENDIF
+				ENDIF
+				M.TAXABLE=M.AMOUNT
+				TRFAMT=M.TAXABLE
+				M_PUR_CODE=RTRIM(M.PUR_CODE)
+MVAR='INSERT INTO PURCHASE(COMP_CODE,COMP_YEAR,R_DATE,R_NO,TYPE,BILL_DATE,'+;
+     'DC_BILL_NO,DC_B_TYPE,CODE,BILL_AMT,ADDEXP,USER_NAME,ENT_DATE,REMARKS,'+;
+     'CGST_CODE,SGST_CODE,IGST_CODE,TAX_CODE,'+;
+     'TRN_NO,ITEM_CODE,QNTY,WEIGHT,'+;
+     'AMT_CAL,RATE,AMOUNT,PUR_CODE,CGST_PER,SGST_PER,'+;
+	 'IGST_PER,CGST_AMT,SGST_AMT,IGST_AMT,INPUT_YN,ENT_TIME,MOD_REASON,S_P,BILL_NO,IRN_NO,ACK_NO,SIGNED_QR_CODE,TCS_OTHERS) VALUES '+;
+     '(?G_COMPCODE,?G_COMPYEAR,?M_R_DATE,?M_R_NO,?M_TYPE,?M_BILL_DATE,'+;
+     '?M_DC_BILL_NO,?M_DC_B_TYPE,?M_CODE,?M_BILL_AMT,?M_ADDEXP,'+;
+     '?M_USER_NAME,?M_ENT_DATE,?M_REMARKS,'+;
+     '?M_CGST_CODE,?M_SGST_CODE,?M_IGST_CODE,?M_ADD_CODE,'+;
+     '?M.TRN_NO,?MITEM,?M.QNTY,?M.WEIGHT,'+;
+     '?M.AMT_CAL,?M.RATE,?M.AMOUNT,?M_PUR_CODE,?M.CGST_PER,'+;
+	 '?M.SGST_PER,?M.IGST_PER,?M.CGST_AMT,?M.SGST_AMT,?M.IGST_AMT,?M_GSTR_YN,?ETIME,?M_MOD_REASON,?M_S_P,?M_BILL_NO,'+;
+	 '?M_IRN_NO,?M_ACK_NO,?M_SIGNED_QR_CODE,?M_TCS_OTHERS)'
+                If SQLExec(GNCONNHANDLE,Mvar) <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+			                  MDET=MVAR+'   '+laArr(2)
+ 			                  INSERT INTO TMP(DET) VALUES (MDET)
+ 			                  SELECT * FROM TMP
+ 			                  BROW
+                ENDIF
+	            *
+	            IF M.QNTY<>0 AND M.WEIGHT<>0 AND M.RATE=0
+	             M_TCS_PER=M.QNTY
+	             M_tCS_ON_AMT=M.WEIGHT
+	            ELSE
+	             M_TCS_PER=0
+	             M_TCS_ON_AMT=0 
+	            ENDI
+				*	
+				M_BILL_NO=LTRIM(STR(THISFORM.DC_bill_no.Value,6))
+				MVAR='INSERT into ledger(comp_code,COMP_YEAR,vr_type,vr_Date,'+;
+				     'vr_no,code,dr_amt,cr_amt,DETAIL,dc_code,TRN_NO,V_dATE,TCS_PER,TCS_ON_AMT,INV_NO,INV_DATE,USER_NAME,ENT_DATE,ENT_TIME) values '+;
+				     '(?G_COMPCODE,?G_COMPYEAR,?M_type,?M_r_date,?M_R_NO,'+;
+				     '?M_PUR_CODE,?DRAMT,?CRAMT,?MDETAIL,?M_CODE,?M.TRN_NO,?M_R_DATE,?M_TCS_PER,?M_TCS_ON_AMT,?M_BILL_NO,?M_BILL_DATE,?M_USER_NAME,?M_ENT_DATE,?M_ENT_TIME)'
+                If SQLExec(GNCONNHANDLE,Mvar) <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+                ENDIF
+				     
+                *
+				SELECT MYX1
+				XSNO=XSNO+1
+			ENDSCAN
+			GO TOP
+			M_PCODE=RTRIM(PUR_CODE)
+*
+            M.TRN_NO=101
+			IF THISFORM.TYPE.VALUE='DX'
+				DRAMT=THISFORM.MBAMT.VALUE
+				CRAMT=0
+			ELSE
+				DRAMT=0
+				CRAMT=THISFORM.MBAMT.VALUE
+			ENDIF
+			*MDETAIL='B.No.:'+LTRIM(STR(THISFORM.DC_BILL_NO.Value,6))+' '+RTRIM(THISFORM.REMARKS.Value)
+			XDETAIL=MDETAIL
+			M_BILL_AMT=THISFORM.MBamt.VALUE
+			MVAR='INSERT into ledger(comp_code,COMP_YEAR,vr_type,vr_Date,vr_no,code,'+;
+			     'dr_amt,cr_amt,DETAIL,dc_code,BILL_DATE,BILL_NO,V_DATE,TRN_NO,USER_NAME,ENT_DATE,ENT_TIME) '+; 
+			     'values '+;
+				 '(?G_COMPCODE,?G_COMPYEAR,?M_type,?M_R_date,?M_R_NO,'+;
+				 '?M_CODE,?DRAMT,?CRAMT,?MDETAIL,?M_PCODE,?M_BILL_DATE,'+;
+				 '?M_R_NO,?M_R_DATE,?M.TRN_NO,?M_USER_NAME,?M_ENT_DATE,?M_ENT_TIME)'
+            If SQLExec(GNCONNHANDLE,Mvar) <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+            ENDIF
+				 
+*
+			IF THISFORM.CGST_AMT.VALUE<>0
+			 M.TRN_NO=102
+			 IF THISFORM.TYPE.VALUE='DX'
+					CRAMT=THISFORM.CGST_AMT.VALUE
+					DRAMT=0
+			 ELSE
+					CRAMT=0
+					DRAMT=THISFORM.CGST_AMT.VALUE
+			 ENDI
+			 MVAR='INSERT into ledger(comp_code,COMP_YEAR,vr_type,vr_Date,vr_no,code,dr_amt,cr_amt,DETAIL,dc_code,TRN_NO,V_DATE,USER_NAME,ENT_DATE,ENT_TIME) VALUES '+;
+				  '(?G_COMPCODE,?G_COMPYEAR,?M_type,?M_R_DATE,?M_r_no,'+;
+				  '?M_CGST_CODE,?DRAMT,?CRAMT,?MDETAIL,?M_CODE,'+;
+				  '?M.TRN_NO,?M_R_DATE,?M_USER_NAME,?M_ENT_DATE,?M_ENT_TIME)'
+             If SQLExec(GNCONNHANDLE,Mvar) <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+             ENDIF
+				  
+			ENDIF
+*
+			IF THISFORM.SGST_AMT.VALUE<>0
+			 M.TRN_NO=103
+				IF THISFORM.TYPE.VALUE='DX'
+					CRAMT=THISFORM.SGST_AMT.VALUE
+					DRAMT=0
+				ELSE
+					CRAMT=0
+					DRAMT=THISFORM.SGST_AMT.VALUE
+				ENDI
+			 MVAR='INSERT into ledger(comp_code,COMP_YEAR,vr_type,vr_Date,vr_no,code,dr_amt,cr_amt,DETAIL,dc_code,TRN_NO,V_DATE,USER_NAME,ENT_DATE,ENT_TIME) VALUES '+;
+				  '(?G_COMPCODE,?G_COMPYEAR,?M_type,?M_R_DATE,?M_r_no,'+;
+				  '?M_SGST_CODE,?DRAMT,?CRAMT,?MDETAIL,?M_CODE,'+;
+				  '?M.TRN_NO,?M_R_DATE,?M_USER_NAME,?M_ENT_DATE,?M_ENT_TIME)'
+             If SQLExec(GNCONNHANDLE,Mvar) <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+             ENDIF
+			ENDIF
+*
+			IF THISFORM.IGST_AMT.VALUE<>0
+			    M.TRN_NO=104
+				IF THISFORM.TYPE.VALUE='DX'
+					CRAMT=THISFORM.IGST_AMT.VALUE
+					DRAMT=0
+				ELSE
+					CRAMT=0
+					DRAMT=THISFORM.IGST_AMT.VALUE
+				ENDI
+			 MVAR='INSERT into ledger(comp_code,COMP_YEAR,vr_type,vr_Date,vr_no,code,dr_amt,cr_amt,DETAIL,dc_code,TRN_NO,V_DATE,USER_NAME,ENT_DATE,ENT_TIME) VALUES '+;
+				  '(?G_COMPCODE,?G_COMPYEAR,?M_type,?M_R_DATE,?M_r_no,'+;
+				  '?M_IGST_CODE,?DRAMT,?CRAMT,?MDETAIL,?M_CODE,'+;
+				  '?M.TRN_NO,?M_R_DATE,?M_USER_NAME,?M_ENT_DATE,?M_ENT_TIME)'
+             If SQLExec(GNCONNHANDLE,Mvar) <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+             ENDIF
+			ENDIF
+*			
+
+            IF THISFORM.ADDEXP.Value<>0
+			    M.TRN_NO=105
+				IF THISFORM.TYPE.VALUE='DX'
+					CRAMT=THISFORM.ADDEXP.VALUE
+					DRAMT=0
+				ELSE
+					CRAMT=0
+					DRAMT=THISFORM.ADDEXP.VALUE
+				ENDI
+			 MVAR='INSERT into ledger(comp_code,COMP_YEAR,vr_type,vr_Date,vr_no,code,dr_amt,cr_amt,DETAIL,dc_code,TRN_NO,V_DATE,USER_NAME,ENT_DATE,ENT_TIME) VALUES '+;
+				  '(?G_COMPCODE,?G_COMPYEAR,?M_type,?M_R_DATE,?M_r_no,'+;
+				  '?M_ADD_CODE,?DRAMT,?CRAMT,?MDETAIL,?M_CODE,'+;
+				  '?M.TRN_NO,?M_R_DATE,?M_USER_NAME,?M_ENT_DATE,?M_ENT_TIME)'
+             If SQLExec(GNCONNHANDLE,Mvar) <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+             ENDIF
+            ENDIF
+*
+            
+		    IF THISFORM.TYPE.VALUE='DX'
+				DRAMT=THISFORM.MBAMT.VALUE
+				CRAMT=0
+			ELSE
+				DRAMT=0
+				CRAMT=THISFORM.MBAMT.VALUE
+			ENDIF
+			*
+		    MVAR='INSERT into bills(comp_code,COMP_YEAR,vr_type,vr_Date,'+;
+			      'vr_no,code,BILL_Date,BILL_no,B_TYPE,dr_amt,cr_amt,V_DATE,DETAIL,TRN_NO) values '+;
+			      '(?G_COMPCODE,?G_COMPYEAR,?M_type,?M_R_DATE,?M_r_no,'+;
+			      '?M_CODE,?M_BILL_Date,?M_DC_BILL_NO,?M_DC_B_TYPE,?DRAMT,?CRAMT,'+;
+			      '?M_R_DATE,?MDETAIL,1)'
+            If SQLExec(GNCONNHANDLE,Mvar) <=0
+			                  =Aerror(laArr)
+			                  Messagebox(MVAR+' '+laArr(2))
+            ENDIF
+			*	
+			THISFORM.AUdit_trail
+			thisform.cmdnew.setfocus()
+		ENDI
+	ENDI
+ENDI
+IF thisform.SAVEDATA='N'
+	thisform.r_date.SETFOCUS()
+ENDI
+

@@ -11,7 +11,7 @@ import { downloadExcelRows } from '../utils/excelExport';
 import { printHtmlDocument } from '../utils/openPrintPreviewWindow';
 import LedgerExportMenu from '../components/LedgerExportMenu';
 import LedgerRowFilterBar from '../components/LedgerRowFilterBar';
-import { filterLedgerRows, countLedgerFilterStats, ledgerFilterIsActive, collectLedgerVrTypes } from '../utils/ledgerMobileDisplay';
+import { filterLedgerRows, countLedgerFilterStats, ledgerFilterIsActive, collectLedgerVrTypes, collectLedgerDcCodes } from '../utils/ledgerMobileDisplay';
 import { toInputDateString, toOracleDate, toDisplayDate, formatCurBal, getCurBal } from '../utils/dateFormat';
 import { formatLedgerVoucherApiError } from '../utils/apiLabel';
 import { computeLedgerSummary } from '../utils/ledgerSummary';
@@ -87,6 +87,8 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
   const [accountSearch, setAccountSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [crStartDate, setCrStartDate] = useState('');
+  const [crEndDate, setCrEndDate] = useState('');
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -102,12 +104,20 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
   const [ledgerRowFilter, setLedgerRowFilter] = useState('');
   const [ledgerAmountSide, setLedgerAmountSide] = useState('all');
   const [ledgerVrType, setLedgerVrType] = useState('all');
+  const [ledgerDcCode, setLedgerDcCode] = useState('all');
   const [interestRate, setInterestRate] = useState('12');
   const [graceDrDays, setGraceDrDays] = useState('0');
   const [graceCrDays, setGraceCrDays] = useState('0');
   const [interestCalcDate, setInterestCalcDate] = useState('');
   const [voucherWiseTotal, setVoucherWiseTotal] = useState('N');
   const isLedgerInterest = String(formData.reportType || '').toLowerCase() === 'ledger-interest';
+  const isLedgerDrCrDate = String(formData.reportType || '').toLowerCase() === 'ledger-dr-cr-date';
+  const ledgerReportTitle = isLedgerDrCrDate
+    ? 'Ledger Dr/Cr Date'
+    : isLedgerInterest
+      ? 'Ledger With Interest'
+      : 'Ledger Report';
+  const ledgerHelpId = isLedgerDrCrDate ? 'ledger-dr-cr-date' : isLedgerInterest ? 'ledger-interest' : 'ledger';
 
   // Period from compdet (passed via Slide2 → App as comp_s_dt / comp_e_dt)
   useEffect(() => {
@@ -117,6 +127,8 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
     const e = toInputDateString(eRaw);
     if (s) setStartDate(s);
     if (e) setEndDate(e);
+    if (s) setCrStartDate(s);
+    if (e) setCrEndDate(e);
     if (e) setInterestCalcDate(e);
   }, [
     formData.comp_s_dt,
@@ -219,6 +231,12 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
       alert('Please select both start and end dates');
       return false;
     }
+    const csDate = toOracleDate(overrides.crStartDate ?? crStartDate);
+    const ceDate = toOracleDate(overrides.crEndDate ?? crEndDate);
+    if (isLedgerDrCrDate && (!csDate || !ceDate)) {
+      alert('Please select both credit start and end dates');
+      return false;
+    }
     const intDate = overrides.interestCalcDate ?? interestCalcDate;
     if (isLedgerInterest && !intDate) {
       alert('Please select interest calculation date');
@@ -241,8 +259,18 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
         params.grace_dr_days = String(overrides.graceDrDays ?? graceDrDays).trim() || '0';
         params.grace_cr_days = String(overrides.graceCrDays ?? graceCrDays).trim() || '0';
       }
+      if (isLedgerDrCrDate) {
+        params.cs_date = csDate;
+        params.ce_date = ceDate;
+      }
 
-      const response = await axios.get(`${apiBase}${isLedgerInterest ? '/api/ledger-interest' : '/api/ledger'}`, {
+      const ledgerApiPath = isLedgerInterest
+        ? '/api/ledger-interest'
+        : isLedgerDrCrDate
+          ? '/api/ledger-dr-cr-date'
+          : '/api/ledger';
+
+      const response = await axios.get(`${apiBase}${ledgerApiPath}`, {
         params,
         withCredentials: true,
         timeout: 30000,
@@ -252,6 +280,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
         setLedgerRowFilter('');
         setLedgerAmountSide('all');
         setLedgerVrType('all');
+        setLedgerDcCode('all');
         setReportData(response.data);
         setShowReport(true);
         return true;
@@ -280,6 +309,8 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
     e.preventDefault();
     if (target.id === 'start-date') {
       endDateInputRef.current?.focus();
+    } else if (target.id === 'end-date' && isLedgerDrCrDate) {
+      document.getElementById('cr-start-date')?.focus();
     }
   };
 
@@ -287,7 +318,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
 
   useEffect(() => {
     const d = formData.ledgerDrilldown;
-    if (!d?.autoRun || !d.code || isLedgerInterest) return;
+    if (!d?.autoRun || !d.code || isLedgerInterest || isLedgerDrCrDate) return;
     if (!startDate || !endDate) return;
     const runKey = String(d.at ?? d.code);
     if (ledgerDrillRanRef.current === runKey) return;
@@ -389,7 +420,9 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
       account,
       accountCodeOverride: selectedAccount,
       year: formData.comp_year ?? formData.COMP_YEAR,
-      endDate: `${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`,
+      endDate: isLedgerDrCrDate
+        ? `Dr ${toDisplayDate(startDate)} – ${toDisplayDate(endDate)} · Cr ${toDisplayDate(crStartDate)} – ${toDisplayDate(crEndDate)}`
+        : `${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`,
     });
   };
 
@@ -400,23 +433,27 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
   const shareWhatsApp = async () => {
     const account = findAccountByCode(accounts, selectedAccount);
     const shareText = [
-      `Ledger Report — ${formData.comp_name}`,
+      `${ledgerReportTitle} — ${formData.comp_name}`,
       `${formData.comp_year} | ${account?.NAME ?? account?.name ?? 'Account'} (${ledgerAccountCode(account) || selectedAccount})`,
-      `${toDisplayDate(startDate)} → ${toDisplayDate(endDate)}`,
+      isLedgerDrCrDate
+        ? `Dr ${toDisplayDate(startDate)} → ${toDisplayDate(endDate)} · Cr ${toDisplayDate(crStartDate)} → ${toDisplayDate(crEndDate)}`
+        : `${toDisplayDate(startDate)} → ${toDisplayDate(endDate)}`,
     ].join('\n');
     await sharePdfWithWhatsApp('ledger', reportData, ledgerPdfMeta(), shareText);
   };
 
   const ledgerTotals = useMemo(() => computeLedgerSummary(reportData), [reportData]);
   const ledgerVrTypeOptions = useMemo(() => collectLedgerVrTypes(reportData), [reportData]);
+  const ledgerDcCodeOptions = useMemo(() => collectLedgerDcCodes(reportData), [reportData]);
   const ledgerFilterStats = useMemo(
     () =>
       countLedgerFilterStats(reportData, ledgerRowFilter, {
         includeInterest: isLedgerInterest,
         amountSide: ledgerAmountSide,
         vrType: ledgerVrType,
+        dcCode: ledgerDcCode,
       }),
-    [reportData, ledgerRowFilter, isLedgerInterest, ledgerAmountSide, ledgerVrType]
+    [reportData, ledgerRowFilter, isLedgerInterest, ledgerAmountSide, ledgerVrType, ledgerDcCode]
   );
   const filteredReportData = useMemo(
     () =>
@@ -425,13 +462,13 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
         includeInterest: isLedgerInterest,
         amountSide: ledgerAmountSide,
         vrType: ledgerVrType,
+        dcCode: ledgerDcCode,
       }),
-    [reportData, ledgerRowFilter, isLedgerInterest, ledgerAmountSide, ledgerVrType]
+    [reportData, ledgerRowFilter, isLedgerInterest, ledgerAmountSide, ledgerVrType, ledgerDcCode]
   );
   const useMobileLedgerCards = viewMode === 'mobile' && !isLedgerInterest;
   const isDesktopLedgerView = viewMode === 'desktop';
-  const ledgerHelpId = isLedgerInterest ? 'ledger-interest' : 'ledger';
-  const ledgerFormTitle = isLedgerInterest ? 'Ledger With Interest' : 'Ledger Report';
+  const ledgerFormTitle = ledgerReportTitle;
 
   if (showReport && reportData.length > 0) {
     const account = findAccountByCode(accounts, selectedAccount);
@@ -439,10 +476,16 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
     const compYear = formData.comp_year ?? formData.COMP_YEAR ?? '';
     const accountName = account?.NAME ?? account?.name ?? '';
     const accountCodeDisplay = selectedAccount || ledgerAccountCode(account);
-    const periodLine = isDesktopLedgerView
-      ? `FY ${compYear} / ${toDisplayDate(startDate)} - ${toDisplayDate(endDate)}`
-      : `Financial year ${compYear} · ${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`;
-    const ledgerHint = isLedgerInterest
+    const periodLine = isLedgerDrCrDate
+      ? isDesktopLedgerView
+        ? `FY ${compYear} / Dr ${toDisplayDate(startDate)} – ${toDisplayDate(endDate)} · Cr ${toDisplayDate(crStartDate)} – ${toDisplayDate(crEndDate)}`
+        : `Financial year ${compYear} · Dr ${toDisplayDate(startDate)} – ${toDisplayDate(endDate)} · Cr ${toDisplayDate(crStartDate)} – ${toDisplayDate(crEndDate)}`
+      : isDesktopLedgerView
+        ? `FY ${compYear} / ${toDisplayDate(startDate)} - ${toDisplayDate(endDate)}`
+        : `Financial year ${compYear} · ${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`;
+    const ledgerHint = isLedgerDrCrDate
+      ? 'Debit lines use Dr dates; credit-only lines use Cr dates (VFP MYLEGER). Tap a row for voucher detail.'
+      : isLedgerInterest
       ? `Interest date ${toDisplayDate(interestCalcDate)} · Rate ${String(interestRate).trim() || '0'}% · Grace DR ${String(
           graceDrDays
         ).trim() || '0'} · Grace CR ${String(graceCrDays).trim() || '0'}`
@@ -454,6 +497,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
       setLedgerRowFilter('');
       setLedgerAmountSide('all');
       setLedgerVrType('all');
+      setLedgerDcCode('all');
       setBillPrintOpen(false);
       setBillPrintParams(null);
     };
@@ -486,7 +530,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
     const handleLedgerExportPrint = () => {
       if (!reportData.length) return;
       const html = buildReportHtml('ledger', reportData, ledgerPdfMeta());
-      printHtmlDocument(html, { title: isLedgerInterest ? 'Ledger With Interest' : 'Ledger Report' });
+      printHtmlDocument(html, { title: ledgerReportTitle });
     };
 
     const ledgerHeaderRightSlot = (
@@ -503,7 +547,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
           />
         ) : null}
         <SessionToolbarChrome
-          helpReportId={isLedgerInterest ? 'ledger-interest' : 'ledger'}
+          helpReportId={ledgerHelpId}
           helpCompanyName={compName}
         />
       </>
@@ -521,7 +565,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
               onBack={() => setVoucherRows(null)}
               rightSlot={
                 <SessionToolbarChrome
-                  helpReportId={isLedgerInterest ? 'ledger-interest' : 'ledger'}
+                  helpReportId={ledgerHelpId}
                   helpCompanyName={compName}
                 />
               }
@@ -617,7 +661,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
         header={
           <FasReportHeader
             className={isDesktopLedgerView ? 'fas-report-header--ledger-desktop' : 'fas-report-header--ledger-toolbar'}
-            title={isLedgerInterest ? 'Ledger With Interest' : 'Ledger Report'}
+            title={ledgerReportTitle}
             onBack={closeReport}
             rightSlot={ledgerHeaderRightSlot}
           />
@@ -724,6 +768,9 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
           vrType={ledgerVrType}
           vrTypeOptions={ledgerVrTypeOptions}
           onVrTypeChange={setLedgerVrType}
+          dcCode={ledgerDcCode}
+          dcCodeOptions={ledgerDcCodeOptions}
+          onDcCodeChange={setLedgerDcCode}
           shownCount={ledgerFilterStats.shown}
           totalCount={ledgerFilterStats.total}
           className={isDesktopLedgerView ? 'fas-ledger-filter--desktop' : ''}
@@ -735,7 +782,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
             type={isLedgerInterest ? 'ledger-interest' : 'ledger'}
             onVoucherClick={runLedgerVoucher}
             onLedgerSaleBillClick={openLedgerSaleBill}
-            filterActive={ledgerFilterIsActive(ledgerRowFilter, ledgerAmountSide, ledgerVrType)}
+            filterActive={ledgerFilterIsActive(ledgerRowFilter, ledgerAmountSide, ledgerVrType, ledgerDcCode)}
           />
         </div>
 
@@ -913,7 +960,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
 
         <div className="fas-ledger-form__date-row">
           <div className="fas-field-group">
-            <div className="fas-field-label">From (comp_s_dt)</div>
+            <div className="fas-field-label">{isLedgerDrCrDate ? 'From (Dr)' : 'From (comp_s_dt)'}</div>
             <div className="fas-field-input fas-tb-date-field">
               <span className="fas-field-icon" aria-hidden="true">
                 📅
@@ -930,7 +977,7 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
           </div>
 
           <div className="fas-field-group">
-            <div className="fas-field-label">To (comp_e_dt)</div>
+            <div className="fas-field-label">{isLedgerDrCrDate ? 'To (Dr)' : 'To (comp_e_dt)'}</div>
             <div className="fas-field-input fas-tb-date-field">
               <span className="fas-field-icon" aria-hidden="true">
                 📅
@@ -946,6 +993,42 @@ export default function Slide5({ apiBase, onPrev, onReset, formData, viewMode = 
             </div>
           </div>
         </div>
+
+        {isLedgerDrCrDate ? (
+          <div className="fas-ledger-form__date-row">
+            <div className="fas-field-group">
+              <div className="fas-field-label">From (Cr)</div>
+              <div className="fas-field-input fas-tb-date-field">
+                <span className="fas-field-icon" aria-hidden="true">
+                  📅
+                </span>
+                <input
+                  id="cr-start-date"
+                  type="date"
+                  lang="en-GB"
+                  value={crStartDate}
+                  onChange={(e) => setCrStartDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="fas-field-group">
+              <div className="fas-field-label">To (Cr)</div>
+              <div className="fas-field-input fas-tb-date-field">
+                <span className="fas-field-icon" aria-hidden="true">
+                  📅
+                </span>
+                <input
+                  id="cr-end-date"
+                  type="date"
+                  lang="en-GB"
+                  value={crEndDate}
+                  onChange={(e) => setCrEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {!isLedgerInterest ? (
           <div className="fas-field-group">

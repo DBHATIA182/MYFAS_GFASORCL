@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toInputDateString, toOracleDate, toDisplayDate } from '../utils/dateFormat';
 import { downloadExcelWorkbook } from '../utils/excelExport';
 import { generatePDF } from '../utils/pdfgenerator';
-import ReportHelpButton from '../components/ReportHelpButton';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 
 function toYesNo(v, defVal = 'Y') {
   const t = String(v ?? '').trim().toUpperCase();
@@ -713,19 +713,14 @@ export default function Slide15({ apiBase, formData, onPrev, onReset }) {
         <div className="slide slide-report">
           <div className="report-toolbar">
             <h2>{saleDetailTitle || 'Detail view'}</h2>
-            <div className="toolbar-actions">
-            <ReportHelpButton reportId="gstr1" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-              <button type="button" className="btn btn-toolbar-back" onClick={() => setDetailScreenOpen(false)}>
-                ← Back
-              </button>
-              <button type="button" className="btn btn-export" onClick={() => exportDetailPdf().catch((e) => alert(String(e?.message || e)))}>
-                Pdf
-              </button>
-              <button type="button" className="btn btn-excel" onClick={exportDetailExcel}>
-                📊 Excel
-              </button>
-            </div>
+            <ReportToolbarActions
+              reportId="gstr1"
+              helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+              onBack={() => setDetailScreenOpen(false)}
+              onPdf={() => exportDetailPdf().catch((e) => alert(String(e?.message || e)))}
+              onExcel={exportDetailExcel}
+              showWhatsApp={false}
+            />
           </div>
           <div className="report-info">
             <p>
@@ -784,19 +779,14 @@ export default function Slide15({ apiBase, formData, onPrev, onReset }) {
       <div className="slide slide-report">
         <div className="report-toolbar">
           <h2>GSTR-1 Report</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="gstr1" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setReport(null)}>
-              ← Back
-            </button>
-            <button type="button" className="btn btn-export" onClick={() => exportPdf().catch((e) => alert(String(e?.message || e)))}>
-              Pdf
-            </button>
-            <button type="button" className="btn btn-excel" onClick={exportExcel}>
-              📊 Excel
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="gstr1"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={() => setReport(null)}
+            onPdf={() => exportPdf().catch((e) => alert(String(e?.message || e)))}
+            onExcel={exportExcel}
+            showWhatsApp={false}
+          />
         </div>
         <div className="report-info">
           <p>

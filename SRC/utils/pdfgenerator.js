@@ -2,7 +2,7 @@ import html2pdf from 'html2pdf.js';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { mergePdfBlobs, yieldToMain } from './mergePdfBlobs';
-import { formatLedgerDateDisplay } from './dateFormat';
+import { formatLedgerDateDisplay, toDisplayDate } from './dateFormat';
 import { buildBrokerOsDisplayRows } from './brokerOsDisplay';
 import { buildSaleListDisplayRows, saleListMeas } from './saleListDisplay';
 import { rupeesToWords } from './rupeesInWords';
@@ -10,6 +10,15 @@ import { rowFieldCI, rowFieldAny } from './rowFieldCI';
 import { ageingCurBalDisplay } from './ageingDisplay';
 import { buildLedgerJsPdfBlob, assertLedgerPdfBlob } from './ledgerJsPdf';
 import { sortTrialBalanceRows, trialBalanceRowKind, trialBalanceRowLabel, findTrialGrandRow } from './trialBalanceSort';
+import {
+  LABOUR_REPORT_GROUPS,
+  labourRowValue,
+  labourTotAmt,
+  fmtLabourQty,
+  fmtLabourAmt,
+  labourGroupColSpan,
+  sortLabourRowsByVrDate,
+} from '../data/labourReportLayout';
 
 function safeFilenamePart(name) {
   return String(name || 'report').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
@@ -80,9 +89,10 @@ export function buildLedgerStatementPdfMetadata({
   };
 }
 
-function formatAmtPdf(n) {
+function formatAmtPdf(n, decimals = 2) {
   const v = parseFloat(n) || 0;
-  return v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dec = Number.isFinite(decimals) ? decimals : 2;
+  return v.toLocaleString('en-IN', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 
 function formatQtyPdf(n) {
@@ -2739,21 +2749,60 @@ function buildPurchaseBillReportHtml(data, metadata) {
   };
 
   const billAmtNum = Number(t.billAmt) || 0;
-  const wordsRaw =
-    billAmtNum < 0 ? 'Minus ' + rupeesToWords(Math.abs(billAmtNum)) : rupeesToWords(billAmtNum || Number(t.sumAmt) || 0);
+  const tdsAmtNum = Number(t.ntdsAmt) || 0;
+  const isPbPdf =
+    String(f.TYPE ?? f.type ?? '')
+      .trim()
+      .toUpperCase() === 'PB' ||
+    String(metadata?.purchaseBillKey || '')
+      .toUpperCase()
+      .startsWith('PB_');
+  const isEvPdf =
+    String(f.TYPE ?? f.type ?? '')
+      .trim()
+      .toUpperCase() === 'EV' ||
+    String(docTitle || '')
+      .toUpperCase()
+      .includes('EXPENSES') ||
+    String(metadata?.purchaseBillKey || '')
+      .toUpperCase()
+      .startsWith('EV_');
+  const purchaseKeyTypePdf = String(metadata?.purchaseBillKey || '')
+    .trim()
+    .split('_')[0]
+    .toUpperCase();
+  const lineTypePdf = String(f.TYPE ?? f.type ?? '').trim().toUpperCase();
+  const effectiveTypePdf = purchaseKeyTypePdf || lineTypePdf;
+  const isDebitPdf = ['DN', 'DX'].includes(effectiveTypePdf) || String(docTitle || '').toUpperCase().includes('DEBIT');
+  const isCreditPdf = ['CN', 'CX'].includes(effectiveTypePdf) || String(docTitle || '').toUpperCase().includes('CREDIT');
+
+  const noLabelPdf = isDebitPdf ? 'Debit Note No.' : isCreditPdf ? 'Credit Note No.' : 'R no.';
+  const dateLabelPdf = isDebitPdf ? 'Debit Note Date' : isCreditPdf ? 'Credit Note Date' : 'R date';
+  const netPayableNum =
+    t.netPayable != null && t.netPayable !== '' ? Number(t.netPayable) || 0 : billAmtNum - tdsAmtNum;
+  const wordsBase = Math.abs(tdsAmtNum) > 0.0001 ? netPayableNum : billAmtNum || Number(t.sumAmt) || 0;
+  const wordsRaw = wordsBase < 0 ? 'Minus ' + rupeesToWords(Math.abs(wordsBase)) : rupeesToWords(wordsBase);
   const words = escHtml(wordsRaw);
 
   let bodyRows = '';
   (lines || []).forEach((row, i) => {
+    const midCol = isEvPdf
+      ? `<td class="num">${formatAmtPdf(purchaseDnSigned(row, 'FREIGHT', 'freight'))}</td>`
+      : `<td class="num">${formatAmtPdf(purchaseDnSigned(row, 'DIS_AMT', 'dis_amt'))}</td>`;
+    const qtyCol = isEvPdf
+      ? ''
+      : `<td class="num">${formatQtyPdf(purchaseDnSigned(row, 'QNTY', 'qnty'))}</td>`;
     bodyRows += `
             <tr>
               <td>${i + 1}</td>
               <td>${escHtml(sbCell(row, 'ITEM_CODE', 'item_code'))}</td>
               <td>${escHtml(sbCell(row, 'ITEM_NAME', 'item_name'))}</td>
-              <td class="num">${formatQtyPdf(purchaseDnSigned(row, 'QNTY', 'qnty'))}</td>
+              <td>${escHtml(sbCell(row, 'HSN_CODE', 'hsn_code'))}</td>
+              ${qtyCol}
               <td class="num">${formatQtyPdf(purchaseDnSigned(row, 'WEIGHT', 'weight'))}</td>
               <td class="num">${formatAmtPdf(stockNum(row, 'RATE', 'rate'))}</td>
               <td class="num">${formatAmtPdf(purchaseDnSigned(row, 'AMOUNT', 'amount'))}</td>
+              ${midCol}
               <td class="num">${formatAmtPdf(purchaseDnSigned(row, 'TAXABLE', 'taxable'))}</td>
               <td class="num">${formatAmtPdf(purchaseDnSigned(row, 'CGST_AMT', 'cgst_amt'))}</td>
               <td class="num">${formatAmtPdf(purchaseDnSigned(row, 'SGST_AMT', 'sgst_amt'))}</td>
@@ -2783,36 +2832,66 @@ function buildPurchaseBillReportHtml(data, metadata) {
         }</div>`
       : '';
 
+  const othLbl = (nameKey, fallback) => {
+    const nm = String(t[nameKey] || '').trim();
+    return nm || fallback;
+  };
   const sumPairs = [
     ['Total amount', t.sumAmt],
+    isEvPdf ? ['Freight', t.sumFreight] : ['Discount', t.sumDis],
     ['Taxable', t.sumTax],
     ['CGST', t.sumC],
     ['SGST', t.sumS],
     ['IGST', t.sumI],
-    ['Discount', t.sumDis],
-    ['Oth exp 1', t.oth1],
-    ['Oth exp 2', t.oth2],
-    ['Oth exp 3', t.oth3],
-    ['Oth exp 4', t.oth4],
-    ['Oth exp 5', t.oth5],
-    ['Oth exp 6', t.oth6],
-    ['Oth exp 7', t.oth7],
-    ['Oth exp 8', t.oth8],
-    ['Broker paid', t.brokPaid],
-    ['Freight paid', t.freightPaid],
-    ['Mandi exp', t.mandiExp],
-    ['Labour exp', t.labourExp],
-    ['Bardana exp', t.bardanaExp],
-    ['CD amount', t.cdAmount],
-    ['Dharm kanta', t.dharmKanta],
-    ['Tulwai exp', t.tulwaiExp],
-    ['Round off', t.roundOff],
+    [othLbl('othName1', 'Oth exp 1'), t.oth1],
+    [othLbl('othName2', 'Oth exp 2'), t.oth2],
+    [othLbl('othName3', 'Oth exp 3'), t.oth3],
+    [othLbl('othName4', 'Oth exp 4'), t.oth4],
+    [othLbl('othName5', 'Oth exp 5'), t.oth5],
+    [othLbl('othName6', 'Oth exp 6'), t.oth6],
+    [othLbl('othName7', 'Oth exp 7'), t.oth7],
+    [othLbl('othName8', 'Oth exp 8'), t.oth8],
+    ['Commission', t.commAmt],
+    ['Mudat', t.mudAmt],
+    ['Brokerage', t.brokAmt],
+    ...(isPbPdf || isEvPdf
+      ? []
+      : [
+          ['Broker paid', t.brokPaid],
+          ['Freight paid', t.freightPaid],
+          ['Mandi exp', t.mandiExp],
+          ['Labour exp', t.labourExp],
+          ['Bardana exp', t.bardanaExp],
+          ['CD amount', t.cdAmount],
+          ['Dharm kanta', t.dharmKanta],
+          ['Tulwai exp', t.tulwaiExp],
+          ['Round off', t.roundOff],
+          ['TCS', t.tcsAmt],
+        ]),
+    ...(isEvPdf && Math.abs(Number(t.tcsAmt) || 0) > 0.0001 ? [['TCS', t.tcsAmt]] : []),
     ['Bill amt', t.billAmt],
-  ];
+    ...(Math.abs(tdsAmtNum) > 0.0001
+      ? [
+          ['Less TDS', tdsAmtNum],
+          ['Net Payable', netPayableNum],
+        ]
+      : []),
+  ].filter(
+    ([lbl, val]) =>
+      lbl === 'Bill amt' ||
+      lbl === 'Net Payable' ||
+      lbl === 'Total amount' ||
+      lbl === 'Discount' ||
+      lbl === 'Freight' ||
+      Math.abs(Number(val) || 0) > 0.0001
+  );
   let sumBody = '';
   sumPairs.forEach(([lbl, val]) => {
     sumBody += `<tr><td>${escHtml(lbl)}</td><td class="num">${formatAmtPdf(val)}</td></tr>`;
   });
+
+  const qtyHead = isEvPdf ? '' : '<th class="num">Qty</th>';
+  const midHead = isEvPdf ? '<th class="num">Freight</th>' : '<th class="num">Disc</th>';
 
   return `
     <div class="report-doc sb-pdf">
@@ -2834,8 +2913,8 @@ function buildPurchaseBillReportHtml(data, metadata) {
       </div>
 
       <div class="sb-pdf-inv">
-        <span><strong>R no.</strong> ${escHtml(String(f.R_NO ?? f.r_no ?? '—'))}</span>
-        <span><strong>R date</strong> ${escHtml(formatLedgerDateDisplay(f.R_DATE ?? f.r_date))}</span>
+        <span><strong>${escHtml(noLabelPdf)}</strong> ${escHtml(String(f.R_NO ?? f.r_no ?? '—'))}</span>
+        <span><strong>${escHtml(dateLabelPdf)}</strong> ${escHtml(formatLedgerDateDisplay(f.R_DATE ?? f.r_date))}</span>
         <span><strong>Bill no.</strong> ${escHtml(String(f.BILL_NO ?? f.bill_no ?? '—'))}</span>
         <span><strong>Bill date</strong> ${escHtml(formatLedgerDateDisplay(f.BILL_DATE ?? f.bill_date))}</span>
       </div>
@@ -2862,10 +2941,12 @@ function buildPurchaseBillReportHtml(data, metadata) {
             <th>Sno</th>
             <th>Item</th>
             <th>Item name</th>
-            <th class="num">Qty</th>
+            <th>HSN</th>
+            ${qtyHead}
             <th class="num">Wt</th>
             <th class="num">Rate</th>
             <th class="num">Amt</th>
+            ${midHead}
             <th class="num">Taxable</th>
             <th class="num">CGST</th>
             <th class="num">SGST</th>
@@ -2893,7 +2974,125 @@ function buildPurchaseBillReportHtml(data, metadata) {
 }
 
 /** Purchase list (PU / DN) */
+function buildExpensesVoucherListReportHtml(data, metadata) {
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+  const company = escHtml(metadata.companyName || '');
+  const sdt = escHtml(metadata.startDate || '');
+  const edt = escHtml(metadata.endDate || '');
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+
+  let tw = 0;
+  let ta = 0;
+  let tf = 0;
+  let tc = 0;
+  let ts = 0;
+  let ti = 0;
+  let toth = 0;
+  let ttcs = 0;
+  let tntds = 0;
+  let tb = 0;
+  let body = '';
+  rows.forEach((r) => {
+    const w = stockNum(r, 'WEIGHT', 'weight');
+    const a = stockNum(r, 'AMOUNT', 'amount');
+    const f = stockNum(r, 'FREIGHT', 'freight');
+    const c = stockNum(r, 'CGST_AMT', 'cgst_amt');
+    const s = stockNum(r, 'SGST_AMT', 'sgst_amt');
+    const i = stockNum(r, 'IGST_AMT', 'igst_amt');
+    const oth = stockNum(r, 'OTH_EXP_1', 'oth_exp_1');
+    const tcs = stockNum(r, 'TCS_AMT', 'tcs_amt');
+    const ntds = stockNum(r, 'NTDS_AMT', 'ntds_amt');
+    const b = stockNum(r, 'BILL_AMT', 'bill_amt');
+    tw += w;
+    ta += a;
+    tf += f;
+    tc += c;
+    ts += s;
+    ti += i;
+    toth += oth;
+    ttcs += tcs;
+    tntds += ntds;
+    tb += b;
+    const itemHsn = [String(r.ITEM_NAME ?? r.item_name ?? '').trim(), String(r.HSN_CODE ?? r.hsn_code ?? '').trim()]
+      .filter(Boolean)
+      .join(' / ');
+    const gstNo = String(r.GST_NO ?? r.gst_no ?? '').trim();
+    body += `<tr>
+      <td>${escHtml(formatLedgerDateDisplay(r.R_DATE ?? r.r_date))}</td>
+      <td>${escHtml(String(r.R_NO ?? r.r_no ?? ''))}</td>
+      <td>${escHtml(String(r.BILL_NO ?? r.bill_no ?? ''))}</td>
+      <td class="col-name">${escHtml(String(r.NAME ?? r.name ?? ''))}</td>
+      <td class="amount">${formatStockPdf(w)}</td>
+      <td class="amount">${formatStockPdf(stockNum(r, 'RATE', 'rate'), 4)}</td>
+      <td class="amount">${formatStockPdf(a)}</td>
+      <td class="amount">${formatStockPdf(f)}</td>
+      <td class="amount">${formatStockPdf(stockNum(r, 'CGST_PER', 'cgst_per'))}</td>
+      <td class="amount">${formatStockPdf(stockNum(r, 'SGST_PER', 'sgst_per'))}</td>
+      <td class="amount">${formatStockPdf(stockNum(r, 'IGST_PER', 'igst_per'))}</td>
+      <td class="amount">${formatStockPdf(c)}</td>
+      <td class="amount">${formatStockPdf(s)}</td>
+      <td class="amount">${formatStockPdf(i)}</td>
+      <td class="amount">${formatStockPdf(oth)}</td>
+      <td class="amount">${formatStockPdf(tcs)}<br/>${formatStockPdf(ntds)}</td>
+      <td class="amount">${formatStockPdf(b)}</td>
+    </tr>
+    <tr>
+      <td colspan="3">${escHtml(itemHsn || '—')}</td>
+      <td colspan="14">${escHtml(gstNo || '—')}</td>
+    </tr>`;
+  });
+
+  const grand = `<tr class="report-grand-total">
+      <td colspan="4" class="lbl-total">Grand total</td>
+      <td class="amount">${formatStockPdf(tw)}</td>
+      <td class="amount">—</td>
+      <td class="amount">${formatStockPdf(ta)}</td>
+      <td class="amount">${formatStockPdf(tf)}</td>
+      <td class="amount">—</td>
+      <td class="amount">—</td>
+      <td class="amount">—</td>
+      <td class="amount">${formatStockPdf(tc)}</td>
+      <td class="amount">${formatStockPdf(ts)}</td>
+      <td class="amount">${formatStockPdf(ti)}</td>
+      <td class="amount">${formatStockPdf(toth)}</td>
+      <td class="amount">${formatStockPdf(ttcs)}<br/>${formatStockPdf(tntds)}</td>
+      <td class="amount">${formatStockPdf(tb)}</td>
+    </tr>`;
+
+  return `
+    <div class="report-doc purchase-list-pdf exp-voucher-list-pdf">
+      <style>${PDF_REPORT_STYLES}</style>
+      <div class="report-topbar">
+        <div class="kicker">EXPENSES</div>
+        <h1>EXPENSES VOUCHER LIST FROM ${sdt} TO ${edt}</h1>
+        <div class="company">${company}</div>
+        <div class="report-period">Generated: ${generated}</div>
+      </div>
+      <table class="table-report">
+        <thead>
+          <tr>
+            <th>Date</th><th>No.</th><th>Bill No</th><th>Name/GST No.</th>
+            <th class="amount">Weight</th><th class="amount">Rate</th><th class="amount">Amount</th>
+            <th class="amount">Freight</th>
+            <th class="amount">Cg%</th><th class="amount">Sg%</th><th class="amount">Ig%</th>
+            <th class="amount">Cgst</th><th class="amount">Sgst</th><th class="amount">Igst</th>
+            <th class="amount">Others</th><th class="amount">Tcs/Tds</th><th class="amount">Net Amt.</th>
+          </tr>
+          <tr>
+            <th colspan="3">Item Name/Hsn Code</th>
+            <th colspan="14"></th>
+          </tr>
+        </thead>
+        <tbody>${body}${grand}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function buildPurchaseListReportHtml(data, metadata) {
+  if (String(metadata?.listKind || '').toUpperCase() === 'EV') {
+    return buildExpensesVoucherListReportHtml(data, metadata);
+  }
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   const company = escHtml(metadata.companyName || '');
   const sdt = escHtml(metadata.startDate || '');
@@ -3941,6 +4140,241 @@ function buildLoanerListReportHtml(data, metadata = {}) {
   `;
 }
 
+function buildPurchaseTdsReportHtml(data, metadata = {}) {
+  const rows = Array.isArray(data) ? data : [];
+  const isDetail = metadata.reportMode === 'detail' || metadata.reportTitle?.includes('Detail');
+  const isSale = String(metadata.reportTitle || '').toLowerCase().includes('sale');
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || (isDetail ? 'Party Wise Purchase Detail (TDS)' : 'Party Wise Purchase Summary (TDS)'));
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || '—');
+  const party = escHtml(metadata.partyFilter || 'All parties');
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+
+  const detailCols = isSale
+    ? ['CODE', 'NAME', 'PAN', 'DOC_DATE', 'DOC_NO', 'TYPE', 'B_TYPE', 'AMOUNT', 'TDS_ON_AMT', 'TDS_PER', 'TDS_AMT', 'CITY', 'STATE']
+    : ['CODE', 'NAME', 'PAN', 'DOC_DATE', 'DOC_NO', 'TYPE', 'AMOUNT', 'TDS_ON_AMT', 'TDS_PER', 'TDS_AMT', 'CITY', 'STATE'];
+  const summaryCols = ['CODE', 'NAME', 'PAN', 'ADD1', 'CITY', 'STATE', 'AMOUNT', 'TDS_ON_AMT', 'TDS_PER', 'TDS_AMT'];
+  const cols = isDetail ? detailCols : summaryCols;
+  const labels = {
+    CODE: 'Code',
+    NAME: 'Name',
+    PAN: 'PAN',
+    ADD1: 'Address',
+    CITY: 'City',
+    STATE: 'State',
+    R_DATE: 'R Date',
+    R_NO: 'R No',
+    TYPE: 'Type',
+    AMOUNT: 'Amount',
+    TDS_ON_AMT: 'TDS On Amt',
+    TDS_PER: 'TDS %',
+    TDS_AMT: 'TDS Amt',
+  };
+  const amtCols = new Set(['AMOUNT', 'TDS_ON_AMT', 'TDS_PER', 'TDS_AMT']);
+
+  const groupedRows =
+    isDetail && rows.length
+      ? (() => {
+          const out = [];
+          let partyKey = null;
+          let partyLabel = '';
+          let subtotal = { AMOUNT: 0, TDS_ON_AMT: 0, TDS_AMT: 0 };
+          const pushSubtotal = () => {
+            if (!partyKey) return;
+            out.push({
+              _rowType: 'partyTotal',
+              _partyLabel: partyLabel,
+              AMOUNT: subtotal.AMOUNT,
+              TDS_ON_AMT: subtotal.TDS_ON_AMT,
+              TDS_AMT: subtotal.TDS_AMT,
+            });
+          };
+          rows.forEach((r) => {
+            const code = String(r?.CODE ?? '').trim();
+            const name = String(r?.NAME ?? '').trim();
+            const key = `${code}||${name}`;
+            if (partyKey !== null && key !== partyKey) {
+              pushSubtotal();
+              subtotal = { AMOUNT: 0, TDS_ON_AMT: 0, TDS_AMT: 0 };
+            }
+            partyKey = key;
+            partyLabel = `${code}${name ? ` - ${name}` : ''}`.trim();
+            subtotal.AMOUNT += Number(r?.AMOUNT ?? 0);
+            subtotal.TDS_ON_AMT += Number(r?.TDS_ON_AMT ?? 0);
+            subtotal.TDS_AMT += Number(r?.TDS_AMT ?? 0);
+            out.push({ ...r, _rowType: 'detail' });
+          });
+          pushSubtotal();
+          return out;
+        })()
+      : rows;
+
+  const body = groupedRows
+    .map((r) => {
+      if (r?._rowType === 'partyTotal') {
+        const subtotalCells = cols
+          .map((c, idx) => {
+            if (idx === 0) return `<td><strong>${escHtml(`${r._partyLabel} TOTAL`)}</strong></td>`;
+            if (c === 'AMOUNT') return `<td class="amount"><strong>${formatAmtPdf(r.AMOUNT)}</strong></td>`;
+            if (c === 'TDS_ON_AMT') return `<td class="amount"><strong>${formatAmtPdf(r.TDS_ON_AMT)}</strong></td>`;
+            if (c === 'TDS_AMT') return `<td class="amount"><strong>${formatAmtPdf(r.TDS_AMT)}</strong></td>`;
+            if (amtCols.has(c)) return '<td class="amount"></td>';
+            return '<td></td>';
+          })
+          .join('');
+        return `<tr class="party-subtotal">${subtotalCells}</tr>`;
+      }
+      const tds = cols
+        .map((c) => {
+          const val = r?.[c];
+          const cls = amtCols.has(c) ? 'amount' : '';
+          const cell = amtCols.has(c) ? formatAmtPdf(val) : escHtml(val ?? '');
+          return `<td class="${cls}">${cell}</td>`;
+        })
+        .join('');
+      return `<tr>${tds}</tr>`;
+    })
+    .join('');
+
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.AMOUNT += Number(r?.AMOUNT ?? 0);
+      acc.TDS_ON_AMT += Number(r?.TDS_ON_AMT ?? 0);
+      acc.TDS_AMT += Number(r?.TDS_AMT ?? 0);
+      return acc;
+    },
+    { AMOUNT: 0, TDS_ON_AMT: 0, TDS_AMT: 0 }
+  );
+
+  const totalRow = rows.length
+    ? `<tr class="report-grand-total">${cols
+        .map((c, idx) => {
+          if (idx === 0) return '<td colspan="1" class="lbl-total">TOTAL</td>';
+          if (c === 'AMOUNT') return `<td class="amount">${formatAmtPdf(totals.AMOUNT)}</td>`;
+          if (c === 'TDS_ON_AMT') return `<td class="amount">${formatAmtPdf(totals.TDS_ON_AMT)}</td>`;
+          if (c === 'TDS_AMT') return `<td class="amount">${formatAmtPdf(totals.TDS_AMT)}</td>`;
+          if (amtCols.has(c)) return '<td class="amount"></td>';
+          return '<td></td>';
+        })
+        .join('')}</tr>`
+    : '';
+
+  const head = cols.map((c) => `<th class="${amtCols.has(c) ? 'amount' : ''}">${labels[c] || c}</th>`).join('');
+
+  return `
+    <div class="report-doc purchase-tds-pdf-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .purchase-tds-pdf-doc { padding: 4px 6px 10px; }
+        .purchase-tds-pdf-doc table.table-report { width: 100%; font-size: 7.5px; table-layout: auto; }
+        .purchase-tds-pdf-doc table.table-report td.amount,
+        .purchase-tds-pdf-doc table.table-report th.amount { text-align: right; }
+        .purchase-tds-pdf-doc .party-subtotal td { background: #fef3c7; font-weight: 700; }
+      </style>
+      <div class="report-topbar">
+        <div class="kicker">GST REPORT</div>
+        <h1>${title.toUpperCase()}</h1>
+        <div class="company">${company}</div>
+        <table class="report-grid">
+          <tr>
+            <td class="lbl">Financial year</td>
+            <td class="val">${fy}</td>
+            <td class="lbl">Period</td>
+            <td class="val">${period}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Party</td>
+            <td class="val" colspan="3">${party}</td>
+          </tr>
+        </table>
+        <div class="report-period"><strong>Generated:</strong> ${generated} · <strong>Rows:</strong> ${rows.length}</div>
+      </div>
+      <table class="table-report">
+        <thead><tr>${head}</tr></thead>
+        <tbody>${body || `<tr><td colspan="${cols.length}">No rows</td></tr>`}${totalRow}</tbody>
+      </table>
+      <div class="report-foot">VFP DO FORM tcs_rpt WITH ${isSale ? (isDetail ? '5' : '6') : isDetail ? '3' : '4'} — ${isSale ? 'SALE TDS' : 'PURCHASE NTDS'} fields.</div>
+    </div>
+  `;
+}
+
+function buildLabourReportHtml(data, metadata = {}) {
+  const rows = sortLabourRowsByVrDate(Array.isArray(data) ? data : []);
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'Labour Report');
+  const fy = escHtml(metadata.year || '—');
+  const period = escHtml(metadata.period || metadata.endDate || '—');
+  const generated = escHtml(new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }));
+
+  const isGrand = (r) =>
+    Boolean(r?._isGrandTotal) ||
+    String(r?.VR_DATE ?? r?.vr_date ?? '').toUpperCase().includes('GRAND TOTAL');
+
+  const groupHead = LABOUR_REPORT_GROUPS.map(
+    (g) => `<th colspan="${labourGroupColSpan(g)}" class="labour-group">${escHtml(g.label)}</th>`
+  ).join('');
+
+  const subHead = LABOUR_REPORT_GROUPS.map((g) =>
+    g.pairs
+      .map(
+        (p) =>
+          `<th class="amount">${escHtml(p.qtyLabel)}</th><th class="amount">${escHtml(p.amtLabel)}</th>`
+      )
+      .join('')
+  ).join('');
+
+  const body = rows
+    .map((r) => {
+      const grand = isGrand(r);
+      const dateLabel = grand
+        ? 'GRAND TOTAL'
+        : escHtml(formatLedgerDateDisplay(labourRowValue(r, 'VR_DATE')) || String(labourRowValue(r, 'VR_DATE') ?? ''));
+      const tot = Number(labourRowValue(r, 'TOT_AMT')) || labourTotAmt(r);
+      const cells = LABOUR_REPORT_GROUPS.map((g) =>
+        g.pairs
+          .map(
+            (p) =>
+              `<td class="amount">${escHtml(fmtLabourQty(labourRowValue(r, p.qty)))}</td><td class="amount">${escHtml(fmtLabourAmt(labourRowValue(r, p.amt)))}</td>`
+          )
+          .join('')
+      ).join('');
+      return `<tr class="${grand ? 'report-grand-total' : ''}"><td class="labour-date">${dateLabel}</td>${cells}<td class="amount">${escHtml(fmtLabourAmt(tot))}</td></tr>`;
+    })
+    .join('');
+
+  const colCount = 1 + LABOUR_REPORT_GROUPS.reduce((s, g) => s + labourGroupColSpan(g), 0) + 1;
+
+  return `
+    <div class="report-doc labour-pdf-doc">
+      <style>${PDF_REPORT_STYLES}
+        .labour-pdf-doc table.table-report { font-size: 7.5px; }
+        .labour-pdf-doc .labour-group { background: #dbeafe; font-weight: 700; text-align: center; border-bottom: 1px solid #93c5fd; }
+        .labour-pdf-doc th.amount { font-size: 7px; white-space: nowrap; }
+        .labour-pdf-doc td.labour-date { white-space: nowrap; font-weight: 600; }
+        .labour-pdf-doc .report-grand-total td { background: #1e3a5f; color: #fff; font-weight: 700; }
+      </style>
+      <div class="report-topbar">
+        <div class="kicker">OTHER REPORT</div>
+        <h1>${title.toUpperCase()}</h1>
+        <div class="company">${company}</div>
+        <table class="report-grid">
+          <tr><td class="lbl">Financial year</td><td class="val">${fy}</td><td class="lbl">Period</td><td class="val">${period}</td></tr>
+        </table>
+        <div class="report-period"><strong>Generated:</strong> ${generated} &nbsp;|&nbsp; <strong>Rows:</strong> ${rows.length}</div>
+      </div>
+      <table class="table-report">
+        <thead>
+          <tr><th rowspan="2" class="labour-date">Date</th>${groupHead}<th rowspan="2" class="amount">Tot.Amt.</th></tr>
+          <tr>${subHead}</tr>
+        </thead>
+        <tbody>${body || `<tr><td colspan="${colCount}">No rows</td></tr>`}</tbody>
+      </table>
+      <div class="report-foot">Computer-generated labour report.</div>
+    </div>
+  `;
+}
+
 function buildIncomeTaxReportHtml(data, metadata = {}) {
   const rows = Array.isArray(data) ? data : [];
   const company = escHtml(metadata.companyName || 'Company');
@@ -3975,7 +4409,48 @@ function buildIncomeTaxReportHtml(data, metadata = {}) {
     .join('');
 
   const tableRows = Array.isArray(metadata.tableRows) && metadata.tableRows.length ? metadata.tableRows : null;
-  const dataRows = tableRows ? tableRows.filter((r) => r._type !== 'group') : rows;
+  const sourceRows = tableRows || rows;
+  const isGrandTotalRow = (r) =>
+    Boolean(r?._isGrandTotal) ||
+    String(r?.CMTH ?? r?.cmth ?? '').toUpperCase().includes('GRAND TOTAL') ||
+    String(r?.R_DATE ?? r?.r_date ?? '').toUpperCase().includes('GRAND TOTAL') ||
+    String(r?.BILL_DATE ?? r?.bill_date ?? '').toUpperCase().includes('GRAND TOTAL') ||
+    String(r?.ITEM_NAME ?? r?.item_name ?? '').toUpperCase().includes('GRAND TOTAL') ||
+    String(r?.NAME ?? r?.name ?? '').toUpperCase().includes('GRAND TOTAL');
+  const isItemTotalRow = (r) => {
+    if (Boolean(r?._isItemTotal)) return true;
+    const fields = ['CMTH', 'NAME', 'ITEM_NAME'];
+    return fields.some((k) => {
+      const v = String(r?.[k] ?? r?.[k?.toLowerCase?.()] ?? '').toUpperCase();
+      return v === 'ITEM TOTAL';
+    });
+  };
+  const isBrokerTotalRow = (r) => {
+    if (Boolean(r?._isBrokerTotal)) return true;
+    const fields = ['CMTH', 'NAME', 'ITEM_NAME'];
+    return fields.some((k) => {
+      const v = String(r?.[k] ?? r?.[k?.toLowerCase?.()] ?? '').toUpperCase();
+      return v === 'BROKER TOTAL';
+    });
+  };
+  const isPartyTotalRow = (r) => {
+    if (Boolean(r?._isPartyTotal)) return true;
+    const fields = ['CMTH', 'R_DATE', 'BILL_DATE', 'ITEM_NAME', 'NAME', 'VR_DATE'];
+    return fields.some((k) => {
+      const v = String(r?.[k] ?? r?.[k?.toLowerCase?.()] ?? '').toUpperCase();
+      return v === 'PARTY TOTAL' || v === 'CODE TOTAL' || v === 'CITY TOTAL';
+    });
+  };
+  const dataRows = sourceRows.filter(
+    (r) =>
+      r._type !== 'group' &&
+      r._type !== 'partyGroup' &&
+      r._type !== 'subtotal' &&
+      !isGrandTotalRow(r) &&
+      !isItemTotalRow(r) &&
+      !isPartyTotalRow(r)
+  );
+  const hasGrandTotal = sourceRows.some(isGrandTotalRow);
 
   const renderDataCells = (r) =>
     columns
@@ -3991,17 +4466,63 @@ function buildIncomeTaxReportHtml(data, metadata = {}) {
           return `<td class="itax-party-cell">${inner}</td>`;
         }
         const raw = r[c.key] ?? r[c.key?.toLowerCase?.()];
-        const val = c.type === 'num' ? formatAmtPdf(raw) : escHtml(raw ?? '');
+        const val =
+          c.type === 'num'
+            ? formatAmtPdf(raw, c.decimals)
+            : c.type === 'date'
+              ? escHtml(formatLedgerDateDisplay(raw))
+              : escHtml(raw ?? '');
         return `<td class="${c.type === 'num' ? 'amount' : ''}">${val}</td>`;
       })
       .join('');
 
-  const body = (tableRows || rows)
+  const renderPartyGroupHeaderPdf = (row) => {
+    const code = escHtml(
+      String(row.BK_CODE ?? row.bk_code ?? row.SUP_CODE ?? row.sup_code ?? row.CODE ?? row.code ?? '').trim()
+    );
+    const name = escHtml(
+      String(row.BNAME ?? row.bname ?? row.BK_NAME ?? row.bk_name ?? row.NAME ?? row.name ?? '').trim()
+    );
+    const minimal = Boolean(metadata.partyGroupHeaderMinimal);
+    const subs = minimal
+      ? ''
+      : ['ADD1', 'ADD2', 'ADD3', 'CITY', 'PAN', 'GST_NO']
+          .map((k) => String(row[k] ?? '').trim())
+          .filter(Boolean)
+          .map((line) => `<div class="itax-party-sub">${escHtml(line)}</div>`)
+          .join('');
+    return `<div class="itax-party-name">${[code, name].filter(Boolean).join(' ')}</div>${subs}`;
+  };
+
+  const body = sourceRows
     .map((r) => {
+      if (r._type === 'partyGroup') {
+        return `<tr class="itax-party-group"><td colspan="${columns.length}"><div class="itax-party-cell">${renderPartyGroupHeaderPdf(r.partyRow || r)}</div></td></tr>`;
+      }
       if (r._type === 'group') {
         return `<tr class="itax-schedule-group"><td colspan="${columns.length}">${escHtml(r.label || '')}</td></tr>`;
       }
-      return `<tr>${renderDataCells(r)}</tr>`;
+      const grand = isGrandTotalRow(r);
+      const itemTotal = isItemTotalRow(r);
+      const brokerTotal = isBrokerTotalRow(r);
+      const partyTotal = isPartyTotalRow(r);
+      const rowKind = String(r?._ROW_KIND ?? '').toLowerCase();
+      const rowClass = grand
+        ? 'report-grand-total'
+        : rowKind === 'day_close'
+          ? 'itax-book-day-close'
+          : rowKind === 'day_total'
+            ? 'itax-book-day-total'
+            : rowKind === 'cash_open'
+              ? 'itax-book-day-open'
+              : brokerTotal
+          ? 'itax-broker-total'
+          : partyTotal
+            ? 'itax-party-total'
+            : itemTotal
+              ? 'itax-item-total'
+              : '';
+      return `<tr class="${rowClass}">${renderDataCells(r)}</tr>`;
     })
     .join('');
 
@@ -4012,7 +4533,7 @@ function buildIncomeTaxReportHtml(data, metadata = {}) {
   });
   const firstNumIdx = columns.findIndex((c) => c.type === 'num');
   const totalRow =
-    dataRows.length && firstNumIdx >= 0
+    !hasGrandTotal && dataRows.length && firstNumIdx >= 0
       ? `<tr class="report-grand-total"><td colspan="${firstNumIdx}" class="lbl-total">TOTAL</td>${columns
           .slice(firstNumIdx)
           .map((c) =>
@@ -4030,6 +4551,13 @@ function buildIncomeTaxReportHtml(data, metadata = {}) {
         .itax-pdf-doc .itax-party-name { font-weight: 700; }
         .itax-pdf-doc .itax-party-sub { color: #444; font-size: 8px; line-height: 1.25; }
         .itax-pdf-doc .itax-schedule-group td { background: #e8eef5; font-weight: 700; padding: 4px 6px; border-top: 2px solid #9ca3af; }
+        .itax-pdf-doc .itax-party-group td { background: #e8eef5; font-weight: 700; padding: 4px 6px; border-top: 2px solid #9ca3af; }
+        .itax-pdf-doc .itax-item-total td { background: #e2e8f0; font-weight: 700; border-top: 1px solid #94a3b8; }
+        .itax-pdf-doc .itax-broker-total td { background: #ecfdf5; font-weight: 700; border-top: 1px solid #86efac; }
+        .itax-pdf-doc .itax-party-total td { background: #dbeafe; font-weight: 700; border-top: 1px solid #93c5fd; }
+        .itax-pdf-doc .itax-book-day-open td { background: #f8fafc; font-weight: 600; }
+        .itax-pdf-doc .itax-book-day-total td { background: #e2e8f0; font-weight: 700; border-top: 1px solid #94a3b8; }
+        .itax-pdf-doc .itax-book-day-close td { background: #f1f5f9; font-weight: 800; border-top: 1px solid #64748b; }
       </style>
       <div class="report-topbar">
         <div class="kicker">INCOME TAX REPORT</div>
@@ -4578,7 +5106,1377 @@ function buildAccountMasterReportHtml(data, metadata = {}) {
   `;
 }
 
+const VOUCHER_PRINT_STYLES = `
+  .vou-print { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; max-width: 210mm; margin: 0 auto; }
+  .vou-print-copy { padding: 8mm 10mm 10mm; page-break-inside: avoid; }
+  .vou-print-copy + .vou-print-copy { border-top: 1px dashed #888; margin-top: 6mm; padding-top: 8mm; }
+  .vou-print-comp { text-align: center; margin-bottom: 6px; }
+  .vou-print-comp h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; }
+  .vou-print-comp .addr { font-size: 10px; line-height: 1.35; margin-top: 2px; }
+  .vou-print-tax { font-size: 9px; line-height: 1.4; margin: 4px 0 6px; }
+  .vou-print-title { text-align: center; font-size: 14px; font-weight: 700; margin: 6px 0 8px; letter-spacing: 0.06em; }
+  .vou-print-meta { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px; }
+  .vou-print-party { font-size: 10px; margin-bottom: 8px; line-height: 1.45; }
+  .vou-print-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  .vou-print-table th, .vou-print-table td { border: 1px solid #333; padding: 4px 6px; vertical-align: top; }
+  .vou-print-table th { background: #f3f3f3; font-weight: 700; }
+  .vou-print-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .vou-print-table tfoot td { font-weight: 700; }
+  .vou-print-words { margin: 8px 0 10px; font-size: 10px; font-weight: 600; }
+  .vou-print-foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 18px; font-size: 10px; }
+  .vou-print-sign { text-align: center; min-width: 120px; }
+  .vou-print-sign .line { border-top: 1px solid #333; margin-top: 28px; padding-top: 3px; }
+  .vou-print-for { text-align: right; font-size: 10px; margin-top: 8px; }
+  .vou-print-part-code { font-weight: 700; }
+  .vou-print-part-name { font-size: 10px; line-height: 1.35; }
+  .vou-print-part-detail { font-size: 9px; color: #444; margin-top: 2px; }
+`;
+
+function fmtVouDate(d) {
+  return escHtml(formatLedgerDateDisplay(d) || d || '');
+}
+
+function formatVoucherParticularsCell(ln) {
+  const code = String(ln?.code ?? '').trim();
+  const name = String(ln?.name ?? '').trim();
+  const detail = String(ln?.detail ?? '').trim();
+  const fallback = String(ln?.particulars ?? '').trim();
+  const main = [code, name].filter(Boolean).join(' ');
+  if (!main) return escHtml(fallback || detail);
+  let html = `<div class="vou-print-part-name">${code ? `<span class="vou-print-part-code">${escHtml(code)}</span> ` : ''}${escHtml(name)}</div>`;
+  if (detail && detail !== name && detail !== main && !main.includes(detail)) {
+    html += `<div class="vou-print-part-detail">${escHtml(detail)}</div>`;
+  }
+  return html;
+}
+
+function buildVoucherSlipHtml(payload, metadata, company) {
+  const lines = payload?.voucher_lines || [];
+  let body = '';
+  for (const ln of lines) {
+    body += `<tr>
+      <td>${formatVoucherParticularsCell(ln)}</td>
+      <td class="num">${formatAmtPdf(ln.dr_amt)}</td>
+      <td class="num">${formatAmtPdf(ln.cr_amt)}</td>
+    </tr>`;
+  }
+  const t = payload?.totals || {};
+  const words = escHtml(rupeesToWords(Math.max(t.dr || 0, t.cr || 0)));
+  const cin = escHtml(company.cin || '');
+  const gst = escHtml(company.gst || '');
+  const addr = [company.add1, company.add2].filter(Boolean).map(escHtml).join(', ');
+  const taxLines = [gst ? `GSTIN: ${gst}` : '', cin ? `CIN: ${cin}` : ''].filter(Boolean).join(' &nbsp;|&nbsp; ');
+  const metaLeft = `Vr.Date: <strong>${fmtVouDate(metadata.vrDate)}</strong>`;
+  const metaRight = `Vr.No.: <strong>${escHtml(metadata.vrNo)}</strong>`;
+
+  return `
+    <div class="vou-print-copy">
+      <div class="vou-print-comp">
+        <h1>${escHtml(company.companyName || metadata.companyName)}</h1>
+        ${addr ? `<div class="addr">${addr}</div>` : ''}
+      </div>
+      <div class="vou-print-title">${escHtml(metadata.documentTitle)}</div>
+      ${taxLines ? `<div class="vou-print-tax" style="text-align:center">${taxLines}</div>` : ''}
+      <div class="vou-print-meta"><span>${metaLeft}</span><span>${metaRight}</span></div>
+      <table class="vou-print-table">
+        <thead><tr><th>PARTICULARS</th><th class="num">Dr.Amount</th><th class="num">Cr.Amount</th></tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot>
+          <tr>
+            <td>TOTAL</td>
+            <td class="num">${formatAmtPdf(t.dr)}</td>
+            <td class="num">${formatAmtPdf(t.cr)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="vou-print-words">${words}</div>
+      <div class="vou-print-for">For ${escHtml(company.companyName || metadata.companyName)}</div>
+      <div class="vou-print-foot">
+        <div class="vou-print-sign"><div class="line">Receiver Signature</div></div>
+        <div class="vou-print-sign"><div class="line">Checked By</div></div>
+        <div class="vou-print-sign"><div class="line">Auth.Signatory</div></div>
+      </div>
+    </div>`;
+}
+
+function buildCashReceiptSlipHtml(payload, metadata, company) {
+  const party = payload?.party || {};
+  const lines = payload?.receipt_lines || [];
+  let body = '';
+  let totCash = 0;
+  for (const ln of lines) {
+    totCash += Number(ln.cash_received ?? 0) || 0;
+    body += `<tr>
+      <td>${fmtVouDate(ln.bill_date)}</td>
+      <td class="num">${escHtml(ln.bill_no)}</td>
+      <td class="num">${formatAmtPdf(ln.bill_amt)}</td>
+      <td class="num">${formatAmtPdf(ln.int_amt)}</td>
+      <td class="num">${formatAmtPdf(ln.total)}</td>
+      <td class="num">${formatAmtPdf(ln.cash_received)}</td>
+    </tr>`;
+  }
+  const words = escHtml(rupeesToWords(totCash || payload?.totals?.amount || 0));
+  const taxLines = [
+    company.cin ? `CIN: ${escHtml(company.cin)}` : '',
+    company.pan ? `PAN: ${escHtml(company.pan)}` : '',
+    company.gst ? `GSTIN: ${escHtml(company.gst)}` : '',
+    company.fssai ? `FSSAI No. ${escHtml(company.fssai)}` : '',
+  ]
+    .filter(Boolean)
+    .join('<br/>');
+  const contact = [company.email, company.tel1, company.tel2].filter(Boolean).map(escHtml).join(' · ');
+  const partyLine = `Party ${escHtml(party.code)} ${escHtml(party.name)} ${escHtml(party.city)}`.trim();
+  const copyHtml = `
+    <div class="vou-print-copy">
+      <div class="vou-print-tax">${taxLines}</div>
+      <div class="vou-print-comp">
+        <h1>${escHtml(company.companyName || metadata.companyName)}</h1>
+        ${contact ? `<div class="addr">${contact}</div>` : ''}
+        ${[company.add1, company.add2].filter(Boolean).length ? `<div class="addr">${[company.add1, company.add2].map(escHtml).join(', ')}</div>` : ''}
+      </div>
+      <div class="vou-print-title">${escHtml(metadata.documentTitle)}</div>
+      <div class="vou-print-meta">
+        <span>Receipt Date: <strong>${fmtVouDate(metadata.vrDate)}</strong></span>
+        <span>Receipt No.: <strong>${escHtml(metadata.receiptNo)}</strong></span>
+      </div>
+      <div class="vou-print-party">
+        <div>${partyLine}</div>
+        ${party.pan ? `<div>Pan: ${escHtml(party.pan)}</div>` : ''}
+      </div>
+      <table class="vou-print-table">
+        <thead>
+          <tr>
+            <th>Bill Date</th><th class="num">Bill No.</th><th class="num">Bill Amount</th>
+            <th class="num">Int. Amount</th><th class="num">Total</th><th class="num">Cash Received</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr><td colspan="5" class="num">TOTAL</td><td class="num">${formatAmtPdf(totCash)}</td></tr></tfoot>
+      </table>
+      <div class="vou-print-words">RS. ${words} ONLY</div>
+      <div style="font-size:9px;margin-top:4px">E. &amp; O.E.</div>
+      <div class="vou-print-for">For ${escHtml(company.companyName || metadata.companyName)}</div>
+      <div class="vou-print-foot">
+        <div>Prepared By <strong>${escHtml(metadata.preparedBy || '')}</strong></div>
+        <div class="vou-print-sign"><div class="line">Auth. Signatory</div></div>
+      </div>
+    </div>`;
+  return copyHtml + copyHtml;
+}
+
+function buildVoucherPrintHtml(payload, metadata) {
+  const company = metadata?.company || {};
+  const inner =
+    metadata?.isReceipt || payload?.format === 'receipt'
+      ? buildCashReceiptSlipHtml(payload, metadata, company)
+      : buildVoucherSlipHtml(payload, metadata, company);
+  return `
+    <div class="vou-print report-doc">
+      <style>${PDF_REPORT_STYLES}${VOUCHER_PRINT_STYLES}</style>
+      ${inner}
+    </div>`;
+}
+
+function buildSinglePurchaseOrderPrintCopy(order, company, metadata) {
+  const h = order?.header || {};
+  const lines = Array.isArray(order?.lines) ? order.lines : [];
+  const t = order?.totals || {};
+  const compName = escHtml(company.companyName || metadata.companyName || '');
+  const slogan = escHtml(company.billSlogan || '');
+  const bHeader = escHtml(company.bHeader || '');
+  const addr1 = escHtml(company.add1 || '');
+  const addr2 = escHtml(company.add2 || '');
+  const gst = escHtml(company.gst || '');
+  const email = escHtml(company.email || '');
+  const pan = escHtml(company.pan || '');
+  const tel1 = escHtml(company.tel1 || '');
+  const tel2 = escHtml(company.tel2 || '');
+  const tel3 = escHtml(company.tel3 || '');
+  const cin = escHtml(company.cin || '');
+  const phLine = [tel1, tel2].filter(Boolean).join(', ');
+  const partyCity = [h.add3, h.city].map((v) => String(v || '').trim()).filter(Boolean).join(' ');
+  const partyAddr = [h.add1, h.add2, partyCity].map((v) => String(v || '').trim()).filter(Boolean);
+
+  let body = '';
+  for (const ln of lines) {
+    const unit = String(ln.status_unit || '').trim();
+    const qtyLabel = unit ? `${formatAmtPdf(ln.qnty, 0)} ${escHtml(unit)}` : formatAmtPdf(ln.qnty, 0);
+    const particulars = `${String(ln.trn_no ?? '').trim()} ${String(ln.item_name || '').trim()}`.trim();
+    body += `<tr>
+      <td>${escHtml(particulars)}</td>
+      <td>${escHtml(ln.hsn_code || '')}</td>
+      <td class="num">${qtyLabel}</td>
+      <td class="num">${formatAmtPdf(ln.weight, 3)}</td>
+      <td class="num">${formatAmtPdf(ln.rate)}</td>
+      <td class="num">${formatAmtPdf(ln.amount)}</td>
+    </tr>`;
+  }
+
+  const pmtDueRow =
+    h.show_pmt_due !== false && h.pmt_due_date
+      ? `<tr><td class="po-print-meta__label">Pmt. Due Date</td><td class="po-print-meta__val">${escHtml(toDisplayDate(h.pmt_due_date) || h.pmt_due_date)}</td></tr>`
+      : '';
+
+  return `
+    <div class="po-print-copy">
+      <table class="po-print-top">
+        <tr>
+          <td class="po-print-top__side">
+            ${gst ? `<div>GSTIN: ${gst}</div>` : ''}
+            ${email ? `<div>EMAIL: ${email}</div>` : ''}
+            ${pan ? `<div>PAN: ${pan}</div>` : ''}
+          </td>
+          <td class="po-print-top__title">PURCHASE ORDER</td>
+          <td class="po-print-top__side po-print-top__side--right">
+            ${phLine ? `<div>PH: ${phLine}</div>` : ''}
+            ${tel3 ? `<div>FAX: ${tel3}</div>` : ''}
+            ${cin ? `<div>CIN: ${cin}</div>` : ''}
+          </td>
+        </tr>
+      </table>
+      <div class="po-print-company">
+        ${slogan ? `<div class="po-print-slogan">${slogan}</div>` : ''}
+        <div class="po-print-company__name">${compName}</div>
+        ${bHeader ? `<div class="po-print-company__tag">${bHeader}</div>` : ''}
+        ${addr1 ? `<div>${addr1}</div>` : ''}
+        ${addr2 ? `<div>${addr2}</div>` : ''}
+      </div>
+      <div class="po-print-party-row">
+        <div class="po-print-party">
+          <div>M/s <strong>${escHtml(h.party_name || '')}</strong></div>
+          ${partyAddr.map((line) => `<div>${escHtml(line)}</div>`).join('')}
+          <div>Tel: ${escHtml(h.tel_no || '')}</div>
+          <div>GSTIN: ${escHtml(h.gst_no || '')}</div>
+          ${h.bk_name ? `<div>Broker: <strong>${escHtml(h.bk_name)}</strong></div>` : ''}
+        </div>
+        <table class="po-print-meta">
+          <tr class="po-print-meta__head"><td class="po-print-meta__label">Order No.</td><td class="po-print-meta__val">${escHtml(h.so_no)}</td></tr>
+          <tr class="po-print-meta__head"><td class="po-print-meta__label">Dated</td><td class="po-print-meta__val">${escHtml(toDisplayDate(h.so_date) || h.so_date)}</td></tr>
+          <tr><td class="po-print-meta__label">Delv. Due Date</td><td class="po-print-meta__val">${escHtml(toDisplayDate(h.delv_date) || h.delv_date)}</td></tr>
+          ${pmtDueRow}
+        </table>
+      </div>
+      <table class="po-print-table">
+        <thead>
+          <tr>
+            <th>Particulars</th>
+            <th>HsnCode</th>
+            <th class="num">Qty.</th>
+            <th class="num">Weight</th>
+            <th class="num">Rate</th>
+            <th class="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2"><strong>TOTAL</strong></td>
+            <td class="num"><strong>${formatAmtPdf(t.qnty, 0)}</strong></td>
+            <td class="num"><strong>${formatAmtPdf(t.weight, 3)}</strong></td>
+            <td></td>
+            <td class="num"><strong>${formatAmtPdf(t.amount)}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="po-print-footer">
+        <div class="po-print-footer__left">
+          ${h.po_no ? `<div>P.O.No.: ${escHtml(h.po_no)}</div>` : ''}
+          ${h.p_condition ? `<div>Payment Condition: ${escHtml(h.p_condition)}</div>` : ''}
+          ${h.delv_mth ? `<div>Delivery Month: ${escHtml(h.delv_mth)}</div>` : ''}
+          ${h.remarks ? `<div>Remarks: ${escHtml(h.remarks)}</div>` : ''}
+          ${h.remarks2 ? `<div>${escHtml(h.remarks2)}</div>` : ''}
+          ${h.remarks3 ? `<div>${escHtml(h.remarks3)}</div>` : ''}
+        </div>
+        <div class="po-print-footer__sign">
+          <div>For ${compName}</div>
+          <div class="po-print-footer__sign-line">Auth.Signatory</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+const PO_PRINT_STYLES = `
+  .po-print { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #111; }
+  .po-print-copy { page-break-after: always; }
+  .po-print-copy:last-child { page-break-after: auto; }
+  .po-print-top { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+  .po-print-top td { vertical-align: top; border: none; padding: 0 2px; font-size: 8.5px; line-height: 1.25; }
+  .po-print-top__title { text-align: center; font-size: 13px; font-weight: 700; letter-spacing: 0.5px; }
+  .po-print-top__side { width: 32%; }
+  .po-print-top__side--right { text-align: right; }
+  .po-print-company { text-align: center; margin: 2px 0 8px; line-height: 1.25; }
+  .po-print-slogan { font-size: 9px; font-weight: 600; }
+  .po-print-company__name { font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .po-print-company__tag { font-size: 10px; font-weight: 700; margin-top: 1px; }
+  .po-print-party-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 6px; }
+  .po-print-party { flex: 1; min-width: 0; line-height: 1.35; font-size: 9.5px; }
+  .po-print-meta { width: 190px; border-collapse: collapse; font-size: 9px; flex-shrink: 0; }
+  .po-print-meta td { border: 1px solid #999; padding: 2px 5px; }
+  .po-print-meta__head { background: #d9d9d9; }
+  .po-print-meta__label { font-weight: 600; width: 52%; }
+  .po-print-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 2px; }
+  .po-print-table th, .po-print-table td { border: 1px solid #999; padding: 2px 4px; vertical-align: top; }
+  .po-print-table thead th { background: #d9d9d9; font-weight: 700; }
+  .po-print-table tfoot td { border-top: 2px solid #666; }
+  .po-print-table .num { text-align: right; white-space: nowrap; }
+  .po-print-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 9px; line-height: 1.35; }
+  .po-print-footer__left { flex: 1; min-width: 0; }
+  .po-print-footer__sign { width: 180px; text-align: right; }
+  .po-print-footer__sign-line { margin-top: 42px; font-weight: 600; }
+`;
+
+function buildPurchaseOrderPrintHtml(payload, metadata) {
+  const company = metadata?.company || {};
+  const orders = Array.isArray(payload?.orders)
+    ? payload.orders
+    : payload?.header
+      ? [{ header: payload.header, lines: payload.lines || [], totals: payload.totals || {} }]
+      : [];
+  const copies = orders.map((order) => buildSinglePurchaseOrderPrintCopy(order, company, metadata)).join('');
+  return `
+    <div class="vou-print po-print report-doc">
+      <style>${PDF_REPORT_STYLES}${PO_PRINT_STYLES}</style>
+      ${copies || '<div class="voucher-help-modal__msg">No purchase orders to print.</div>'}
+    </div>`;
+}
+
+function buildPurchaseOrderPendingSummaryHtml(payload, metadata = {}) {
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(payload?.head_name || metadata.reportTitle || 'PENDING PURCHASE ORDER LIST');
+  const period = escHtml(
+    metadata.period || `FROM ${formatLedgerDateDisplay(payload?.s_date) || payload?.s_date || '—'} TO ${formatLedgerDateDisplay(payload?.e_date) || payload?.e_date || '—'}`
+  );
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const grand = payload?.grand || {};
+
+  const sumFields = (list, keys) => {
+    const t = {};
+    for (const k of keys) t[k] = 0;
+    for (const r of list) for (const k of keys) t[k] += Number(r[k]) || 0;
+    return t;
+  };
+  const qtyKeys = ['oqty', 'rqty', 'bqty', 'owgt', 'rwgt', 'bwgt'];
+
+  let body = '';
+  let currentCode = null;
+  let currentItem = null;
+  let itemRows = [];
+  let supplierRows = [];
+
+  const itemTotalRow = (list, label) => {
+    const t = sumFields(list, qtyKeys);
+    return `<tr class="po-pnd-total"><td colspan="5"><strong>${label}</strong></td>
+      <td class="num">${formatAmtPdf(t.oqty, 0)}</td><td class="num">${formatAmtPdf(t.rqty, 0)}</td><td class="num">${formatAmtPdf(t.bqty, 0)}</td>
+      <td class="num">${formatAmtPdf(t.owgt, 3)}</td><td class="num">${formatAmtPdf(t.rwgt, 3)}</td><td class="num">${formatAmtPdf(t.bwgt, 3)}</td><td></td></tr>`;
+  };
+
+  const flushItem = () => {
+    if (itemRows.length) body += itemTotalRow(itemRows, 'ITEM TOTAL');
+    itemRows = [];
+  };
+  const flushSupplier = () => {
+    flushItem();
+    if (supplierRows.length) body += itemTotalRow(supplierRows, 'SUPPLIER TOTAL');
+    supplierRows = [];
+  };
+
+  for (const r of rows) {
+    if (currentCode !== r.code) {
+      flushSupplier();
+      currentCode = r.code;
+      currentItem = null;
+      supplierRows = [];
+      body += `<tr class="po-pnd-party"><td colspan="11"><strong>${escHtml(r.name)}</strong>${r.bk_name ? ` &nbsp; Broker: ${escHtml(r.bk_name)}` : ''}${r.sup_name ? ` &nbsp; Supplier: ${escHtml(r.sup_name)}` : ''}</td></tr>`;
+    }
+    if (currentItem !== r.item_code) {
+      flushItem();
+      currentItem = r.item_code;
+      itemRows = [];
+    }
+    itemRows.push(r);
+    supplierRows.push(r);
+    body += `<tr>
+      <td>${escHtml(r.item_name)}</td>
+      <td>${escHtml(r.loc_code)}</td>
+      <td>${escHtml(r.god_code)}</td>
+      <td>${escHtml(formatLedgerDateDisplay(r.so_date) || r.so_date)}</td>
+      <td class="num">${escHtml(r.so_no)}</td>
+      <td class="num">${formatAmtPdf(r.oqty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.rqty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.bqty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.owgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.rwgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.bwgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.rate)}</td>
+    </tr>`;
+    if (r.remarks || r.delv_mth) {
+      body += `<tr class="po-pnd-sub"><td colspan="11">${r.remarks ? `Remarks: ${escHtml(r.remarks)}` : ''}${r.delv_mth ? ` &nbsp; Delv.Mth: ${escHtml(r.delv_mth)}` : ''}</td></tr>`;
+    }
+  }
+  flushSupplier();
+
+  return `
+    <div class="report-doc po-pnd">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .po-pnd.report-doc { border: 1px solid #c8c8c8; padding: 10px 12px; font-size: 8.5px; }
+        .po-pnd-header { text-align: center; margin-bottom: 8px; }
+        .po-pnd-company { font-size: 14px; font-weight: 700; text-transform: uppercase; }
+        .po-pnd-title { font-size: 13px; font-weight: 700; margin-top: 2px; }
+        .po-pnd-period { font-size: 9px; margin-top: 3px; }
+        .po-pnd-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .po-pnd-table th, .po-pnd-table td { border: 1px solid #bbb; padding: 2px 3px; vertical-align: top; word-break: break-word; }
+        .po-pnd-table thead th { background: #d9d9d9; font-weight: 700; }
+        .po-pnd-table .num { text-align: right; white-space: nowrap; }
+        .po-pnd-party td { background: #eef2ff; font-weight: 600; }
+        .po-pnd-total td { font-weight: 700; background: #f8fafc; border-top: 2px solid #666; }
+        .po-pnd-sub td { font-size: 8px; color: #444; border-top: none; }
+        .po-pnd-grand td { font-weight: 700; background: #e2e8f0; }
+      </style>
+      <div class="po-pnd report-doc">
+        <div class="po-pnd-header">
+          <div class="po-pnd-company">${company}</div>
+          <div class="po-pnd-title">${title}</div>
+          <div class="po-pnd-period">${period}</div>
+        </div>
+        <table class="po-pnd-table">
+          <thead>
+            <tr>
+              <th rowspan="2">Item Name</th><th rowspan="2">Loc.</th><th rowspan="2">God.</th>
+              <th rowspan="2">So.Date</th><th rowspan="2">So.No.</th>
+              <th colspan="3">Qty.</th><th colspan="3">Weight</th><th rowspan="2">Rate</th>
+            </tr>
+            <tr>
+              <th class="num">Oqty.</th><th class="num">SQty.</th><th class="num">BQty.</th>
+              <th class="num">OWgt.</th><th class="num">SWgt.</th><th class="num">BWgt.</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="12">(No rows)</td></tr>'}</tbody>
+          <tfoot>
+            <tr class="po-pnd-grand">
+              <td colspan="5"><strong>TOTAL</strong></td>
+              <td class="num">${formatAmtPdf(grand.oqty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.rqty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.bqty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.owgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.rwgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.bwgt, 3)}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+}
+
+function buildPurchaseOrderPendingDetailHtml(payload, metadata = {}) {
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(payload?.head_name || metadata.reportTitle || 'PENDING PURCHASE ORDER LIST');
+  const period = escHtml(
+    metadata.period || `FROM ${formatLedgerDateDisplay(payload?.s_date) || payload?.s_date || '—'} TO ${formatLedgerDateDisplay(payload?.e_date) || payload?.e_date || '—'}`
+  );
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const grand = payload?.grand || {};
+  const qtyKeys = ['so_qty', 'sl_qty', 'bqty', 'so_wgt', 'sl_wgt', 'bwgt'];
+
+  const sumFields = (list, keys) => {
+    const t = {};
+    for (const k of keys) t[k] = 0;
+    for (const r of list) for (const k of keys) t[k] += Number(r[k]) || 0;
+    return t;
+  };
+
+  let body = '';
+  let currentCode = null;
+  let currentSo = null;
+  let orderRows = [];
+  let supplierRows = [];
+
+  const totalRow = (list, label, colspan = 7) => {
+    const t = sumFields(list, qtyKeys);
+    return `<tr class="po-pnd-total"><td colspan="${colspan}"><strong>${label}</strong></td>
+      <td class="num">${formatAmtPdf(t.so_qty, 0)}</td><td class="num">${formatAmtPdf(t.sl_qty, 0)}</td><td class="num">${formatAmtPdf(t.bqty, 0)}</td>
+      <td class="num">${formatAmtPdf(t.so_wgt, 3)}</td><td class="num">${formatAmtPdf(t.sl_wgt, 3)}</td><td class="num">${formatAmtPdf(t.bwgt, 3)}</td><td></td><td></td></tr>`;
+  };
+
+  const flushOrder = () => {
+    if (orderRows.length) body += totalRow(orderRows, `ORDER TOTAL — ${currentSo}`);
+    orderRows = [];
+  };
+  const flushSupplier = () => {
+    flushOrder();
+    if (supplierRows.length) body += totalRow(supplierRows, 'SUPPLIER TOTAL');
+    supplierRows = [];
+  };
+
+  for (const r of rows) {
+    if (currentCode !== r.code) {
+      flushSupplier();
+      currentCode = r.code;
+      currentSo = null;
+      supplierRows = [];
+      body += `<tr class="po-pnd-party"><td colspan="14"><strong>${escHtml(r.name)}</strong></td></tr>`;
+    }
+    if (currentSo !== null && r.so_no !== currentSo) flushOrder();
+    currentSo = r.so_no;
+    orderRows.push(r);
+    supplierRows.push(r);
+    const billNo = r.m_type === 1 ? '' : r.bill_no || String(r.r_no || '');
+    body += `<tr>
+      <td>${escHtml(r.item_name)}</td>
+      <td>${escHtml(formatLedgerDateDisplay(r.so_date) || r.so_date)}</td>
+      <td class="num">${escHtml(r.so_no)}</td>
+      <td>${escHtml(r.loc_code)}</td>
+      <td>${escHtml(r.god_code)}</td>
+      <td>${escHtml(billNo)}</td>
+      <td>${escHtml(r.status)}</td>
+      <td class="num">${formatAmtPdf(r.so_qty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.sl_qty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.bqty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.so_wgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.sl_wgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.bwgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.rate)}</td>
+      <td>${escHtml(r.bk_name)}</td>
+    </tr>`;
+  }
+  flushSupplier();
+
+  return `
+    <div class="report-doc po-pnd">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .po-pnd.report-doc { border: 1px solid #c8c8c8; padding: 10px 12px; font-size: 8px; }
+        .po-pnd-header { text-align: center; margin-bottom: 8px; }
+        .po-pnd-company { font-size: 14px; font-weight: 700; text-transform: uppercase; }
+        .po-pnd-title { font-size: 13px; font-weight: 700; margin-top: 2px; }
+        .po-pnd-period { font-size: 9px; margin-top: 3px; }
+        .po-pnd-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .po-pnd-table th, .po-pnd-table td { border: 1px solid #bbb; padding: 2px 3px; vertical-align: top; word-break: break-word; }
+        .po-pnd-table thead th { background: #d9d9d9; font-weight: 700; }
+        .po-pnd-table .num { text-align: right; white-space: nowrap; }
+        .po-pnd-party td { background: #eef2ff; font-weight: 600; }
+        .po-pnd-total td { font-weight: 700; background: #f8fafc; border-top: 2px solid #666; }
+        .po-pnd-grand td { font-weight: 700; background: #e2e8f0; }
+      </style>
+      <div class="po-pnd report-doc">
+        <div class="po-pnd-header">
+          <div class="po-pnd-company">${company}</div>
+          <div class="po-pnd-title">${title}</div>
+          <div class="po-pnd-period">${period}</div>
+        </div>
+        <table class="po-pnd-table">
+          <thead>
+            <tr>
+              <th>Item Name</th><th>Date</th><th>So.No.</th><th>Loc</th><th>God</th><th>B.No.</th><th>B/K/H</th>
+              <th class="num">OQTY.</th><th class="num">SQTY.</th><th class="num">BQTY.</th>
+              <th class="num">OWgt.</th><th class="num">SWgt.</th><th class="num">BWgt.</th><th class="num">Rate</th><th>Broker</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="15">(No rows)</td></tr>'}</tbody>
+          <tfoot>
+            <tr class="po-pnd-grand">
+              <td colspan="7"><strong>TOTAL</strong></td>
+              <td class="num">${formatAmtPdf(grand.so_qty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.sl_qty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.bqty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.so_wgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.sl_wgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.bwgt, 3)}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+}
+
+function buildSalesOrderPendingSummaryHtml(payload, metadata = {}) {
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(payload?.head_name || metadata.reportTitle || 'PENDING SALES ORDER LIST');
+  const period = escHtml(
+    metadata.period || `FROM ${formatLedgerDateDisplay(payload?.s_date) || payload?.s_date || '—'} TO ${formatLedgerDateDisplay(payload?.e_date) || payload?.e_date || '—'}`
+  );
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const grand = payload?.grand || {};
+
+  const sumFields = (list, keys) => {
+    const t = {};
+    for (const k of keys) t[k] = 0;
+    for (const r of list) for (const k of keys) t[k] += Number(r[k]) || 0;
+    return t;
+  };
+  const qtyKeys = ['oqty', 'rqty', 'bqty', 'owgt', 'rwgt', 'bwgt'];
+
+  let body = '';
+  let currentCode = null;
+  let currentItem = null;
+  let itemRows = [];
+  let partyRows = [];
+
+  const itemTotalRow = (list, label) => {
+    const t = sumFields(list, qtyKeys);
+    return `<tr class="so-pnd-total"><td colspan="4"><strong>${label}</strong></td>
+      <td class="num">${formatAmtPdf(t.oqty, 0)}</td><td class="num">${formatAmtPdf(t.rqty, 0)}</td><td class="num">${formatAmtPdf(t.bqty, 0)}</td>
+      <td class="num">${formatAmtPdf(t.owgt, 3)}</td><td class="num">${formatAmtPdf(t.rwgt, 3)}</td><td class="num">${formatAmtPdf(t.bwgt, 3)}</td><td></td></tr>`;
+  };
+
+  const flushItem = () => {
+    if (itemRows.length) body += itemTotalRow(itemRows, 'ITEM TOTAL');
+    itemRows = [];
+  };
+  const flushParty = () => {
+    flushItem();
+    if (partyRows.length) body += itemTotalRow(partyRows, 'PARTY TOTAL');
+    partyRows = [];
+  };
+
+  for (const r of rows) {
+    if (currentCode !== r.code) {
+      flushParty();
+      currentCode = r.code;
+      currentItem = null;
+      partyRows = [];
+      body += `<tr class="so-pnd-party"><td colspan="11"><strong>${escHtml(r.name)}</strong>${r.bk_name ? ` &nbsp; Broker: ${escHtml(r.bk_name)}` : ''}</td></tr>`;
+    }
+    if (currentItem !== r.item_code) {
+      flushItem();
+      currentItem = r.item_code;
+      itemRows = [];
+    }
+    itemRows.push(r);
+    partyRows.push(r);
+    body += `<tr>
+      <td>${escHtml(r.item_name)}</td>
+      <td>${escHtml(r.god_code)}</td>
+      <td>${escHtml(formatLedgerDateDisplay(r.so_date) || r.so_date)}</td>
+      <td class="num">${escHtml(r.so_no)}</td>
+      <td class="num">${formatAmtPdf(r.oqty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.rqty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.bqty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.owgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.rwgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.bwgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.rate)}</td>
+    </tr>`;
+    if (r.remarks || r.delv_city) {
+      body += `<tr class="so-pnd-sub"><td colspan="11">${r.remarks ? `Remarks: ${escHtml(r.remarks)}` : ''}${r.delv_city ? ` &nbsp; Delv.Station: ${escHtml(r.delv_city)}` : ''}</td></tr>`;
+    }
+  }
+  flushParty();
+
+  return `
+    <div class="report-doc so-pnd">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .so-pnd.report-doc { border: 1px solid #c8c8c8; padding: 10px 12px; font-size: 8.5px; }
+        .so-pnd-header { text-align: center; margin-bottom: 8px; }
+        .so-pnd-company { font-size: 14px; font-weight: 700; text-transform: uppercase; }
+        .so-pnd-title { font-size: 13px; font-weight: 700; margin-top: 2px; }
+        .so-pnd-period { font-size: 9px; margin-top: 3px; }
+        .so-pnd-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .so-pnd-table th, .so-pnd-table td { border: 1px solid #bbb; padding: 2px 3px; vertical-align: top; word-break: break-word; }
+        .so-pnd-table thead th { background: #d9d9d9; font-weight: 700; }
+        .so-pnd-table .num { text-align: right; white-space: nowrap; }
+        .so-pnd-party td { background: #eef2ff; font-weight: 600; }
+        .so-pnd-total td { font-weight: 700; background: #f8fafc; border-top: 2px solid #666; }
+        .so-pnd-sub td { font-size: 8px; color: #444; border-top: none; }
+        .so-pnd-grand td { font-weight: 700; background: #e2e8f0; }
+      </style>
+      <div class="so-pnd report-doc">
+        <div class="so-pnd-header">
+          <div class="so-pnd-company">${company}</div>
+          <div class="so-pnd-title">${title}</div>
+          <div class="so-pnd-period">${period}</div>
+        </div>
+        <table class="so-pnd-table">
+          <thead>
+            <tr>
+              <th rowspan="2">Item Name</th><th rowspan="2">God.</th>
+              <th rowspan="2">So.Date</th><th rowspan="2">So.No.</th>
+              <th colspan="3">Qty.</th><th colspan="3">Weight</th><th rowspan="2">Rate</th>
+            </tr>
+            <tr>
+              <th class="num">Oqty.</th><th class="num">SQty.</th><th class="num">BQty.</th>
+              <th class="num">OWgt.</th><th class="num">SWgt.</th><th class="num">BWgt.</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="11">(No rows)</td></tr>'}</tbody>
+          <tfoot>
+            <tr class="so-pnd-grand">
+              <td colspan="4"><strong>TOTAL</strong></td>
+              <td class="num">${formatAmtPdf(grand.oqty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.rqty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.bqty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.owgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.rwgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.bwgt, 3)}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+}
+
+function buildSalesOrderPendingDetailHtml(payload, metadata = {}) {
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(payload?.head_name || metadata.reportTitle || 'PENDING SALES ORDER LIST');
+  const period = escHtml(
+    metadata.period || `FROM ${formatLedgerDateDisplay(payload?.s_date) || payload?.s_date || '—'} TO ${formatLedgerDateDisplay(payload?.e_date) || payload?.e_date || '—'}`
+  );
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const grand = payload?.grand || {};
+  const qtyKeys = ['so_qty', 'sl_qty', 'bqty', 'so_wgt', 'sl_wgt', 'bwgt'];
+
+  const sumFields = (list, keys) => {
+    const t = {};
+    for (const k of keys) t[k] = 0;
+    for (const r of list) for (const k of keys) t[k] += Number(r[k]) || 0;
+    return t;
+  };
+
+  let body = '';
+  let currentCode = null;
+  let currentSo = null;
+  let orderRows = [];
+  let partyRows = [];
+
+  const totalRow = (list, label, colspan = 6) => {
+    const t = sumFields(list, qtyKeys);
+    return `<tr class="so-pnd-total"><td colspan="${colspan}"><strong>${label}</strong></td>
+      <td class="num">${formatAmtPdf(t.so_qty, 0)}</td><td class="num">${formatAmtPdf(t.sl_qty, 0)}</td><td class="num">${formatAmtPdf(t.bqty, 0)}</td>
+      <td class="num">${formatAmtPdf(t.so_wgt, 3)}</td><td class="num">${formatAmtPdf(t.sl_wgt, 3)}</td><td class="num">${formatAmtPdf(t.bwgt, 3)}</td><td></td><td></td></tr>`;
+  };
+
+  const flushOrder = () => {
+    if (orderRows.length) body += totalRow(orderRows, `ORDER TOTAL — ${currentSo}`);
+    orderRows = [];
+  };
+  const flushParty = () => {
+    flushOrder();
+    if (partyRows.length) body += totalRow(partyRows, 'PARTY TOTAL');
+    partyRows = [];
+  };
+
+  for (const r of rows) {
+    if (currentCode !== r.code) {
+      flushParty();
+      currentCode = r.code;
+      currentSo = null;
+      partyRows = [];
+      body += `<tr class="so-pnd-party"><td colspan="14"><strong>${escHtml(r.name)}</strong></td></tr>`;
+    }
+    if (currentSo !== null && r.so_no !== currentSo) flushOrder();
+    currentSo = r.so_no;
+    orderRows.push(r);
+    partyRows.push(r);
+    const billNo = r.m_type === 1 ? '' : String(r.bill_no || '');
+    body += `<tr>
+      <td>${escHtml(r.item_name)}</td>
+      <td>${escHtml(formatLedgerDateDisplay(r.so_date) || r.so_date)}</td>
+      <td class="num">${escHtml(r.so_no)}</td>
+      <td>${escHtml(r.god_code)}</td>
+      <td>${escHtml(billNo)}</td>
+      <td>${escHtml(r.status)}</td>
+      <td class="num">${formatAmtPdf(r.so_qty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.sl_qty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.bqty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.so_wgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.sl_wgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.bwgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.rate)}</td>
+      <td>${escHtml(r.bk_name)}</td>
+    </tr>`;
+  }
+  flushParty();
+
+  return `
+    <div class="report-doc so-pnd">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .so-pnd.report-doc { border: 1px solid #c8c8c8; padding: 10px 12px; font-size: 8px; }
+        .so-pnd-header { text-align: center; margin-bottom: 8px; }
+        .so-pnd-company { font-size: 14px; font-weight: 700; text-transform: uppercase; }
+        .so-pnd-title { font-size: 13px; font-weight: 700; margin-top: 2px; }
+        .so-pnd-period { font-size: 9px; margin-top: 3px; }
+        .so-pnd-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .so-pnd-table th, .so-pnd-table td { border: 1px solid #bbb; padding: 2px 3px; vertical-align: top; word-break: break-word; }
+        .so-pnd-table thead th { background: #d9d9d9; font-weight: 700; }
+        .so-pnd-table .num { text-align: right; white-space: nowrap; }
+        .so-pnd-party td { background: #eef2ff; font-weight: 600; }
+        .so-pnd-total td { font-weight: 700; background: #f8fafc; border-top: 2px solid #666; }
+        .so-pnd-grand td { font-weight: 700; background: #e2e8f0; }
+      </style>
+      <div class="so-pnd report-doc">
+        <div class="so-pnd-header">
+          <div class="so-pnd-company">${company}</div>
+          <div class="so-pnd-title">${title}</div>
+          <div class="so-pnd-period">${period}</div>
+        </div>
+        <table class="so-pnd-table">
+          <thead>
+            <tr>
+              <th>Item Name</th><th>Date</th><th>So.No.</th><th>God</th><th>B.No.</th><th>B/K/H</th>
+              <th class="num">OQTY.</th><th class="num">SQTY.</th><th class="num">BQTY.</th>
+              <th class="num">OWgt.</th><th class="num">SWgt.</th><th class="num">BWgt.</th><th class="num">Rate</th><th>Broker</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="14">(No rows)</td></tr>'}</tbody>
+          <tfoot>
+            <tr class="so-pnd-grand">
+              <td colspan="6"><strong>TOTAL</strong></td>
+              <td class="num">${formatAmtPdf(grand.so_qty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.sl_qty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.bqty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.so_wgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.sl_wgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.bwgt, 3)}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+}
+
+function buildSalesOrderPendingSoDoSaleHtml(payload, metadata = {}) {
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(payload?.head_name || metadata.reportTitle || 'PENDING SALES ORDER LIST');
+  const period = escHtml(
+    metadata.period || `FROM ${formatLedgerDateDisplay(payload?.s_date) || payload?.s_date || '—'} TO ${formatLedgerDateDisplay(payload?.e_date) || payload?.e_date || '—'}`
+  );
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const grand = payload?.grand || {};
+  const qtyKeys = ['so_qty', 'do_qty', 'sl_qty', 'bqty', 'bqty_so_do', 'so_wgt', 'do_wgt', 'sl_wgt', 'bwgt', 'bwgt_so_do'];
+
+  const sumFields = (list, keys) => {
+    const t = {};
+    for (const k of keys) t[k] = 0;
+    for (const r of list) for (const k of keys) t[k] += Number(r[k]) || 0;
+    return t;
+  };
+
+  let body = '';
+  let currentCode = null;
+  let currentSo = null;
+  let orderRows = [];
+  let partyRows = [];
+
+  const totalRow = (list, label, colspan = 6) => {
+    const t = sumFields(list, qtyKeys);
+    return `<tr class="so-pnd-total"><td colspan="${colspan}"><strong>${label}</strong></td>
+      <td class="num">${formatAmtPdf(t.so_qty, 0)}</td><td class="num">${formatAmtPdf(t.do_qty, 0)}</td><td class="num">${formatAmtPdf(t.sl_qty, 0)}</td><td class="num">${formatAmtPdf(t.bqty, 0)}</td><td class="num">${formatAmtPdf(t.bqty_so_do, 0)}</td>
+      <td class="num">${formatAmtPdf(t.so_wgt, 3)}</td><td class="num">${formatAmtPdf(t.do_wgt, 3)}</td><td class="num">${formatAmtPdf(t.sl_wgt, 3)}</td><td class="num">${formatAmtPdf(t.bwgt, 3)}</td><td class="num">${formatAmtPdf(t.bwgt_so_do, 3)}</td><td></td><td></td></tr>`;
+  };
+
+  const flushOrder = () => {
+    if (orderRows.length) body += totalRow(orderRows, `ORDER TOTAL — ${currentSo}`);
+    orderRows = [];
+  };
+  const flushParty = () => {
+    flushOrder();
+    if (partyRows.length) body += totalRow(partyRows, 'PARTY TOTAL');
+    partyRows = [];
+  };
+
+  for (const r of rows) {
+    if (currentCode !== r.code) {
+      flushParty();
+      currentCode = r.code;
+      currentSo = null;
+      partyRows = [];
+      body += `<tr class="so-pnd-party"><td colspan="19"><strong>${escHtml(r.name)}</strong></td></tr>`;
+    }
+    if (currentSo !== null && r.so_no !== currentSo) flushOrder();
+    currentSo = r.so_no;
+    orderRows.push(r);
+    partyRows.push(r);
+    const billNo = r.m_type === 1 ? '' : String(r.bill_no || '');
+    body += `<tr>
+      <td>${escHtml(r.item_name)}</td>
+      <td>${escHtml(formatLedgerDateDisplay(r.so_date) || r.so_date)}</td>
+      <td class="num">${escHtml(r.so_no)}</td>
+      <td>${escHtml(r.god_code)}</td>
+      <td>${escHtml(billNo)}</td>
+      <td>${escHtml(r.status)}</td>
+      <td class="num">${formatAmtPdf(r.so_qty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.do_qty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.sl_qty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.bqty, 0)}</td>
+      <td class="num">${formatAmtPdf(r.bqty_so_do, 0)}</td>
+      <td class="num">${formatAmtPdf(r.so_wgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.do_wgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.sl_wgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.bwgt, 3)}</td>
+      <td class="num">${formatAmtPdf(r.bwgt_so_do, 3)}</td>
+      <td>${escHtml(r.valid_date || '')}</td>
+      <td class="num">${formatAmtPdf(r.rate)}</td>
+      <td>${escHtml(r.bk_name)}</td>
+    </tr>`;
+  }
+  flushParty();
+
+  return `
+    <div class="report-doc so-pnd">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .so-pnd.report-doc { border: 1px solid #c8c8c8; padding: 10px 12px; font-size: 8px; }
+        .so-pnd-header { text-align: center; margin-bottom: 8px; }
+        .so-pnd-company { font-size: 14px; font-weight: 700; text-transform: uppercase; }
+        .so-pnd-title { font-size: 13px; font-weight: 700; margin-top: 2px; }
+        .so-pnd-period { font-size: 9px; margin-top: 3px; }
+        .so-pnd-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .so-pnd-table th, .so-pnd-table td { border: 1px solid #bbb; padding: 2px 3px; vertical-align: top; word-break: break-word; }
+        .so-pnd-table thead th { background: #d9d9d9; font-weight: 700; }
+        .so-pnd-table .num { text-align: right; white-space: nowrap; }
+        .so-pnd-party td { background: #eef2ff; font-weight: 600; }
+        .so-pnd-total td { font-weight: 700; background: #f8fafc; border-top: 2px solid #666; }
+        .so-pnd-grand td { font-weight: 700; background: #e2e8f0; }
+      </style>
+      <div class="so-pnd report-doc">
+        <div class="so-pnd-header">
+          <div class="so-pnd-company">${company}</div>
+          <div class="so-pnd-title">${title} (SO/DO/SALE)</div>
+          <div class="so-pnd-period">${period}</div>
+        </div>
+        <table class="so-pnd-table">
+          <thead>
+            <tr>
+              <th>Item Name</th><th>Date</th><th>So.No.</th><th>God</th><th>B.No.</th><th>B/K/H</th>
+              <th class="num">SO Qty</th><th class="num">DO Qty</th><th class="num">SL Qty</th><th class="num">BQty So-Sl</th><th class="num">BQty So-Do</th>
+              <th class="num">SO Wgt</th><th class="num">DO Wgt</th><th class="num">SL Wgt</th><th class="num">BWgt So-Sl</th><th class="num">BWgt So-Do</th><th>Valid Date</th><th class="num">Rate</th><th>Broker</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="19">(No rows)</td></tr>'}</tbody>
+          <tfoot>
+            <tr class="so-pnd-grand">
+              <td colspan="6"><strong>TOTAL</strong></td>
+              <td class="num">${formatAmtPdf(grand.so_qty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.do_qty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.sl_qty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.bqty, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.bqty_so_do, 0)}</td>
+              <td class="num">${formatAmtPdf(grand.so_wgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.do_wgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.sl_wgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.bwgt, 3)}</td>
+              <td class="num">${formatAmtPdf(grand.bwgt_so_do, 3)}</td>
+              <td></td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+}
+
+function buildPurchaseOrderChecklistHtml(payload, metadata = {}) {
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(metadata.reportTitle || 'PURCHASE ORDER CHECKLIST');
+  const period = escHtml(metadata.period || '—');
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const totals = payload?.totals || {};
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r.so_date)}</td>
+        <td class="amount">${escHtml(r.so_no)}</td>
+        <td>${escHtml(r.delv_date)}</td>
+        <td>${escHtml(r.party_name)}</td>
+        <td>${escHtml(r.broker_supplier)}</td>
+        <td>${escHtml(r.item_name)}</td>
+        <td>${escHtml(r.loc_code)}</td>
+        <td>${escHtml(r.god_code)}</td>
+        <td class="amount">${formatAmtPdf(r.qnty, 0)}</td>
+        <td class="amount">${formatAmtPdf(r.weight, 3)}</td>
+        <td class="amount">${formatAmtPdf(r.rate)}</td>
+        <td class="amount">${formatAmtPdf(r.amount)}</td>
+        <td class="amount">${formatAmtPdf(r.dr_amt)}</td>
+      </tr>`
+    )
+    .join('');
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .po-checklist.report-doc { border: 1px solid #c8c8c8; padding: 10px 12px; }
+        .po-checklist .po-checklist-header { text-align: center; margin-bottom: 10px; }
+        .po-checklist .po-checklist-company { font-size: 15px; font-weight: 700; text-transform: uppercase; }
+        .po-checklist .po-checklist-title { font-size: 16px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .po-checklist .po-checklist-period { font-size: 10px; margin-top: 4px; color: #444; }
+        .po-checklist .table-report { width: 100%; table-layout: fixed; font-size: 7.5px; border-collapse: collapse; }
+        .po-checklist .table-report th, .po-checklist .table-report td { border: 1px solid #ddd; padding: 2px 3px; line-height: 1.1; vertical-align: top; word-break: break-word; }
+        .po-checklist .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+        .po-checklist .table-report tfoot td { font-weight: 700; background: #f8fafc; border-top: 2px solid #777; }
+      </style>
+      <div class="po-checklist report-doc">
+        <div class="po-checklist-header">
+          <div class="po-checklist-company">${company}</div>
+          <div class="po-checklist-title">${title}</div>
+          <div class="po-checklist-period">${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th class="amount">No.</th>
+              <th>Delv.Date</th>
+              <th>Party Name</th>
+              <th>Broker/Supplier</th>
+              <th>Item Name</th>
+              <th>Loc.</th>
+              <th>God.</th>
+              <th class="amount">Qty.</th>
+              <th class="amount">Weight</th>
+              <th class="amount">Rate</th>
+              <th class="amount">Amount</th>
+              <th class="amount">Adv.Amount</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="13">(No rows)</td></tr>'}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="8">GRAND TOTAL</td>
+              <td class="amount">${formatAmtPdf(totals.qnty, 0)}</td>
+              <td class="amount">${formatAmtPdf(totals.weight, 3)}</td>
+              <td></td>
+              <td class="amount">${formatAmtPdf(totals.amount)}</td>
+              <td class="amount">${formatAmtPdf(totals.dr_amt)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+const GI_PRINT_STYLES = `
+  .gi-print { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #111; }
+  .gi-print-copy { page-break-after: always; }
+  .gi-print-copy:last-child { page-break-after: auto; }
+  .gi-print-top { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+  .gi-print-top td { vertical-align: top; border: none; padding: 0 2px; font-size: 8.5px; line-height: 1.25; }
+  .gi-print-top__title { text-align: center; font-size: 13px; font-weight: 700; letter-spacing: 0.5px; }
+  .gi-print-top__side { width: 32%; }
+  .gi-print-top__side--right { text-align: right; }
+  .gi-print-company { text-align: center; margin: 2px 0 8px; line-height: 1.25; }
+  .gi-print-slogan { font-size: 9px; font-weight: 600; }
+  .gi-print-company__name { font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .gi-print-company__tag { font-size: 10px; font-weight: 700; margin-top: 1px; }
+  .gi-print-party-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 6px; }
+  .gi-print-party { flex: 1; min-width: 0; line-height: 1.35; font-size: 9.5px; }
+  .gi-print-meta { width: 190px; border-collapse: collapse; font-size: 9px; flex-shrink: 0; }
+  .gi-print-meta td { border: 1px solid #999; padding: 2px 5px; }
+  .gi-print-meta__head { background: #d9d9d9; }
+  .gi-print-meta__label { font-weight: 600; width: 52%; }
+  .gi-print-table { width: 100%; border-collapse: collapse; font-size: 8.5px; margin-top: 2px; table-layout: fixed; }
+  .gi-print-table th, .gi-print-table td { border: 1px solid #999; padding: 2px 3px; vertical-align: top; word-break: break-word; }
+  .gi-print-table thead th { background: #d9d9d9; font-weight: 700; }
+  .gi-print-table tfoot td { border-top: 2px solid #666; }
+  .gi-print-table .num { text-align: right; white-space: nowrap; }
+  .gi-print-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 9px; line-height: 1.35; }
+`;
+
+function buildSingleGoodsInwardPrintCopy(note, company, metadata) {
+  const h = note?.header || {};
+  const lines = Array.isArray(note?.lines) ? note.lines : [];
+  const t = note?.totals || {};
+  const compName = escHtml(company.companyName || metadata.companyName || '');
+  const slogan = escHtml(company.billSlogan || '');
+  const bHeader = escHtml(company.bHeader || '');
+  const addr1 = escHtml(company.add1 || '');
+  const addr2 = escHtml(company.add2 || '');
+  const gst = escHtml(company.gst || h.gst_no || '');
+  const email = escHtml(company.email || '');
+  const tel1 = escHtml(company.tel1 || '');
+  const tel2 = escHtml(company.tel2 || '');
+  const tel3 = escHtml(company.tel3 || '');
+  const phLine = [tel1, tel2].filter(Boolean).join(', ');
+  const title = escHtml(h.head_name || metadata.documentTitle || 'GATE PASS/INWARD');
+  const stateLine = [h.state_code, h.state].map((v) => String(v || '').trim()).filter(Boolean).join(' — ');
+
+  let body = '';
+  for (const ln of lines) {
+    const unit = String(ln.status_unit || '').trim();
+    body += `<tr>
+      <td class="num">${escHtml(ln.po_no || '')}</td>
+      <td>${escHtml(ln.item_name || '')}</td>
+      <td>${escHtml(ln.bard_item_name || '')}</td>
+      <td>${escHtml(unit)}</td>
+      <td class="num">${formatAmtPdf(ln.qnty, 0)}</td>
+      <td class="num">${formatAmtPdf(ln.packing, 0)}</td>
+      <td class="num">${formatAmtPdf(ln.g_weight, 3)}</td>
+      <td class="num">${formatAmtPdf(ln.d_weight, 3)}</td>
+      <td class="num">${formatAmtPdf(ln.weight, 3)}</td>
+      <td class="num">${formatAmtPdf(ln.rate)}</td>
+      <td>${escHtml(ln.cost_code || '')}</td>
+    </tr>`;
+  }
+
+  return `
+    <div class="gi-print-copy">
+      <table class="gi-print-top">
+        <tr>
+          <td class="gi-print-top__side">
+            ${gst ? `<div>GSTIN: ${gst}</div>` : ''}
+            ${email ? `<div>EMAIL: ${email}</div>` : ''}
+          </td>
+          <td class="gi-print-top__title">${title}</td>
+          <td class="gi-print-top__side gi-print-top__side--right">
+            ${phLine ? `<div>PH: ${phLine}</div>` : ''}
+            ${tel3 ? `<div>FAX: ${tel3}</div>` : ''}
+          </td>
+        </tr>
+      </table>
+      <div class="gi-print-company">
+        ${slogan ? `<div class="gi-print-slogan">${slogan}</div>` : ''}
+        <div class="gi-print-company__name">${compName}</div>
+        ${bHeader ? `<div class="gi-print-company__tag">${bHeader}</div>` : ''}
+        ${addr1 ? `<div>${addr1}</div>` : ''}
+        ${addr2 ? `<div>${addr2}</div>` : ''}
+      </div>
+      <div class="gi-print-party-row">
+        <div class="gi-print-party">
+          <div>M/s <strong>${escHtml(h.party_name || '')}</strong></div>
+          <div>State: ${escHtml(stateLine || '—')}</div>
+          <div>GSTin: ${escHtml(h.gst_no || '—')}</div>
+          ${h.bk_name ? `<div>Broker: <strong>${escHtml(h.bk_name)}</strong></div>` : ''}
+        </div>
+        <table class="gi-print-meta">
+          <tr class="gi-print-meta__head"><td class="gi-print-meta__label">No.</td><td>${escHtml(h.bill_no)}</td></tr>
+          <tr class="gi-print-meta__head"><td class="gi-print-meta__label">Dated</td><td>${escHtml(toDisplayDate(h.bill_date) || h.bill_date)}</td></tr>
+          <tr><td class="gi-print-meta__label">Truck No.</td><td>${escHtml(h.truck_no || '')}</td></tr>
+          <tr><td class="gi-print-meta__label">Time In</td><td>${escHtml(h.time_in || '')}</td></tr>
+          <tr><td class="gi-print-meta__label">Time Out</td><td>${escHtml(h.time_out || '')}</td></tr>
+        </table>
+      </div>
+      <table class="gi-print-table">
+        <thead>
+          <tr>
+            <th>Po.No.</th><th>Commodity</th><th>Bardana</th><th>Unit</th>
+            <th class="num">Qty.</th><th class="num">Pkg.</th><th class="num">G.Weight</th>
+            <th class="num">Dana</th><th class="num">Net Weight</th><th class="num">Rate</th><th>Cost</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4"><strong>TOTAL</strong></td>
+            <td class="num"><strong>${formatAmtPdf(t.qnty, 0)}</strong></td>
+            <td class="num"><strong>${formatAmtPdf(t.packing, 0)}</strong></td>
+            <td class="num"><strong>${formatAmtPdf(t.g_weight, 3)}</strong></td>
+            <td class="num"><strong>${formatAmtPdf(t.d_weight, 3)}</strong></td>
+            <td class="num"><strong>${formatAmtPdf(t.weight, 3)}</strong></td>
+            <td class="num"><strong>${formatAmtPdf(t.amount)}</strong></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="gi-print-footer">
+        <div>
+          ${h.gr_no ? `<div>G.R.No.: ${escHtml(h.gr_no)}</div>` : ''}
+          ${h.tpt ? `<div>Transport: ${escHtml(h.tpt)}</div>` : ''}
+          ${h.remarks ? `<div>Remarks: ${escHtml(h.remarks)}</div>` : ''}
+          ${h.dk_weight_net ? `<div>Net Wgt (Kanta): ${formatAmtPdf(h.dk_weight_net, 3)}</div>` : ''}
+        </div>
+        <div>For ${compName}</div>
+      </div>
+    </div>`;
+}
+
+function buildGoodsInwardPrintHtml(payload, metadata) {
+  const company = metadata?.company || {};
+  const notes = Array.isArray(payload?.notes) ? payload.notes : [];
+  const copies = notes.map((note) => buildSingleGoodsInwardPrintCopy(note, company, metadata)).join('');
+  return `
+    <div class="gi-print report-doc">
+      <style>${PDF_REPORT_STYLES}${GI_PRINT_STYLES}</style>
+      ${copies || '<div class="voucher-help-modal__msg">No inward notes to print.</div>'}
+    </div>`;
+}
+
+function buildGoodsInwardChecklistHtml(payload, metadata = {}) {
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(payload?.head_name || metadata.reportTitle || 'INWARD REGISTER');
+  const period = escHtml(metadata.period || '—');
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const totals = payload?.totals || {};
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r.bill_date)}</td>
+        <td class="amount">${escHtml(r.bill_no)}</td>
+        <td class="amount">${escHtml(r.sb_no || '')}</td>
+        <td>${escHtml(r.party_name)}</td>
+        <td>${escHtml(r.bk_name)}</td>
+        <td class="amount">${escHtml(r.po_no || '')}</td>
+        <td>${escHtml(r.item_name)}</td>
+        <td class="amount">${formatAmtPdf(r.qnty, 0)}</td>
+        <td class="amount">${formatAmtPdf(r.weight, 3)}</td>
+        <td class="amount">${formatAmtPdf(r.rate)}</td>
+        <td class="amount">${formatAmtPdf(r.amount)}</td>
+        <td>${escHtml(r.god_code)}</td>
+      </tr>`
+    )
+    .join('');
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .gi-checklist.report-doc { border: 1px solid #c8c8c8; padding: 10px 12px; }
+        .gi-checklist .gi-checklist-header { text-align: center; margin-bottom: 10px; }
+        .gi-checklist .gi-checklist-company { font-size: 15px; font-weight: 700; text-transform: uppercase; }
+        .gi-checklist .gi-checklist-title { font-size: 16px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .gi-checklist .gi-checklist-period { font-size: 10px; margin-top: 4px; color: #444; }
+        .gi-checklist .table-report { width: 100%; table-layout: fixed; font-size: 7.5px; border-collapse: collapse; }
+        .gi-checklist .table-report th, .gi-checklist .table-report td { border: 1px solid #ddd; padding: 2px 3px; line-height: 1.1; vertical-align: top; word-break: break-word; }
+        .gi-checklist .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+        .gi-checklist .table-report tfoot td { font-weight: 700; background: #f8fafc; border-top: 2px solid #777; }
+      </style>
+      <div class="gi-checklist report-doc">
+        <div class="gi-checklist-header">
+          <div class="gi-checklist-company">${company}</div>
+          <div class="gi-checklist-title">${title}</div>
+          <div class="gi-checklist-period">${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th class="amount">No.</th>
+              <th class="amount">SB</th>
+              <th>Party Name</th>
+              <th>Broker</th>
+              <th class="amount">Po.No.</th>
+              <th>Item Name</th>
+              <th class="amount">Qty.</th>
+              <th class="amount">Weight</th>
+              <th class="amount">Rate</th>
+              <th class="amount">Amount</th>
+              <th>God.</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="12">(No rows)</td></tr>'}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="7">GRAND TOTAL</td>
+              <td class="amount">${formatAmtPdf(totals.qnty, 0)}</td>
+              <td class="amount">${formatAmtPdf(totals.weight, 3)}</td>
+              <td></td>
+              <td class="amount">${formatAmtPdf(totals.amount)}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildConsignmentStockChecklistHtml(payload, metadata = {}) {
+  const company = escHtml(metadata.companyName || 'Company');
+  const title = escHtml(payload?.head_name || metadata.reportTitle || 'CONSIGNMENT STOCK LIST');
+  const period = escHtml(metadata.period || '—');
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const totals = payload?.totals || {};
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td>${escHtml(r.r_date)}</td>
+        <td class="amount">${escHtml(r.r_no)}</td>
+        <td>${escHtml(r.b_no_disp || r.b_no || '')}</td>
+        <td class="amount">${escHtml(r.item_code)}</td>
+        <td>${escHtml(r.item_name)}</td>
+        <td>${escHtml(r.god_code)}</td>
+        <td class="amount">${escHtml(r.lot || '')}</td>
+        <td>${escHtml(r.party_name)}</td>
+        <td class="amount">${formatAmtPdf(r.bags, 0)}</td>
+        <td class="amount">${formatAmtPdf(r.katta, 0)}</td>
+        <td class="amount">${formatAmtPdf(r.hkatta, 0)}</td>
+        <td class="amount">${formatAmtPdf(r.weight, 3)}</td>
+        <td class="amount">${formatAmtPdf(r.amount)}</td>
+        <td>${escHtml(r.f_form)}</td>
+        <td>${escHtml(r.labour)}</td>
+        <td>${escHtml(r.l_c)}</td>
+        <td>${escHtml(r.exp_cat)}</td>
+        <td>${escHtml([r.truck_no, r.gr_no].filter(Boolean).join(' / '))}</td>
+      </tr>`
+    )
+    .join('');
+  return `
+    <div class="report-doc">
+      <style>
+        ${PDF_REPORT_STYLES}
+        .cstock-checklist.report-doc { border: 1px solid #c8c8c8; padding: 10px 12px; }
+        .cstock-checklist .cstock-checklist-header { text-align: center; margin-bottom: 10px; }
+        .cstock-checklist .cstock-checklist-company { font-size: 15px; font-weight: 700; text-transform: uppercase; }
+        .cstock-checklist .cstock-checklist-title { font-size: 16px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
+        .cstock-checklist .cstock-checklist-period { font-size: 10px; margin-top: 4px; color: #444; }
+        .cstock-checklist .table-report { width: 100%; table-layout: fixed; font-size: 7px; border-collapse: collapse; }
+        .cstock-checklist .table-report th, .cstock-checklist .table-report td { border: 1px solid #ddd; padding: 2px 2px; line-height: 1.1; vertical-align: top; word-break: break-word; }
+        .cstock-checklist .table-report thead th { background: #f4f4f4; color: #111; text-align: left; }
+        .cstock-checklist .table-report tfoot td { font-weight: 700; background: #f8fafc; border-top: 2px solid #777; }
+      </style>
+      <div class="cstock-checklist report-doc">
+        <div class="cstock-checklist-header">
+          <div class="cstock-checklist-company">${company}</div>
+          <div class="cstock-checklist-title">${title}</div>
+          <div class="cstock-checklist-period">${period}</div>
+        </div>
+        <table class="table-report">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th class="amount">Sr.No.</th>
+              <th>B.No.</th>
+              <th class="amount">Item</th>
+              <th>Item Name</th>
+              <th>G</th>
+              <th class="amount">Lot</th>
+              <th>Party Name</th>
+              <th class="amount">Bags</th>
+              <th class="amount">Kata</th>
+              <th class="amount">Hkatta</th>
+              <th class="amount">Weight</th>
+              <th class="amount">Amount</th>
+              <th>Form</th>
+              <th>FB</th>
+              <th>L</th>
+              <th>CAT</th>
+              <th>Truck / GR</th>
+            </tr>
+          </thead>
+          <tbody>${body || '<tr><td colspan="18">(No rows)</td></tr>'}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="8">GRAND TOTAL</td>
+              <td class="amount">${formatAmtPdf(totals.bags, 0)}</td>
+              <td class="amount">${formatAmtPdf(totals.katta, 0)}</td>
+              <td class="amount">${formatAmtPdf(totals.hkatta, 0)}</td>
+              <td class="amount">${formatAmtPdf(totals.weight, 3)}</td>
+              <td class="amount">${formatAmtPdf(totals.amount)}</td>
+              <td colspan="5"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 export function buildReportHtml(reportType, data, metadata) {
+  if (reportType === 'voucher-print') return buildVoucherPrintHtml(data, metadata);
+  if (reportType === 'purchase-order-print') return buildPurchaseOrderPrintHtml(data, metadata);
+  if (reportType === 'purchase-order-checklist') return buildPurchaseOrderChecklistHtml(data, metadata);
+  if (reportType === 'goods-inward-print') return buildGoodsInwardPrintHtml(data, metadata);
+  if (reportType === 'goods-inward-checklist') return buildGoodsInwardChecklistHtml(data, metadata);
+  if (reportType === 'consignment-stock-checklist') return buildConsignmentStockChecklistHtml(data, metadata);
+  if (reportType === 'purchase-order-pending-summary') return buildPurchaseOrderPendingSummaryHtml(data, metadata);
+  if (reportType === 'purchase-order-pending-detail') return buildPurchaseOrderPendingDetailHtml(data, metadata);
+  if (reportType === 'sales-order-pending-summary') return buildSalesOrderPendingSummaryHtml(data, metadata);
+  if (reportType === 'sales-order-pending-detail') return buildSalesOrderPendingDetailHtml(data, metadata);
+  if (reportType === 'sales-order-pending-so-do-sale') return buildSalesOrderPendingSoDoSaleHtml(data, metadata);
   if (reportType === 'ledger') return buildLedgerReportHtml(data, metadata);
   if (reportType === 'complete-ledger') return buildCompleteLedgerReportHtml(data, metadata);
   if (reportType === 'trading-ledger') return buildTradingLedgerReportHtml(data, metadata);
@@ -4613,7 +6511,16 @@ export function buildReportHtml(reportType, data, metadata) {
   if (reportType === 'opdet-report') return buildOpdetReportHtml(data, metadata);
   if (reportType === 'gst-state-master') return buildGstStateMasterReportHtml(data, metadata);
   if (reportType === 'loaner-list') return buildLoanerListReportHtml(data, metadata);
-  if (reportType === 'income-tax-report') return buildIncomeTaxReportHtml(data, metadata);
+  if (
+    reportType === 'purchase-tds-detail' ||
+    reportType === 'purchase-tds-summary' ||
+    reportType === 'sale-tds-detail' ||
+    reportType === 'sale-tds-summary'
+  ) {
+    return buildPurchaseTdsReportHtml(data, metadata);
+  }
+  if (reportType === 'other-report' && metadata.reportId === 'labour-report') return buildLabourReportHtml(data, metadata);
+  if (reportType === 'income-tax-report' || reportType === 'other-report' || reportType === 'ledger-report' || reportType === 'voucher-book') return buildIncomeTaxReportHtml(data, metadata);
   if (reportType === 'godown-master') return buildGodownMasterReportHtml(data, metadata);
   if (reportType === 'trial-balance') return buildTrialBalanceReportHtml(data, metadata);
   if (reportType === 'trial-balance-summary') return buildTrialBalanceSummaryReportHtml(data, metadata);
@@ -4628,8 +6535,26 @@ function getPdfOptions(metadata, reportType) {
   const filename =
     reportType === 'sale-bill'
       ? `${safeFilenamePart(metadata.companyName)}_SaleBill_${inv || 'inv'}_${stamp}.pdf`
-      : reportType === 'purchase-bill'
+        : reportType === 'purchase-bill'
         ? `${safeFilenamePart(metadata.companyName)}_PurchaseBill_${pbKey || 'bill'}_${stamp}.pdf`
+        : reportType === 'voucher-print' || reportType === 'purchase-order-print' || reportType === 'goods-inward-print'
+          ? `${safeFilenamePart(metadata.companyName)}_${safeFilenamePart(metadata.documentTitle || 'Doc')}_${metadata.soNo || metadata.billNo || metadata.vrNo || metadata.receiptNo || 'doc'}_${stamp}.pdf`
+        : reportType === 'purchase-order-checklist'
+          ? `${safeFilenamePart(metadata.companyName)}_POChecklist_${stamp}.pdf`
+        : reportType === 'goods-inward-checklist'
+          ? `${safeFilenamePart(metadata.companyName)}_InwardChecklist_${stamp}.pdf`
+        : reportType === 'consignment-stock-checklist'
+          ? `${safeFilenamePart(metadata.companyName)}_CstockChecklist_${stamp}.pdf`
+        : reportType === 'purchase-order-pending-summary'
+          ? `${safeFilenamePart(metadata.companyName)}_POPendingSum_${stamp}.pdf`
+        : reportType === 'purchase-order-pending-detail'
+          ? `${safeFilenamePart(metadata.companyName)}_POPendingDet_${stamp}.pdf`
+        : reportType === 'sales-order-pending-summary'
+          ? `${safeFilenamePart(metadata.companyName)}_SOPendingSum_${stamp}.pdf`
+        : reportType === 'sales-order-pending-detail'
+          ? `${safeFilenamePart(metadata.companyName)}_SOPendingDet_${stamp}.pdf`
+        : reportType === 'sales-order-pending-so-do-sale'
+          ? `${safeFilenamePart(metadata.companyName)}_SOPendingSoDoSale_${stamp}.pdf`
         : reportType === 'stock-sum-detail'
           ? `${safeFilenamePart(metadata.companyName)}_StockDetail_${safeFilenamePart(metadata.itemCode || 'item')}_${stamp}.pdf`
           : `${safeFilenamePart(metadata.companyName)}_${reportType}_${stamp}.pdf`;
@@ -4661,6 +6586,37 @@ function getPdfOptions(metadata, reportType) {
               scrollX: 0,
               scrollY: 0,
             }
+        : reportType === 'voucher-print' || reportType === 'purchase-order-print' || reportType === 'goods-inward-print'
+          ? {
+              scale: 2,
+              useCORS: true,
+              logging: false,
+              windowWidth: 794,
+              scrollX: 0,
+              scrollY: 0,
+            }
+        : reportType === 'purchase-order-checklist' || reportType === 'goods-inward-checklist' || reportType === 'consignment-stock-checklist'
+          ? {
+              scale: 1,
+              useCORS: true,
+              logging: false,
+              windowWidth: 2400,
+              scrollX: 0,
+              scrollY: 0,
+            }
+        : reportType === 'purchase-order-pending-summary' ||
+            reportType === 'purchase-order-pending-detail' ||
+            reportType === 'sales-order-pending-summary' ||
+            reportType === 'sales-order-pending-detail' ||
+            reportType === 'sales-order-pending-so-do-sale'
+          ? {
+              scale: 1,
+              useCORS: true,
+              logging: false,
+              windowWidth: 2600,
+              scrollX: 0,
+              scrollY: 0,
+            }
         : reportType === 'godown-master'
           ? {
               scale: 1,
@@ -4684,12 +6640,24 @@ function getPdfOptions(metadata, reportType) {
               reportType === 'opdet-report' ||
               reportType === 'gst-state-master' ||
               reportType === 'loaner-list' ||
-              reportType === 'income-tax-report'
+              reportType === 'purchase-tds-detail' ||
+              reportType === 'purchase-tds-summary' ||
+              reportType === 'sale-tds-detail' ||
+              reportType === 'sale-tds-summary' ||
+              reportType === 'income-tax-report' ||
+              reportType === 'other-report' ||
+              reportType === 'ledger-report' ||
+              reportType === 'voucher-book'
             ? {
                 scale: 1,
                 useCORS: true,
                 logging: false,
-                windowWidth: 2800,
+                windowWidth:
+                  metadata?.reportId === 'brokerage-item-wise'
+                    ? 3400
+                    : reportType === 'income-tax-report' && metadata?.pdfLandscape === false
+                      ? 794
+                      : 2800,
                 scrollX: 0,
                 scrollY: 0,
               }
@@ -4732,7 +6700,7 @@ function getPdfOptions(metadata, reportType) {
     margin:
       reportType === 'sale-bill' || reportType === 'purchase-bill'
         ? 8
-        : reportType === 'balance-sheet' || reportType === 'complete-ledger'
+        : reportType === 'balance-sheet' || reportType === 'complete-ledger' || reportType === 'voucher-print' || reportType === 'purchase-order-print' || reportType === 'goods-inward-print'
           ? 6
           : 10,
     filename,
@@ -4756,10 +6724,15 @@ function getPdfOptions(metadata, reportType) {
           reportType === 'sale-cond-master' ||
           reportType === 'loc-btype-master' ||
           reportType === 'detail-mast-master' ||
-          reportType === 'gst-state-master'
+          reportType === 'gst-state-master' ||
+          reportType === 'voucher-print' || reportType === 'purchase-order-print' || reportType === 'goods-inward-print'
           ? 'portrait'
-          : reportType === 'loaner-list' || reportType === 'income-tax-report'
+          : reportType === 'purchase-order-checklist' || reportType === 'goods-inward-checklist' || reportType === 'consignment-stock-checklist'
             ? 'landscape'
+          : reportType === 'loaner-list' || reportType === 'income-tax-report' || reportType === 'other-report' || reportType === 'ledger-report' || reportType === 'voucher-book'
+            ? metadata?.pdfLandscape === false
+              ? 'portrait'
+              : 'landscape'
           : reportType === 'opdet-report'
             ? 'landscape'
           : 'landscape',
@@ -4820,8 +6793,28 @@ export async function getPdfBlob(reportType, data, metadata) {
   }
 
   const htmlContent = buildReportHtml(reportType, data, metadata);
-  const blob = await html2pdf().set(options).from(htmlContent).outputPdf('blob');
+  const blob =
+    reportType === 'voucher-print' || reportType === 'purchase-order-print' || reportType === 'goods-inward-print'
+      ? await html2pdfFromHtmlDom(htmlContent, options)
+      : await html2pdf().set(options).from(htmlContent).outputPdf('blob');
+  if (!blob || blob.size < 80) {
+    throw new Error('PDF could not be generated (empty output).');
+  }
   return { blob, filename: options.filename };
+}
+
+/** Mount HTML off-screen so html2canvas can measure voucher/receipt layout reliably. */
+async function html2pdfFromHtmlDom(htmlContent, options) {
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-12000px;top:0;width:210mm;visibility:hidden;pointer-events:none;';
+  host.innerHTML = htmlContent;
+  document.body.appendChild(host);
+  try {
+    const target = host.querySelector('.vou-print') || host.querySelector('.po-print') || host.querySelector('.gi-print') || host.firstElementChild || host;
+    return await html2pdf().set(options).from(target).outputPdf('blob');
+  } finally {
+    document.body.removeChild(host);
+  }
 }
 
 function downloadBlob(blob, filename) {
@@ -4841,6 +6834,59 @@ function openBlobInNewTab(blob) {
   const win = window.open(url, '_blank', 'noopener,noreferrer');
   if (!win) return;
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Open print dialog for a PDF blob (iframe — works when blob tabs skip `load`). */
+export function printPdfBlob(blob) {
+  if (!blob || blob.size < 80) {
+    return Promise.reject(new Error('PDF could not be generated (empty file).'));
+  }
+  const url = URL.createObjectURL(blob);
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('title', 'Print preview');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:none;';
+  iframe.src = url;
+  document.body.appendChild(iframe);
+
+  const cleanup = () => {
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      iframe.remove();
+    }, 120_000);
+  };
+
+  return new Promise((resolve) => {
+    let printed = false;
+    const tryPrint = () => {
+      if (printed) return true;
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        printed = true;
+        cleanup();
+        resolve();
+        return true;
+      } catch (_) {
+        return false;
+      }
+    };
+
+    iframe.onload = () => {
+      if (!tryPrint()) {
+        openBlobInNewTab(blob);
+        cleanup();
+        resolve();
+      }
+    };
+
+    setTimeout(() => {
+      if (printed) return;
+      if (tryPrint()) return;
+      openBlobInNewTab(blob);
+      cleanup();
+      resolve();
+    }, 2000);
+  });
 }
 
 /**
@@ -4967,8 +7013,18 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
                       ? 'GST State Master'
                     : reportType === 'loaner-list'
                       ? 'Loaner List'
+                    : reportType === 'purchase-tds-detail'
+                      ? 'Party Wise Purchase Detail (TDS)'
+                    : reportType === 'purchase-tds-summary'
+                      ? 'Party Wise Purchase Summary (TDS)'
+                    : reportType === 'sale-tds-detail'
+                      ? 'Party Wise Sale Detail (TDS)'
+                    : reportType === 'sale-tds-summary'
+                      ? 'Party Wise Sale Summary (TDS)'
                     : reportType === 'godown-master'
                       ? 'Godown Master'
+          : reportType === 'voucher-print'
+            ? metadata?.documentTitle || 'Voucher'
           : reportType === 'sale-list'
             ? 'Sale list'
             : reportType === 'sale-bill'
@@ -5019,7 +7075,7 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
     canShareFiles = false;
   }
 
-  if (canShareFiles && shouldPreferNativeFileShare()) {
+  if (canShareFiles) {
     try {
       await navigator.share({
         files: [file],

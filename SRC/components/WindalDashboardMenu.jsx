@@ -56,9 +56,33 @@ function ReportTile({ item, color, icon, onOpen, frozenDesktopOnly = false, froz
 
 export default function WindalDashboardMenu({ formData, onPrev, onNext, onExit }) {
   const session = useAppSession();
-  const [activeModuleId, setActiveModuleId] = useState(HOME_MODULE_ID);
-  const [reportType, setReportType] = useState('trial-balance');
+  const menuReturnModule = String(formData?.menuReturnModule ?? '').trim();
+  const [activeModuleId, setActiveModuleId] = useState(() =>
+    menuReturnModule && menuReturnModule !== HOME_MODULE_ID ? menuReturnModule : HOME_MODULE_ID
+  );
+  const [reportType, setReportType] = useState(() => {
+    const rt = String(formData?.reportType ?? '').trim();
+    if (rt && menuReturnModule && categoryForReport(rt) === menuReturnModule) return rt;
+    if (menuReturnModule && menuReturnModule !== HOME_MODULE_ID) {
+      const mod = REPORT_MENU.find((m) => m.id === menuReturnModule);
+      if (mod?.items?.[0]?.id) return mod.items[0].id;
+    }
+    return 'trial-balance';
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const returnMod = String(formData?.menuReturnModule ?? '').trim();
+    if (!returnMod || returnMod === HOME_MODULE_ID) return;
+    setActiveModuleId(returnMod);
+    const rt = String(formData?.reportType ?? '').trim();
+    if (rt && categoryForReport(rt) === returnMod) {
+      setReportType(rt);
+      return;
+    }
+    const mod = REPORT_MENU.find((m) => m.id === returnMod);
+    if (mod?.items?.[0]?.id) setReportType(mod.items[0].id);
+  }, [formData?.menuReturnModule, formData?.reportType]);
 
   const contextCompany = String(formData?.comp_name ?? formData?.COMP_NAME ?? '').trim() || '—';
   const compYear = String(formData?.comp_year ?? formData?.COMP_YEAR ?? '').trim();

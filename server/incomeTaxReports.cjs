@@ -25,6 +25,7 @@ const REPORT_IDS = [
   'broker-list',
   'party-wise-purchase',
   'party-wise-sales',
+  'top-party-sales',
   'month-schedule-wise-list',
   'customer-arhat',
   'dami-wise-sales',
@@ -98,6 +99,7 @@ function normalizeParams(params = {}) {
     s_date: pick('s_date', 'sdt', 'SDT', 'S_DATE'),
     e_date: pick('e_date', 'edt', 'EDT', 'E_DATE'),
     min_amt: pickNum('min_amt', 'minAmt', 'MINAMT', 'MIN_AMT'),
+    top_n: pickNum('top_n', 'topN', 'TOP_N', 'TOPN'),
     schedule_no: pickNum('schedule_no', 'scheduleNo', 'schno', 'SCHNO', 'SCH_NO'),
     state_code: pick('state_code', 'stateCode', 'STATE_CODE'),
     scode: pick('scode', 'mcode_party', 'MCODE', 'CODE'),
@@ -109,7 +111,11 @@ function normalizeParams(params = {}) {
     mcode: pick('mcode', 'cash_code', 'MCODE'),
     mru: pick('mru', 'MRU').toUpperCase(),
     b_no: pickNum('b_no', 'bNo', 'B_NO'),
-    pan_yn: pick('pan_yn', 'panYn', 'PAN_YN'),
+    pan_yn: pick('pan_yn', 'panYn', 'PAN_YN').toUpperCase(),
+    sp_no: pickNum('sp_no', 'spNo', 'SP_NO'),
+    exp_type: pick('exp_type', 'expType', 'EXP_TYPE').toLowerCase(),
+    detail_mode: pick('detail_mode', 'detailMode', 'DETAIL_MODE').toLowerCase(),
+    month_key: pick('month_key', 'monthKey', 'MONTH_KEY').toUpperCase(),
     comp_year: pickNum('comp_year', 'compYear', 'COMP_YEAR') || null,
     self_dalal_code: pick('self_dalal_code', 'selfDalalCode', 'G_SELF_DALAL_CODE'),
     stk_tdg_wgt_type: pick('stk_tdg_wgt_type', 'g_stk_tdg_wgt_type', 'G_STK_TDG_WGT_TYPE'),
@@ -124,6 +130,62 @@ function betweenDatesSql(col = 'A.VR_DATE') {
 
 function billBetweenDatesSql(col = 'A.BILL_DATE') {
   return `${col} BETWEEN TO_DATE(:s_date,'DD-MM-YYYY') AND TO_DATE(:e_date,'DD-MM-YYYY')`;
+}
+
+function appendGrandTotalRow(rows, { labelKey, labelValue, sumKeys }) {
+  if (!rows.length) return rows;
+  const total = { [labelKey]: labelValue, _isGrandTotal: true };
+  for (const k of sumKeys) {
+    total[k] = rows.reduce((s, r) => s + num(r[k]), 0);
+  }
+  return [...rows, total];
+}
+
+function computeLotBillGroupTotals(groupRows) {
+  const sumKey = (k) => groupRows.reduce((s, r) => s + num(r[k]), 0);
+  const rQty = sumKey('R_QNTY');
+  const sQty = sumKey('S_QNTY');
+  const rWgt = sumKey('R_WEIGHT');
+  const sWgt = sumKey('S_WEIGHT');
+  const balQty = rQty - sQty;
+  const balWgt = rWgt - sWgt;
+  const rAmt = groupRows.reduce((s, r) => s + (num(r.R_QNTY) > 0 ? num(r.AMOUNT) : 0), 0);
+  const avgRate = rQty > 0 ? rAmt / rQty : 0;
+  const balAmount = balWgt * avgRate;
+  return { BAL_QTY: balQty, BAL_WGT: balWgt, AVG_RATE: avgRate, BAL_AMOUNT: balAmount, RATE: '' };
+}
+
+function appendLotBillGrandTotalRow(rows, { labelKey, labelValue, sumKeys }) {
+  if (!rows.length) return rows;
+  const total = { [labelKey]: labelValue, _isGrandTotal: true };
+  for (const k of sumKeys) {
+    total[k] = rows.reduce((s, r) => s + num(r[k]), 0);
+  }
+  Object.assign(total, computeLotBillGroupTotals(rows));
+  return [...rows, total];
+}
+
+function formatCmthYear(cmth, yr) {
+  const mon = String(cmth ?? '').trim().toUpperCase();
+  const y2 = String(yr ?? '').trim();
+  if (!mon) return '';
+  const year = y2.length === 4 ? y2 : y2.length === 2 ? `20${y2}` : y2;
+  return `${mon}-${year}`;
+}
+
+function mapMonthlySummaryRows(rows, { monthKey = 'CMTH', sumKeys }) {
+  const mapped = rows.map((raw) => {
+    const row = normalizeRow(raw);
+    return {
+      ...row,
+      [monthKey]: formatCmthYear(row.CMTH, row.YR),
+    };
+  });
+  return appendGrandTotalRow(mapped, {
+    labelKey: monthKey,
+    labelValue: 'GRAND TOTAL',
+    sumKeys,
+  });
 }
 
 function rDateBetweenSql(col = 'A.R_DATE') {
@@ -211,6 +273,26 @@ function pivotFiscalMonths(detailRows, opts = {}) {
     row.TOT = num(row.TOT) + amt;
   }
   return [...map.values()];
+}
+
+function parseDmyDateParts(dmy) {
+  const parts = String(dmy ?? '').trim().split('-');
+  if (parts.length !== 3 || parts[2].length !== 4) return null;
+  const day = Number(parts[0]);
+  const month = Number(parts[1]);
+  const year = Number(parts[2]);
+  if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) return null;
+  return { day, month, year };
+}
+
+/** Map fiscal month column (APR…MAR) to calendar month/year within FY bounds. */
+function fiscalMonthCalendar(sDate, eDate, monthKey) {
+  const fm = FISCAL_MONTHS.find((m) => m.key === String(monthKey ?? '').trim().toUpperCase());
+  if (!fm) return null;
+  const start = parseDmyDateParts(sDate);
+  const end = parseDmyDateParts(eDate);
+  if (!start || !end) return null;
+  return { mth: fm.mth, myear: fm.mth >= 4 ? start.year : end.year };
 }
 
 function pivotExpensesMonthly(rawRows) {
@@ -411,6 +493,9 @@ function createIncomeTaxReports(runQuery) {
       ),
       X0 AS (
         SELECT A.CODE, B.NAME, B.PAN, B.TIN, B.GST_NO, B.ADD1, B.ADD2, B.ADD3, B.CITY, B.STATE_CODE, B.STATE,
+          COUNT(DISTINCT CASE WHEN A.VR_TYPE IN (:v_sl, :v_cn, :v_st, :v_se)
+            THEN TRIM(A.VR_TYPE) || '|' || TO_CHAR(A.VR_DATE, 'YYYYMMDD') || '|' || TRIM(TO_CHAR(A.VR_NO)) || '|' || TRIM(NVL(A.TYPE, ' '))
+          END) AS BILL_CNT,
           SUM(NVL(A.QNTY, 0)) AS QNTY, SUM(NVL(A.WEIGHT, 0)) AS WEIGHT,
           SUM(CASE WHEN SUBSTR(A.DETAIL, 1, 3) <> :mdet THEN NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0) ELSE 0 END) AS AMOUNT,
           SUM(CASE WHEN SUBSTR(A.DETAIL, 1, 3) = :mdet THEN NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0) ELSE 0 END) AS TDS_AMOUNT
@@ -429,7 +514,75 @@ function createIncomeTaxReports(runQuery) {
     if (p.state_code) {
       rows = rows.filter((r) => String(r.STATE_CODE || '').trim() === String(p.state_code).trim());
     }
+    if (forceMinAmt !== undefined) {
+      rows = appendGrandTotalRow(rows, {
+        labelKey: 'NAME',
+        labelValue: 'GRAND TOTAL',
+        sumKeys: ['BILL_CNT', 'QNTY', 'WEIGHT', 'AMOUNT', 'TDS_AMOUNT'],
+      });
+    }
     return { rows, columns: inferColumnsFromRows(rows) };
+  }
+
+  /** Top N parties by sales amount (default 10). Same ledger base as party-wise-sales. */
+  async function runItaxTopPartySale(comp_code, comp_uid, p) {
+    const topNRaw = Number(p.top_n) || 0;
+    const topN = Math.min(500, Math.max(1, topNRaw > 0 ? Math.floor(topNRaw) : 10));
+    const binds = {
+      comp_code,
+      s_date: p.s_date,
+      e_date: p.e_date,
+      min_amt: 0,
+      top_n: topN,
+      v_sl: 'SL',
+      v_cn: 'CN',
+      v_st: 'ST',
+      v_kv: 'KV',
+      v_cx: 'CX',
+      v_dx: 'DX',
+      v_se: 'SE',
+      mdet: 'TDS',
+    };
+    let compYearSql = '';
+    if (p.comp_year) {
+      compYearSql = ' AND A.COMP_YEAR = :comp_year';
+      binds.comp_year = p.comp_year;
+    }
+    const sql = `
+      WITH Y1 AS (
+        SELECT CODE FROM SALE WHERE COMP_CODE = :comp_code AND TYPE IN (:v_sl, :v_cn, :v_st, :v_se) GROUP BY CODE
+        UNION
+        SELECT CODE FROM DBIKRI WHERE COMP_CODE = :comp_code
+      ),
+      X0 AS (
+        SELECT A.CODE, B.NAME, B.CITY, B.STATE,
+          SUM(NVL(A.QNTY, 0)) AS QNTY,
+          SUM(NVL(A.WEIGHT, 0)) AS WEIGHT,
+          SUM(CASE WHEN SUBSTR(A.DETAIL, 1, 3) <> :mdet THEN NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0) ELSE 0 END) AS AMOUNT
+        FROM LEDGER A
+        INNER JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.CODE = B.CODE
+        WHERE A.COMP_CODE = :comp_code${compYearSql}
+          AND A.VR_TYPE IN (:v_sl, :v_cn, :v_st, :v_kv, :v_cx, :v_dx, :v_se)
+          AND ${betweenDatesSql('A.VR_DATE')}
+        GROUP BY A.CODE, B.NAME, B.CITY, B.STATE
+        HAVING SUM(CASE WHEN SUBSTR(A.DETAIL, 1, 3) <> :mdet THEN NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0) ELSE 0 END) > :min_amt
+      ),
+      RANKED AS (
+        SELECT X0.*, ROW_NUMBER() OVER (ORDER BY X0.AMOUNT DESC, X0.NAME) AS RANK_NO
+        FROM X0
+        WHERE EXISTS (SELECT 1 FROM Y1 WHERE Y1.CODE = X0.CODE)
+      )
+      SELECT RANK_NO, CODE, NAME, CITY, STATE, QNTY, WEIGHT, AMOUNT
+      FROM RANKED
+      WHERE RANK_NO <= :top_n
+      ORDER BY RANK_NO`;
+    let rows = await q(sql, binds, comp_uid);
+    rows = appendGrandTotalRow(rows, {
+      labelKey: 'NAME',
+      labelValue: 'TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'AMOUNT'],
+    });
+    return { rows, columns: inferColumnsFromRows(rows), meta: { top_n: topN } };
   }
 
   async function runItaxSch(comp_code, comp_uid, p) {
@@ -452,6 +605,12 @@ function createIncomeTaxReports(runQuery) {
       ORDER BY CODE, MYEAR, MTH`;
     const raw = await q(sql, { comp_code, schedule_no }, comp_uid);
     const mdc = p.mdc || '';
+    /** Net Dr−Cr balance per account — used for D/C row filter (not display totals). */
+    const netBalByCode = new Map();
+    for (const r of raw) {
+      const code = String(r.CODE ?? '');
+      netBalByCode.set(code, num(netBalByCode.get(code)) + num(r.AMOUNT));
+    }
     const detail = raw.map((r) => ({
       ...r,
       MTH_AMT: mdc === 'D' ? num(r.DR_AMT) : mdc === 'C' ? num(r.CR_AMT) : num(r.AMOUNT),
@@ -461,11 +620,16 @@ function createIncomeTaxReports(runQuery) {
       const parts = p.e_date.split('-');
       if (parts.length === 3) endYear = num(parts[2]);
     }
-    const rows = pivotFiscalMonths(detail, {
+    let rows = pivotFiscalMonths(detail, {
       groupKeys: ['CODE', 'NAME', 'SCHEDULE', 'SCH_NAME'],
       carryFields: ['SCHEDULE', 'SCH_NAME'],
       endYear,
     });
+    if (mdc === 'D') {
+      rows = rows.filter((r) => num(netBalByCode.get(String(r.CODE))) > 0);
+    } else if (mdc === 'C') {
+      rows = rows.filter((r) => num(netBalByCode.get(String(r.CODE))) < 0);
+    }
     const columns = cols(['CODE', 'NAME', 'SCHEDULE', 'SCH_NAME', 'OP', ...FISCAL_MONTHS.map((m) => m.key), 'TOT']);
     return { rows, columns };
   }
@@ -484,7 +648,7 @@ function createIncomeTaxReports(runQuery) {
     return { rows, columns: inferColumnsFromRows(rows) };
   }
 
-  async function runSaleRpt(comp_code, comp_uid) {
+  async function runDamiWiseSales(comp_code, comp_uid, p) {
     const sql = `
       SELECT TO_CHAR(BILL_DATE, 'MM') AS MTH, TO_CHAR(BILL_DATE, 'YY') AS YR,
         MAX(TO_CHAR(BILL_DATE, 'MON')) AS CMTH,
@@ -494,10 +658,14 @@ function createIncomeTaxReports(runQuery) {
         SUM(CASE WHEN NVL(COMM_PER, 0) <> 3.1250 AND NVL(COMM_PER, 0) <> 1.75 THEN NVL(AMOUNT, 0) ELSE 0 END) AS AMT0
       FROM SALE
       WHERE COMP_CODE = :comp_code AND TYPE IN ('SL', 'SE')
+        AND ${billBetweenDatesSql('BILL_DATE')}
       GROUP BY TO_CHAR(BILL_DATE, 'MM'), TO_CHAR(BILL_DATE, 'YY')
       ORDER BY YR, MTH`;
-    const rows = await q(sql, { comp_code }, comp_uid);
-    return { rows, columns: inferColumnsFromRows(rows) };
+    const detail = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
+    const rows = mapMonthlySummaryRows(detail, {
+      sumKeys: ['AMOUNT', 'AMT175', 'AMT3125', 'AMT0'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runPurRpt(comp_code, comp_uid, p) {
@@ -518,8 +686,11 @@ function createIncomeTaxReports(runQuery) {
         AND B.SCHEDULE = :schedule_no
       GROUP BY TO_CHAR(A.VR_DATE, 'MM'), TO_CHAR(A.VR_DATE, 'YY')
       ORDER BY YR, MTH`;
-    const rows = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date, schedule_no }, comp_uid);
-    return { rows, columns: inferColumnsFromRows(rows) };
+    const detail = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date, schedule_no }, comp_uid);
+    const rows = mapMonthlySummaryRows(detail, {
+      sumKeys: ['QNTY', 'WEIGHT', 'AMOUNT'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runSaleRpt1(comp_code, comp_uid, p) {
@@ -556,9 +727,25 @@ function createIncomeTaxReports(runQuery) {
         AND B.SCHEDULE IN (:sno1, :sno2)
       GROUP BY TO_CHAR(A.VR_DATE, 'MM'), TO_CHAR(A.VR_DATE, 'YY')
       ORDER BY YR, MTH`;
-    const raw = await q(sql, binds, comp_uid);
-    const rows = raw.map((r) => ({ ...r, AMOUNT: num(r.TOT_SALE) }));
-    return { rows, columns: inferColumnsFromRows(rows) };
+    const detail = await q(sql, binds, comp_uid);
+    const withAmount = detail.map((raw) => {
+      const row = normalizeRow(raw);
+      return { ...row, AMOUNT: num(row.TOT_SALE) };
+    });
+    const rows = mapMonthlySummaryRows(withAmount, {
+      sumKeys: [
+        'T_SALE_QTY',
+        'C_SALE_QTY',
+        'T_SALE_WGT',
+        'C_SALE_WGT',
+        'T_SALE',
+        'C_SALE',
+        'QNTY',
+        'WEIGHT',
+        'AMOUNT',
+      ],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runItmSalPur(comp_code, comp_uid, p) {
@@ -587,15 +774,20 @@ function createIncomeTaxReports(runQuery) {
         )
       GROUP BY A.ITEM_CODE, B.ITEM_NAME, TO_CHAR(A.VR_DATE, 'MM'), TO_CHAR(A.VR_DATE, 'YY')
       ORDER BY ITEM_NAME, ITEM_CODE, YR, MTH`;
-    const raw = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
-    const rows = raw.map((r) => ({
-      ...r,
-      P_QTY: num(r.P_QTY) - num(r.D_QTY),
-      P_WGT: num(r.P_WGT) - num(r.D_WGT),
-      S_QTY: num(r.S_QTY) - num(r.C_QTY),
-      S_WGT: num(r.S_WGT) - num(r.C_WGT),
-    }));
-    return { rows, columns: inferColumnsFromRows(rows) };
+    const detail = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
+    const adjusted = detail.map((raw) => {
+      const row = normalizeRow(raw);
+      return {
+        ...row,
+        CMTH: formatCmthYear(row.CMTH, row.YR),
+      };
+    });
+    const rows = appendGrandTotalRow(adjusted, {
+      labelKey: 'CMTH',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['P_QTY', 'D_QTY', 'P_WGT', 'D_WGT', 'P_AMT', 'S_QTY', 'C_QTY', 'S_WGT', 'C_WGT', 'S_AMT'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runItmSale(comp_code, comp_uid, p) {
@@ -653,23 +845,49 @@ function createIncomeTaxReports(runQuery) {
     if (p.state_code) {
       grouped = grouped.filter((r) => String(r.STATE_CODE || '').trim() === String(p.state_code).trim());
     }
-    return { rows: grouped, columns: inferColumnsFromRows(grouped) };
+    const adjusted = grouped.map((raw) => {
+      const row = normalizeRow(raw);
+      return {
+        ...row,
+        CMTH: formatCmthYear(row.CMTH, row.YR),
+      };
+    });
+    adjusted.sort((a, b) => {
+      const byCode = String(a.ITEM_CODE ?? '').localeCompare(String(b.ITEM_CODE ?? ''));
+      if (byCode !== 0) return byCode;
+      return String(a.CMTH ?? '').localeCompare(String(b.CMTH ?? ''));
+    });
+    const rows = appendGrandTotalRow(adjusted, {
+      labelKey: 'CMTH',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['S_QTY', 'S_WGT', 'S_AMT', 'S_COMM'],
+    });
+    return { rows, columns: inferColumnsFromRows(adjusted) };
   }
 
   async function runItaxPurBill(comp_code, comp_uid, p) {
     const sql = `
-      SELECT A.SUP_CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, A.R_DATE, A.R_NO, A.BILL_NO,
+      SELECT A.SUP_CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, B.GST_NO, A.R_DATE, A.R_NO, A.BILL_NO,
+        MAX(A.TYPE) AS TYPE,
         MAX(C.ITEM_NAME) AS ITEM_NAME,
-        SUM(NVL(A.QNTY, 0)) AS QNTY, SUM(NVL(A.WEIGHT, 0)) AS WEIGHT,
-        MAX(A.RATE) AS RATE, SUM(NVL(A.AMOUNT, 0)) AS AMOUNT, SUM(NVL(A.BILL_AMT, 0)) AS BILL_AMT
+        SUM(CASE WHEN A.TYPE = 'DN' THEN NVL(A.QNTY, 0) * -1 ELSE NVL(A.QNTY, 0) END) AS QNTY,
+        SUM(CASE WHEN A.TYPE = 'DN' THEN NVL(A.WEIGHT, 0) * -1 ELSE NVL(A.WEIGHT, 0) END) AS WEIGHT,
+        MAX(A.RATE) AS RATE,
+        SUM(CASE WHEN A.TYPE = 'DN' THEN NVL(A.AMOUNT, 0) * -1 ELSE NVL(A.AMOUNT, 0) END) AS AMOUNT,
+        SUM(CASE WHEN A.TYPE = 'DN' THEN NVL(A.BILL_AMT, 0) * -1 ELSE NVL(A.BILL_AMT, 0) END) AS BILL_AMT
       FROM PURCHASE A
       INNER JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.SUP_CODE = B.CODE
       INNER JOIN ITEMMAST C ON A.COMP_CODE = C.COMP_CODE AND A.ITEM_CODE = C.ITEM_CODE
       WHERE A.COMP_CODE = :comp_code AND ${rDateBetweenSql('A.R_DATE')}
-      GROUP BY A.SUP_CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, A.R_DATE, A.R_NO, A.BILL_NO
+      GROUP BY A.SUP_CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, B.GST_NO, A.R_DATE, A.R_NO, A.BILL_NO
       ORDER BY NAME, SUP_CODE, R_DATE, R_NO`;
-    const rows = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
-    return { rows, columns: inferColumnsFromRows(rows) };
+    const detail = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
+    const rows = appendGrandTotalRow(detail, {
+      labelKey: 'R_DATE',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'AMOUNT', 'BILL_AMT'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runItaxSaleBill(comp_code, comp_uid, p) {
@@ -678,7 +896,7 @@ function createIncomeTaxReports(runQuery) {
       ? ' AND D.SCHEDULE = :schedule_no'
       : '';
     const sql = `
-      SELECT A.TYPE, A.CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, A.BILL_DATE, A.BILL_NO, A.B_TYPE,
+      SELECT A.TYPE, A.CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, B.GST_NO, A.BILL_DATE, A.BILL_NO, A.B_TYPE,
         D.SCHEDULE, A.ITEM_CODE, C.ITEM_NAME, A.RATE,
         SUM(NVL(A.QNTY, 0)) AS QNTY, SUM(NVL(A.WEIGHT, 0)) AS WEIGHT, SUM(NVL(A.AMOUNT, 0)) AS BILL_AMT
       FROM SALE A
@@ -686,34 +904,52 @@ function createIncomeTaxReports(runQuery) {
       INNER JOIN ITEMMAST C ON A.COMP_CODE = C.COMP_CODE AND A.ITEM_CODE = C.ITEM_CODE
       INNER JOIN MASTER D ON A.COMP_CODE = D.COMP_CODE AND A.SUP_CODE = D.CODE
       WHERE A.COMP_CODE = :comp_code AND ${billBetweenDatesSql('A.BILL_DATE')}${schSql}
-      GROUP BY A.TYPE, A.CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, A.BILL_DATE, A.BILL_NO, A.B_TYPE,
-        D.SCHEDULE, A.ITEM_CODE, C.ITEM_NAME, A.RATE`;
+      GROUP BY A.TYPE, A.CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, B.GST_NO, A.BILL_DATE, A.BILL_NO, A.B_TYPE,
+        D.SCHEDULE, A.ITEM_CODE, C.ITEM_NAME, A.RATE
+      ORDER BY NAME, CODE, BILL_DATE, BILL_NO`;
     const binds = { comp_code, s_date: p.s_date, e_date: p.e_date };
     if (schedule_no) binds.schedule_no = schedule_no;
     const x1 = (await q(sql, binds, comp_uid)).filter((r) => ['SL', 'CN', 'SE'].includes(String(r.TYPE || '').toUpperCase()));
-    const rows = groupSaleCn(x1, ['CODE', 'NAME', 'ADD1', 'ADD2', 'CITY', 'PAN', 'BILL_DATE', 'BILL_NO', 'B_TYPE', 'ITEM_CODE', 'ITEM_NAME', 'RATE'], ['QNTY', 'WEIGHT', 'BILL_AMT']);
-    return { rows, columns: inferColumnsFromRows(rows) };
+    const grouped = groupSaleCn(
+      x1,
+      ['CODE', 'NAME', 'ADD1', 'ADD2', 'CITY', 'PAN', 'GST_NO', 'BILL_DATE', 'BILL_NO', 'B_TYPE', 'ITEM_CODE', 'ITEM_NAME', 'RATE'],
+      ['QNTY', 'WEIGHT', 'BILL_AMT']
+    );
+    const rows = appendGrandTotalRow(grouped, {
+      labelKey: 'BILL_DATE',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'BILL_AMT'],
+    });
+    return { rows, columns: inferColumnsFromRows(grouped) };
   }
 
   async function runItaxPurItem(comp_code, comp_uid, p) {
     const sql = `
-      SELECT A.SUP_CODE, B.NAME, B.CITY, B.PAN, A.ITEM_CODE, MAX(C.ITEM_NAME) AS ITEM_NAME,
-        SUM(NVL(A.QNTY, 0)) AS QNTY, SUM(NVL(A.WEIGHT, 0)) AS WEIGHT, MAX(A.RATE) AS RATE,
-        SUM(NVL(A.AMOUNT, 0) + NVL(A.COMM_AMT, 0) + NVL(A.TAX_AMT, 0) + NVL(A.OTH_EXP_1, 0) + NVL(A.OTH_EXP_2, 0)) AS BILL_AMT
+      SELECT A.SUP_CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, B.GST_NO, A.ITEM_CODE, MAX(C.ITEM_NAME) AS ITEM_NAME,
+        SUM(CASE WHEN A.TYPE = 'DN' THEN NVL(A.QNTY, 0) * -1 ELSE NVL(A.QNTY, 0) END) AS QNTY,
+        SUM(CASE WHEN A.TYPE = 'DN' THEN NVL(A.WEIGHT, 0) * -1 ELSE NVL(A.WEIGHT, 0) END) AS WEIGHT,
+        MAX(A.RATE) AS RATE,
+        SUM(CASE WHEN A.TYPE = 'DN' THEN (NVL(A.AMOUNT, 0) + NVL(A.COMM_AMT, 0) + NVL(A.TAX_AMT, 0) + NVL(A.OTH_EXP_1, 0) + NVL(A.OTH_EXP_2, 0)) * -1
+          ELSE NVL(A.AMOUNT, 0) + NVL(A.COMM_AMT, 0) + NVL(A.TAX_AMT, 0) + NVL(A.OTH_EXP_1, 0) + NVL(A.OTH_EXP_2, 0) END) AS BILL_AMT
       FROM PURCHASE A
       INNER JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.SUP_CODE = B.CODE
       INNER JOIN ITEMMAST C ON A.COMP_CODE = C.COMP_CODE AND A.ITEM_CODE = C.ITEM_CODE
       WHERE A.COMP_CODE = :comp_code AND ${rDateBetweenSql('A.R_DATE')}
-      GROUP BY A.SUP_CODE, B.NAME, B.CITY, B.PAN, A.ITEM_CODE
+      GROUP BY A.SUP_CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, B.GST_NO, A.ITEM_CODE
       ORDER BY NAME, SUP_CODE, ITEM_CODE`;
-    const rows = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
-    return { rows, columns: inferColumnsFromRows(rows) };
+    const detail = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
+    const rows = appendGrandTotalRow(detail, {
+      labelKey: 'ITEM_NAME',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'BILL_AMT'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runItaxSaleItem(comp_code, comp_uid, p) {
     const scode = String(p.scode || '').trim();
     const sql = `
-      SELECT A.TYPE, A.CODE, B.NAME, B.CITY, B.PAN, B.STATE_CODE, B.STATE, A.ITEM_CODE,
+      SELECT A.TYPE, A.CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, B.GST_NO, B.STATE_CODE, B.STATE, A.ITEM_CODE,
         MAX(C.ITEM_NAME) AS ITEM_NAME,
         SUM(NVL(A.QNTY, 0)) AS QNTY, SUM(NVL(A.WEIGHT, 0)) AS WEIGHT, MAX(A.RATE) AS RATE,
         SUM(NVL(A.AMOUNT, 0) + NVL(A.COMMISSION, 0) + NVL(A.TAX_AMT, 0) + NVL(A.FREIGHT, 0) + NVL(A.LABOUR, 0)) AS BILL_AMT
@@ -723,23 +959,33 @@ function createIncomeTaxReports(runQuery) {
       WHERE A.COMP_CODE = :comp_code AND ${billBetweenDatesSql('A.BILL_DATE')}
         AND A.TYPE IN ('CN', 'SL', 'SE')
         AND (:scode IS NULL OR :scode = '' OR A.CODE = :scode)
-      GROUP BY A.TYPE, A.CODE, B.NAME, B.CITY, B.PAN, B.STATE_CODE, B.STATE, A.ITEM_CODE
+      GROUP BY A.TYPE, A.CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, B.GST_NO, B.STATE_CODE, B.STATE, A.ITEM_CODE
       ORDER BY NAME, CODE, ITEM_CODE`;
     const binds = { comp_code, s_date: p.s_date, e_date: p.e_date, scode: scode || null };
     const x1 = await q(sql, binds, comp_uid);
-    let rows = groupSaleCn(x1, ['CODE', 'NAME', 'CITY', 'PAN', 'STATE_CODE', 'STATE', 'ITEM_CODE', 'ITEM_NAME'], ['QNTY', 'WEIGHT', 'BILL_AMT']);
+    let detail = groupSaleCn(
+      x1,
+      ['CODE', 'NAME', 'ADD1', 'ADD2', 'CITY', 'PAN', 'GST_NO', 'STATE_CODE', 'STATE', 'ITEM_CODE', 'ITEM_NAME'],
+      ['QNTY', 'WEIGHT', 'BILL_AMT']
+    );
     const wgtKq = p.wgt_kq || 'Q';
-    rows = rows.map((r) => {
+    detail = detail.map((r) => {
       const w = num(r.WEIGHT);
       const bill = num(r.BILL_AMT);
       const rate = w !== 0 ? (wgtKq === 'Q' ? bill / w : (bill / w) * 100) : 0;
       return { ...r, RATE: Math.round(rate * 100) / 100 };
     });
-    if (p.state_code) rows = rows.filter((r) => String(r.STATE_CODE || '').trim() === String(p.state_code).trim());
-    return { rows, columns: inferColumnsFromRows(rows) };
+    if (p.state_code) detail = detail.filter((r) => String(r.STATE_CODE || '').trim() === String(p.state_code).trim());
+    const rows = appendGrandTotalRow(detail, {
+      labelKey: 'ITEM_NAME',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'BILL_AMT'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runItaxItemSale(comp_code, comp_uid, p) {
+    const scode = String(p.scode || '').trim();
     const sql = `
       SELECT A.TYPE, A.CODE, B.NAME, B.CITY, B.PAN, B.STATE_CODE, B.STATE, A.ITEM_CODE,
         MAX(C.ITEM_NAME) AS ITEM_NAME, MAX(A.RATE) AS RATE,
@@ -750,23 +996,28 @@ function createIncomeTaxReports(runQuery) {
       INNER JOIN ITEMMAST C ON A.COMP_CODE = C.COMP_CODE AND A.ITEM_CODE = C.ITEM_CODE
       WHERE A.COMP_CODE = :comp_code AND ${billBetweenDatesSql('A.BILL_DATE')}
         AND A.TYPE IN ('SL', 'CN', 'SE')
+        AND (:scode IS NULL OR :scode = '' OR A.CODE = :scode)
       GROUP BY A.TYPE, A.CODE, B.NAME, B.CITY, B.PAN, B.STATE_CODE, B.STATE, A.ITEM_CODE
       ORDER BY ITEM_CODE, NAME, CODE`;
-    const x1 = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
-    let rows = groupSaleCn(x1, ['ITEM_CODE', 'ITEM_NAME', 'CODE', 'NAME', 'CITY', 'PAN', 'STATE_CODE', 'STATE'], ['QNTY', 'WEIGHT', 'BILL_AMT']);
-    rows = rows.map((r) => {
+    const binds = { comp_code, s_date: p.s_date, e_date: p.e_date, scode: scode || null };
+    const x1 = await q(sql, binds, comp_uid);
+    let detail = groupSaleCn(x1, ['ITEM_CODE', 'ITEM_NAME', 'CODE', 'NAME', 'CITY', 'PAN', 'STATE_CODE', 'STATE'], ['QNTY', 'WEIGHT', 'BILL_AMT']);
+    detail = detail.map((r) => {
       const maxRate = x1.filter((x) => x.ITEM_CODE === r.ITEM_CODE && x.CODE === r.CODE).reduce((m, x) => Math.max(m, num(x.RATE)), 0);
       return { ...r, RATE: maxRate };
     });
-    if (p.state_code) rows = rows.filter((r) => String(r.STATE_CODE || '').trim() === String(p.state_code).trim());
-    if (p.icode) rows = rows.filter((r) => num(r.ITEM_CODE) === num(p.icode));
-    return { rows, columns: inferColumnsFromRows(rows) };
+    if (p.icode) detail = detail.filter((r) => num(r.ITEM_CODE) === num(p.icode));
+    const rows = appendGrandTotalRow(detail, {
+      labelKey: 'NAME',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'BILL_AMT'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runItaxSaleMth(comp_code, comp_uid, p) {
-    const bk_code = String(p.bk_code || '').trim();
     const sql = `
-      SELECT A.TYPE, A.CODE, B.NAME, B.CITY, B.PAN, B.STATE_CODE, B.STATE,
+      SELECT A.TYPE, A.CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, B.GST_NO, B.STATE_CODE, B.STATE,
         TO_CHAR(A.BILL_DATE, 'MM') AS MTH, TO_CHAR(A.BILL_DATE, 'YYYY') AS YR,
         MAX(TO_CHAR(A.BILL_DATE, 'MON')) AS CMTH,
         SUM(NVL(A.QNTY, 0)) AS QNTY, SUM(NVL(A.WEIGHT, 0)) AS WEIGHT, MAX(A.RATE) AS RATE,
@@ -775,27 +1026,44 @@ function createIncomeTaxReports(runQuery) {
       INNER JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.CODE = B.CODE
       WHERE A.COMP_CODE = :comp_code AND ${billBetweenDatesSql('A.BILL_DATE')}
         AND A.TYPE IN ('SL', 'CN', 'SE')
-        AND (:bk_code IS NULL OR :bk_code = '' OR A.BK_CODE = :bk_code)
-      GROUP BY A.TYPE, A.CODE, B.NAME, B.CITY, B.PAN, B.STATE_CODE, B.STATE,
+      GROUP BY A.TYPE, A.CODE, B.NAME, B.ADD1, B.ADD2, B.CITY, B.PAN, B.GST_NO, B.STATE_CODE, B.STATE,
         TO_CHAR(A.BILL_DATE, 'MM'), TO_CHAR(A.BILL_DATE, 'YYYY')
       ORDER BY NAME, CODE, YR, MTH`;
-    const x1 = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date, bk_code: bk_code || null }, comp_uid);
-    let rows = groupSaleCn(x1, ['CODE', 'NAME', 'CITY', 'PAN', 'STATE_CODE', 'STATE', 'MTH', 'YR', 'CMTH'], ['QNTY', 'WEIGHT', 'BILL_AMT']);
-    rows = rows.map((r) => ({
+    const x1 = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
+    let detail = groupSaleCn(
+      x1,
+      ['CODE', 'NAME', 'ADD1', 'ADD2', 'CITY', 'PAN', 'GST_NO', 'STATE_CODE', 'STATE', 'MTH', 'YR', 'CMTH'],
+      ['QNTY', 'WEIGHT', 'BILL_AMT']
+    );
+    detail = detail.map((r) => ({
       ...r,
-      BK_CODE: bk_code,
-      BK_NAME: p.bk_name || '',
-      RATE: x1.filter((x) => x.CODE === r.CODE && x.MTH === r.MTH && x.YR === r.YR).reduce((m, x) => Math.max(m, num(x.RATE)), 0),
+      CMTH: formatCmthYear(r.CMTH, r.YR),
+      RATE: x1
+        .filter((x) => x.CODE === r.CODE && x.MTH === r.MTH && x.YR === r.YR)
+        .reduce((m, x) => Math.max(m, num(x.RATE)), 0),
     }));
-    if (p.state_code) rows = rows.filter((r) => String(r.STATE_CODE || '').trim() === String(p.state_code).trim());
-    return { rows, columns: inferColumnsFromRows(rows) };
+    if (p.state_code) detail = detail.filter((r) => String(r.STATE_CODE || '').trim() === String(p.state_code).trim());
+    detail.sort((a, b) => {
+      const byName = String(a.NAME ?? '').localeCompare(String(b.NAME ?? ''));
+      if (byName !== 0) return byName;
+      const byCode = String(a.CODE ?? '').localeCompare(String(b.CODE ?? ''));
+      if (byCode !== 0) return byCode;
+      const byYr = String(a.YR ?? '').localeCompare(String(b.YR ?? ''));
+      if (byYr !== 0) return byYr;
+      return String(a.MTH ?? '').localeCompare(String(b.MTH ?? ''));
+    });
+    const rows = appendGrandTotalRow(detail, {
+      labelKey: 'CMTH',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'BILL_AMT'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runItaxSaleItemMth(comp_code, comp_uid, p) {
-    const bk_code = String(p.bk_code || '').trim();
     const sql = `
-      SELECT A.TYPE, A.ITEM_CODE, B.ITEM_NAME, A.CODE, C.NAME, C.CITY,
-        EXTRACT(MONTH FROM A.BILL_DATE) AS MTH, EXTRACT(YEAR FROM A.BILL_DATE) AS YR,
+      SELECT A.TYPE, A.ITEM_CODE, B.ITEM_NAME, A.CODE, C.NAME, C.ADD1, C.ADD2, C.CITY, C.PAN, C.GST_NO,
+        TO_CHAR(A.BILL_DATE, 'MM') AS MTH, TO_CHAR(A.BILL_DATE, 'YYYY') AS YR,
         MAX(TO_CHAR(A.BILL_DATE, 'MON')) AS CMTH,
         SUM(NVL(A.QNTY, 0)) AS QNTY, SUM(NVL(A.WEIGHT, 0)) AS WEIGHT, MAX(A.RATE) AS RATE,
         SUM(NVL(A.AMOUNT, 0) + NVL(A.COMMISSION, 0) + NVL(A.TAX_AMT, 0) + NVL(A.FREIGHT, 0) + NVL(A.LABOUR, 0)) AS BILL_AMT
@@ -804,19 +1072,46 @@ function createIncomeTaxReports(runQuery) {
       INNER JOIN MASTER C ON A.COMP_CODE = C.COMP_CODE AND A.CODE = C.CODE
       WHERE A.COMP_CODE = :comp_code AND ${billBetweenDatesSql('A.BILL_DATE')}
         AND A.TYPE IN ('SL', 'CN', 'SE')
-        AND (:bk_code IS NULL OR :bk_code = '' OR A.BK_CODE = :bk_code)
-      GROUP BY A.TYPE, A.ITEM_CODE, B.ITEM_NAME, A.CODE, C.NAME, C.CITY,
-        EXTRACT(MONTH FROM A.BILL_DATE), EXTRACT(YEAR FROM A.BILL_DATE)
-      ORDER BY YR, MTH`;
-    let x1 = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date, bk_code: bk_code || null }, comp_uid);
+      GROUP BY A.TYPE, A.ITEM_CODE, B.ITEM_NAME, A.CODE, C.NAME, C.ADD1, C.ADD2, C.CITY, C.PAN, C.GST_NO,
+        TO_CHAR(A.BILL_DATE, 'MM'), TO_CHAR(A.BILL_DATE, 'YYYY')
+      ORDER BY ITEM_CODE, C.NAME, A.CODE, YR, MTH`;
+    let x1 = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
     if (p.icode) x1 = x1.filter((r) => num(r.ITEM_CODE) === num(p.icode));
-    const rows = groupSaleCn(x1, ['ITEM_CODE', 'ITEM_NAME', 'CODE', 'NAME', 'CITY', 'MTH', 'YR', 'CMTH'], ['QNTY', 'WEIGHT', 'BILL_AMT']).map((r) => ({
+    let detail = groupSaleCn(
+      x1,
+      ['ITEM_CODE', 'ITEM_NAME', 'CODE', 'NAME', 'ADD1', 'ADD2', 'CITY', 'PAN', 'GST_NO', 'MTH', 'YR', 'CMTH'],
+      ['QNTY', 'WEIGHT', 'BILL_AMT']
+    );
+    detail = detail.map((r) => ({
       ...r,
-      BK_CODE: bk_code,
-      BK_NAME: p.bk_name || '',
-      RATE: x1.filter((x) => x.ITEM_CODE === r.ITEM_CODE && x.CODE === r.CODE && num(x.MTH) === num(r.MTH)).reduce((m, x) => Math.max(m, num(x.RATE)), 0),
+      CMTH: formatCmthYear(r.CMTH, r.YR),
+      RATE: x1
+        .filter(
+          (x) =>
+            x.ITEM_CODE === r.ITEM_CODE &&
+            x.CODE === r.CODE &&
+            x.MTH === r.MTH &&
+            x.YR === r.YR
+        )
+        .reduce((m, x) => Math.max(m, num(x.RATE)), 0),
     }));
-    return { rows, columns: inferColumnsFromRows(rows) };
+    detail.sort((a, b) => {
+      const byItem = String(a.ITEM_CODE ?? '').localeCompare(String(b.ITEM_CODE ?? ''), undefined, { numeric: true });
+      if (byItem !== 0) return byItem;
+      const byName = String(a.NAME ?? '').localeCompare(String(b.NAME ?? ''));
+      if (byName !== 0) return byName;
+      const byCode = String(a.CODE ?? '').localeCompare(String(b.CODE ?? ''));
+      if (byCode !== 0) return byCode;
+      const byYr = String(a.YR ?? '').localeCompare(String(b.YR ?? ''));
+      if (byYr !== 0) return byYr;
+      return String(a.MTH ?? '').localeCompare(String(b.MTH ?? ''));
+    });
+    const rows = appendGrandTotalRow(detail, {
+      labelKey: 'CMTH',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'BILL_AMT'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runItaxSaleCust(comp_code, comp_uid, p) {
@@ -846,11 +1141,16 @@ function createIncomeTaxReports(runQuery) {
       icode,
       god_code: god_code || null,
     }, comp_uid);
-    const rows = groupSaleCn(x1, ['CODE', 'NAME', 'CITY'], ['QNTY', 'WEIGHT', 'BILL_AMT']).map((r) => ({
+    const detail = groupSaleCn(x1, ['CODE', 'NAME', 'CITY'], ['QNTY', 'WEIGHT', 'BILL_AMT']).map((r) => ({
       ...r,
       RATE: x1.filter((x) => x.CODE === r.CODE).reduce((m, x) => Math.max(m, num(x.RATE)), 0),
     }));
-    return { rows, columns: inferColumnsFromRows(rows) };
+    const rows = appendGrandTotalRow(detail, {
+      labelKey: 'NAME',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'BILL_AMT'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runItaxPurItemMth(comp_code, comp_uid, p) {
@@ -868,11 +1168,36 @@ function createIncomeTaxReports(runQuery) {
         AND (:bk_code IS NULL OR :bk_code = '' OR A.B_CODE = :bk_code)
       GROUP BY A.ITEM_CODE, B.ITEM_NAME, A.CODE, C.NAME, C.CITY,
         TO_CHAR(A.R_DATE, 'MM'), TO_CHAR(A.R_DATE, 'YYYY')
-      ORDER BY ITEM_NAME, ITEM_CODE, CODE, YR, MTH`;
-    let rows = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date, bk_code: bk_code || null }, comp_uid);
-    if (p.icode) rows = rows.filter((r) => num(r.ITEM_CODE) === num(p.icode));
-    rows = rows.map((r) => ({ ...r, BK_CODE: bk_code, BK_NAME: p.bk_name || '' }));
-    return { rows, columns: inferColumnsFromRows(rows) };
+      ORDER BY A.ITEM_CODE, B.ITEM_NAME, C.NAME, A.CODE, YR, MTH`;
+    let detail = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date, bk_code: bk_code || null }, comp_uid);
+    if (p.icode) detail = detail.filter((r) => num(r.ITEM_CODE) === num(p.icode));
+    detail = detail.map((r) => ({
+      ITEM_CODE: r.ITEM_CODE,
+      ITEM_NAME: r.ITEM_NAME,
+      CODE: r.CODE,
+      NAME: r.NAME,
+      CITY: r.CITY,
+      CMTH: formatCmthYear(r.CMTH, r.YR),
+      QNTY: r.QNTY,
+      WEIGHT: r.WEIGHT,
+      RATE: r.RATE,
+      BILL_AMT: r.BILL_AMT,
+    }));
+    detail.sort((a, b) => {
+      const byItem = String(a.ITEM_CODE ?? '').localeCompare(String(b.ITEM_CODE ?? ''), undefined, { numeric: true });
+      if (byItem !== 0) return byItem;
+      const byName = String(a.NAME ?? '').localeCompare(String(b.NAME ?? ''));
+      if (byName !== 0) return byName;
+      const byCode = String(a.CODE ?? '').localeCompare(String(b.CODE ?? ''));
+      if (byCode !== 0) return byCode;
+      return String(a.CMTH ?? '').localeCompare(String(b.CMTH ?? ''));
+    });
+    const rows = appendGrandTotalRow(detail, {
+      labelKey: 'CMTH',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'BILL_AMT'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runItaxItemPur(comp_code, comp_uid, p) {
@@ -885,8 +1210,13 @@ function createIncomeTaxReports(runQuery) {
       INNER JOIN ITEMMAST C ON A.COMP_CODE = C.COMP_CODE AND A.ITEM_CODE = C.ITEM_CODE
       WHERE A.COMP_CODE = :comp_code AND ${rDateBetweenSql('A.R_DATE')}
       GROUP BY A.CODE, B.NAME, B.CITY, B.PAN, A.ITEM_CODE
-      ORDER BY ITEM_CODE, NAME, CODE`;
-    const rows = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
+      ORDER BY A.ITEM_CODE, ITEM_NAME, B.NAME, A.CODE`;
+    const detail = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
+    const rows = appendGrandTotalRow(detail, {
+      labelKey: 'NAME',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['QNTY', 'WEIGHT', 'BILL_AMT'],
+    });
     return { rows, columns: inferColumnsFromRows(rows) };
   }
 
@@ -908,7 +1238,7 @@ function createIncomeTaxReports(runQuery) {
       LEFT JOIN MASTER E ON A.COMP_CODE = E.COMP_CODE AND A.CODE = E.CODE
       LEFT JOIN MASTER F ON A.COMP_CODE = F.COMP_CODE AND A.MSUP_CODE = F.CODE
       WHERE A.COMP_CODE = :comp_code AND A.VR_DATE <= TO_DATE(:e_date, 'DD-MM-YYYY')
-      ORDER BY A.ITEM_CODE, A.LOT, A.B_NO, A.VR_DATE, A.VR_TYPE, A.VR_NO`;
+      ORDER BY A.B_NO, A.SUP_CODE, A.ITEM_CODE, A.LOT, A.VR_DATE, A.VR_TYPE, A.VR_NO`;
     let rows = await q(sql, { comp_code, e_date: p.e_date }, comp_uid);
     const scode = String(p.scode || '').trim();
     if (scode) rows = rows.filter((r) => String(r.SUP_CODE || '').trim() === scode);
@@ -916,6 +1246,11 @@ function createIncomeTaxReports(runQuery) {
     if (p.b_no) rows = rows.filter((r) => num(r.B_NO) === num(p.b_no));
     const sch = scheduleFilter(p.schedule_no);
     if (sch) rows = rows.filter((r) => num(r.SCHEDULE) === sch);
+    const sumKeys = [
+      'R_QNTY', 'S_QNTY', 'R_WEIGHT', 'S_WEIGHT', 'AMOUNT', 'DANE',
+      'PAPLOO1', 'PAPLOO2', 'PAPLOO3', 'PAPLOO5', 'COMMISSION', 'BROKERAGE',
+    ];
+    rows = appendLotBillGrandTotalRow(rows, { labelKey: 'B_NO', labelValue: 'GRAND TOTAL', sumKeys });
     return { rows, columns: inferColumnsFromRows(rows) };
   }
 
@@ -956,7 +1291,7 @@ function createIncomeTaxReports(runQuery) {
       e_date: p.e_date,
       self_dalal: selfDalal || ' ',
     }, comp_uid);
-    const rows = raw.map((r) => {
+    const saleRows = raw.map((r) => {
       const net =
         num(r.TDG_SALE) + num(r.CONSG_SALE) + num(r.TDG_COMM) + num(r.CONSG_COMM) +
         num(r.TDG_BROK) + num(r.CONSG_BROK) + num(r.TDG_EXP) + num(r.CONSG_EXP) +
@@ -964,7 +1299,54 @@ function createIncomeTaxReports(runQuery) {
         num(r.WOCOMM_BROK) - num(r.COMM_SD_BROK) - num(r.WOCOMM_SD_BROK);
       return { ...r, NET_SALE: net };
     });
-    return { rows, columns: inferColumnsFromRows(rows) };
+
+    const opSql = `
+      SELECT A.CODE, SUM(NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0)) AS OP_BAL
+      FROM LEDGER A
+      WHERE A.COMP_CODE = :comp_code AND A.VR_DATE < TO_DATE(:s_date, 'DD-MM-YYYY')
+      GROUP BY A.CODE`;
+    const opMap = new Map(
+      (await q(opSql, { comp_code, s_date: p.s_date }, comp_uid)).map((r) => [
+        String(r.CODE ?? '').trim(),
+        num(r.OP_BAL),
+      ])
+    );
+
+    const rcptSql = `
+      SELECT A.CODE, SUM(NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0)) AS PMT_AMT
+      FROM LEDGER A
+      WHERE A.COMP_CODE = :comp_code AND ${betweenDatesSql('A.VR_DATE')}
+        AND A.VR_TYPE IN ('CV', 'BV', 'JV')
+      GROUP BY A.CODE`;
+    const rcptMap = new Map(
+      (await q(rcptSql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid)).map((r) => [
+        String(r.CODE ?? '').trim(),
+        num(r.PMT_AMT),
+      ])
+    );
+
+    const enriched = saleRows.map((r) => {
+      const code = String(r.CODE ?? '').trim();
+      const opBal = opMap.get(code) ?? 0;
+      const sale = num(r.NET_SALE);
+      const pmtAmt = rcptMap.get(code) ?? 0;
+      const receipts = Math.abs(pmtAmt);
+      const clBal = opBal + sale + pmtAmt;
+      return { ...r, OP_BAL: opBal, SALE: sale, RECEIPTS: receipts, CL_BAL: clBal };
+    });
+
+    const sumKeys = [
+      'TDG_WGT', 'CONSG_WGT', 'TDG_SALE', 'CONSG_SALE', 'TDG_PAP', 'CONSG_PAP',
+      'TDG_DANE', 'CONSG_DANE', 'TDG_COMM', 'CONSG_COMM', 'TDG_BROK', 'CONSG_BROK',
+      'TDG_EXP', 'CONSG_EXP', 'WOCOMM_BROK', 'COMM_SD_BROK', 'WOCOMM_SD_BROK',
+      'NET_SALE', 'OP_BAL', 'SALE', 'RECEIPTS', 'CL_BAL',
+    ];
+    const rows = appendGrandTotalRow(enriched, {
+      labelKey: 'NAME',
+      labelValue: 'GRAND TOTAL',
+      sumKeys,
+    });
+    return { rows, columns: inferColumnsFromRows(enriched) };
   }
 
   async function runPartySaleDet(comp_code, comp_uid, p) {
@@ -988,7 +1370,7 @@ function createIncomeTaxReports(runQuery) {
       if (!map.has(gk)) {
         map.set(gk, {
           CODE: r.CODE, NAME: r.NAME, PAN: r.PAN, TIN: r.TIN, ADD1: r.ADD1, ADD2: r.ADD2, ADD3: r.ADD3, CITY: r.CITY,
-          OP_AMT: 0, SL_AMT: 0, CN_AMT: 0, PMT_AMT: 0,
+          OP_AMT: 0, SL_AMT: 0, CN_AMT: 0, CASH_RECEIPT: 0, BANK_RECEIPT: 0, JOURNAL_ADJ: 0,
         });
       }
       const row = map.get(gk);
@@ -997,15 +1379,40 @@ function createIncomeTaxReports(runQuery) {
       if (vt === 'OP') row.OP_AMT += amt;
       else if (['SL', 'ST', 'KV', 'SE'].includes(vt)) row.SL_AMT += amt;
       else if (vt === 'CN') row.CN_AMT += amt;
-      else if (['CV', 'BV', 'JV'].includes(vt)) row.PMT_AMT += amt;
+      else if (vt === 'CV') row.CASH_RECEIPT += amt;
+      else if (vt === 'BV') row.BANK_RECEIPT += amt;
+      else if (vt === 'JV') row.JOURNAL_ADJ += amt;
     }
-    const rows = [...map.values()].map((r) => ({
-      ...r,
+    const receiptDisplay = (raw) => {
+      const n = num(raw);
+      return n !== 0 ? -n : 0;
+    };
+    let rows = [...map.values()].map((r) => ({
+      CODE: r.CODE,
+      NAME: r.NAME,
+      PAN: r.PAN,
+      TIN: r.TIN,
+      ADD1: r.ADD1,
+      ADD2: r.ADD2,
+      ADD3: r.ADD3,
+      CITY: r.CITY,
       OPENING: r.OP_AMT,
-      SALE_AMOUNT: r.SL_AMT - r.CN_AMT,
-      PMT_AMOUNT: r.PMT_AMT,
-      CL_BAL: r.OP_AMT + r.SL_AMT + r.PMT_AMT - r.CN_AMT,
+      SALE_AMOUNT: r.SL_AMT,
+      CN_AMOUNT: r.CN_AMT,
+      CASH_RECEIPT: receiptDisplay(r.CASH_RECEIPT),
+      BANK_RECEIPT: receiptDisplay(r.BANK_RECEIPT),
+      JOURNAL_ADJ: receiptDisplay(r.JOURNAL_ADJ),
+      CL_BAL:
+        r.OP_AMT + r.SL_AMT + r.CASH_RECEIPT + r.BANK_RECEIPT + r.JOURNAL_ADJ - r.CN_AMT,
     }));
+    rows.sort((a, b) => String(a.NAME ?? '').localeCompare(String(b.NAME ?? '')));
+    rows = appendGrandTotalRow(rows, {
+      labelKey: 'NAME',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: [
+        'OPENING', 'SALE_AMOUNT', 'CN_AMOUNT', 'CASH_RECEIPT', 'BANK_RECEIPT', 'JOURNAL_ADJ', 'CL_BAL',
+      ],
+    });
     return { rows, columns: inferColumnsFromRows(rows) };
   }
 
@@ -1041,8 +1448,18 @@ function createIncomeTaxReports(runQuery) {
       S_AMT: num(r.AMOUNT),
       S_COMM: num(r.S_COMM),
     }));
-    const rows = groupSaleCn(merged, ['ITEM_CODE', 'ITEM_NAME'], ['S_QTY', 'S_WGT', 'S_AMT', 'S_COMM']);
-    return { rows, columns: inferColumnsFromRows(rows) };
+    const detail = groupSaleCn(merged, ['ITEM_CODE', 'ITEM_NAME'], ['S_QTY', 'S_WGT', 'S_AMT', 'S_COMM']);
+    detail.sort((a, b) => {
+      const byName = String(a.ITEM_NAME ?? '').localeCompare(String(b.ITEM_NAME ?? ''));
+      if (byName !== 0) return byName;
+      return String(a.ITEM_CODE ?? '').localeCompare(String(b.ITEM_CODE ?? ''), undefined, { numeric: true });
+    });
+    const rows = appendGrandTotalRow(detail, {
+      labelKey: 'ITEM_NAME',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['S_QTY', 'S_WGT', 'S_AMT', 'S_COMM'],
+    });
+    return { rows, columns: inferColumnsFromRows(detail) };
   }
 
   async function runLedgerDcCode(comp_code, comp_uid, p) {
@@ -1062,7 +1479,7 @@ function createIncomeTaxReports(runQuery) {
         WHERE A.COMP_CODE = :comp_code AND A.CODE = :scode
           AND A.VR_DATE <= TO_DATE(:e_date, 'DD-MM-YYYY') AND NVL(A.BIKRI, 'X') <> 'Y'
         GROUP BY A.CODE, B.NAME, B.SCHEDULE, A.DC_CODE, C.NAME
-        ORDER BY CODE, NAME, DC_CODE`;
+        ORDER BY CODE, NAME, DC_NAME`;
       binds.scode = scode;
     } else {
       if (!schedule_no) throw new Error('ledger-dccode-report requires scode or schedule_no');
@@ -1077,7 +1494,7 @@ function createIncomeTaxReports(runQuery) {
         WHERE A.COMP_CODE = :comp_code AND B.SCHEDULE = :schedule_no
           AND A.VR_DATE <= TO_DATE(:e_date, 'DD-MM-YYYY') AND NVL(A.BIKRI, 'X') <> 'Y'
         GROUP BY A.CODE, B.NAME, B.SCHEDULE, A.DC_CODE, C.NAME
-        ORDER BY CODE, NAME, DC_CODE`;
+        ORDER BY CODE, NAME, DC_NAME`;
       binds.schedule_no = schedule_no;
     }
     let rows = await q(sql, binds, comp_uid);
@@ -1086,6 +1503,11 @@ function createIncomeTaxReports(runQuery) {
     else if (mdc === 'C') rows = rows.filter((r) => num(r.CR_AMT) !== 0);
     if (p.mru === 'R') rows = rows.filter((r) => String(r.GST_NO || '').trim() !== '');
     else if (p.mru === 'U') rows = rows.filter((r) => String(r.GST_NO || '').trim() === '');
+    rows = appendGrandTotalRow(rows, {
+      labelKey: 'DC_CODE',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['DR_AMT', 'CR_AMT'],
+    });
     return { rows, columns: inferColumnsFromRows(rows) };
   }
 
@@ -1104,7 +1526,7 @@ function createIncomeTaxReports(runQuery) {
       WHERE A.COMP_CODE = :comp_code
         AND ${betweenDatesSql('A.VR_DATE')}
         AND NVL(A.BIKRI, 'N') <> 'Y'
-        AND A.VR_TYPE IN ('PU', 'DN', 'CV', 'BV', 'JV', 'EV')
+        AND A.VR_TYPE IN ('PU', 'DN', 'DX', 'CV', 'BV', 'JV', 'EV')
         AND EXISTS (SELECT 1 FROM TMP_PUR C WHERE A.COMP_CODE = C.COMP_CODE AND A.CODE = C.CODE)
       GROUP BY A.CODE, B.NAME, B.PAN, B.TIN, B.ADD1, B.ADD2, B.ADD3, B.CITY, A.VR_TYPE`;
     const x1 = (await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid)).map((r) => ({
@@ -1117,7 +1539,7 @@ function createIncomeTaxReports(runQuery) {
       if (!map.has(gk)) {
         map.set(gk, {
           CODE: r.CODE, NAME: r.NAME, PAN: r.PAN, TIN: r.TIN, ADD1: r.ADD1, ADD2: r.ADD2, ADD3: r.ADD3, CITY: r.CITY,
-          OP_AMT: 0, PUR_AMT: 0, DN_AMT: 0, PMT_AMT: 0,
+          OP_AMT: 0, PUR_AMT: 0, DN_AMT: 0, CASH_PAYMENT: 0, BANK_PAYMENT: 0, JOURNAL: 0,
         });
       }
       const row = map.get(gk);
@@ -1125,45 +1547,89 @@ function createIncomeTaxReports(runQuery) {
       const amt = num(r.AMOUNT);
       if (vt === 'OP') row.OP_AMT += amt;
       else if (['PU', 'SV'].includes(vt)) row.PUR_AMT += amt;
-      else if (vt === 'DN') row.DN_AMT += amt;
-      else if (['CV', 'BV', 'JV', 'TV'].includes(vt)) row.PMT_AMT += amt;
+      else if (['DN', 'DX'].includes(vt)) row.DN_AMT += amt;
+      else if (vt === 'CV') row.CASH_PAYMENT += amt;
+      else if (vt === 'BV') row.BANK_PAYMENT += amt;
+      else if (['JV', 'EV', 'TV'].includes(vt)) row.JOURNAL += amt;
     }
-    const rows = [...map.values()].map((r) => ({
-      ...r,
+    const paymentDisplay = (raw) => {
+      const n = num(raw);
+      return n !== 0 ? -n : 0;
+    };
+    let rows = [...map.values()].map((r) => ({
+      CODE: r.CODE,
+      NAME: r.NAME,
+      PAN: r.PAN,
+      TIN: r.TIN,
+      ADD1: r.ADD1,
+      ADD2: r.ADD2,
+      ADD3: r.ADD3,
+      CITY: r.CITY,
       OPENING: r.OP_AMT,
-      PUR_AMOUNT: r.PUR_AMT - r.DN_AMT,
-      PMT_AMOUNT: r.PMT_AMT,
-      CL_BAL: r.OP_AMT + r.PUR_AMT + r.PMT_AMT - r.DN_AMT,
+      PUR_AMOUNT: r.PUR_AMT,
+      DN_AMOUNT: r.DN_AMT,
+      CASH_PAYMENT: paymentDisplay(r.CASH_PAYMENT),
+      BANK_PAYMENT: paymentDisplay(r.BANK_PAYMENT),
+      JOURNAL: paymentDisplay(r.JOURNAL),
+      CL_BAL:
+        r.OP_AMT + r.PUR_AMT + r.CASH_PAYMENT + r.BANK_PAYMENT + r.JOURNAL - r.DN_AMT,
     }));
+    rows.sort((a, b) => String(a.NAME ?? '').localeCompare(String(b.NAME ?? '')));
+    rows = appendGrandTotalRow(rows, {
+      labelKey: 'NAME',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: [
+        'OPENING', 'PUR_AMOUNT', 'DN_AMOUNT', 'CASH_PAYMENT', 'BANK_PAYMENT', 'JOURNAL', 'CL_BAL',
+      ],
+    });
     return { rows, columns: inferColumnsFromRows(rows) };
   }
 
   async function runCashflowMonthly(comp_code, comp_uid, p) {
-    const mcode = String(p.mcode || '').trim();
+    const mcode = String(p.mcode || '').trim().toUpperCase();
     if (!mcode) throw new Error('cash-movement-monthly requires mcode (cash account code)');
+    const spNo = scheduleFilter(p.sp_no);
+    const panYn = String(p.pan_yn || '').trim().toUpperCase();
+    const cpMatchSql = `
+      (
+        :sp_no = 0 OR ROUND(NVL(B.SCHEDULE, 0), 2) = :sp_no
+      )
+      AND (
+        :pan_yn = 'A'
+        OR (:pan_yn = 'Y' AND TRIM(NVL(B.PAN, '')) <> '')
+        OR (:pan_yn = 'N' AND TRIM(NVL(B.PAN, '')) = '')
+      )`;
+    const binds = {
+      comp_code,
+      mcode,
+      s_date: p.s_date,
+      e_date: p.e_date,
+      sp_no: spNo,
+      pan_yn: panYn === 'Y' || panYn === 'N' ? panYn : 'A',
+    };
     const opSql = `
       SELECT SUM(NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0)) AS OPBAL
       FROM LEDGER A
-      WHERE A.COMP_CODE = :comp_code AND A.CODE = :mcode
+      WHERE A.COMP_CODE = :comp_code AND TRIM(A.CODE) = TRIM(:mcode)
         AND A.VR_DATE < TO_DATE(:s_date, 'DD-MM-YYYY')`;
     const opRow = (await q(opSql, { comp_code, mcode, s_date: p.s_date }, comp_uid))[0];
     let opBal = num(opRow?.OPBAL);
     const sql = `
       SELECT TO_CHAR(A.VR_DATE, 'MON') AS MTH, TO_CHAR(A.VR_DATE, 'YYYY') AS YR, TO_CHAR(A.VR_DATE, 'MM') AS MM,
-        SUM(CASE WHEN NVL(A.DR_AMT, 0) <> 0 THEN NVL(A.DR_AMT, 0) ELSE 0 END) AS CASH_ADD,
-        SUM(CASE WHEN NVL(A.CR_AMT, 0) <> 0 AND B.SCHEDULE >= 9 AND B.SCHEDULE < 10 THEN NVL(A.CR_AMT, 0) ELSE 0 END) AS BANK_DEP,
-        SUM(CASE WHEN NVL(A.CR_AMT, 0) <> 0 AND B.SCHEDULE >= 15 THEN NVL(A.CR_AMT, 0) ELSE 0 END) AS CASH_EXP,
-        SUM(CASE WHEN NVL(A.CR_AMT, 0) <> 0 AND B.SCHEDULE >= 1 AND B.SCHEDULE < 3 THEN NVL(A.CR_AMT, 0) ELSE 0 END) AS CASH_DRAW,
-        SUM(CASE WHEN NVL(A.CR_AMT, 0) <> 0 AND B.SCHEDULE >= 5 AND B.SCHEDULE < 6 THEN NVL(A.CR_AMT, 0) ELSE 0 END) AS CASH_PUR,
-        SUM(NVL(A.CR_AMT, 0)) AS CASH_OTHERS,
-        SUM(NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0)) AS CL_BAL
+        SUM(CASE WHEN NVL(A.DR_AMT, 0) <> 0 AND ${cpMatchSql} THEN NVL(A.DR_AMT, 0) ELSE 0 END) AS CASH_ADD,
+        SUM(CASE WHEN NVL(A.CR_AMT, 0) <> 0 AND B.SCHEDULE >= 9 AND B.SCHEDULE < 10 AND ${cpMatchSql} THEN NVL(A.CR_AMT, 0) ELSE 0 END) AS BANK_DEP,
+        SUM(CASE WHEN NVL(A.CR_AMT, 0) <> 0 AND B.SCHEDULE >= 15 AND ${cpMatchSql} THEN NVL(A.CR_AMT, 0) ELSE 0 END) AS CASH_EXP,
+        SUM(CASE WHEN NVL(A.CR_AMT, 0) <> 0 AND B.SCHEDULE >= 1 AND B.SCHEDULE < 3 AND ${cpMatchSql} THEN NVL(A.CR_AMT, 0) ELSE 0 END) AS CASH_DRAW,
+        SUM(CASE WHEN NVL(A.CR_AMT, 0) <> 0 AND B.SCHEDULE >= 5 AND B.SCHEDULE < 6 AND ${cpMatchSql} THEN NVL(A.CR_AMT, 0) ELSE 0 END) AS CASH_PUR,
+        SUM(CASE WHEN NVL(A.CR_AMT, 0) <> 0 AND ${cpMatchSql} THEN NVL(A.CR_AMT, 0) ELSE 0 END) AS CASH_OTHERS,
+        SUM(CASE WHEN ${cpMatchSql} THEN NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0) ELSE 0 END) AS CL_BAL
       FROM LEDGER A
-      LEFT JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.DC_CODE = B.CODE
-      WHERE A.COMP_CODE = :comp_code AND A.CODE = :mcode
+      LEFT JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND TRIM(A.DC_CODE) = TRIM(B.CODE)
+      WHERE A.COMP_CODE = :comp_code AND TRIM(A.CODE) = TRIM(:mcode)
         AND ${betweenDatesSql('A.VR_DATE')}
       GROUP BY TO_CHAR(A.VR_DATE, 'MON'), TO_CHAR(A.VR_DATE, 'YYYY'), TO_CHAR(A.VR_DATE, 'MM')
       ORDER BY YR, MM`;
-    const raw = await q(sql, { comp_code, mcode, s_date: p.s_date, e_date: p.e_date }, comp_uid);
+    const raw = await q(sql, binds, comp_uid);
     const rows = raw.map((r) => {
       const bankDep = num(r.BANK_DEP);
       const cashExp = num(r.CASH_EXP);
@@ -1172,9 +1638,12 @@ function createIncomeTaxReports(runQuery) {
       let cashOth = num(r.CASH_OTHERS) - (bankDep + cashExp + cashPur + cashDraw);
       const cashAdd = num(r.CASH_ADD);
       const clBal = opBal + cashAdd - (bankDep + cashExp + cashPur + cashDraw + cashOth);
+      const mth = String(r.MTH ?? '').trim();
+      const yr = String(r.YR ?? '').trim();
       const out = {
-        MTH: r.MTH,
-        YR: r.YR,
+        MONTH: [mth, yr].filter(Boolean).join(' '),
+        MTH: mth,
+        YR: yr,
         MM: r.MM,
         OP_BAL: opBal,
         CASH_ADD: cashAdd,
@@ -1188,10 +1657,30 @@ function createIncomeTaxReports(runQuery) {
       opBal = clBal;
       return out;
     });
+    if (rows.length) {
+      rows.push({
+        MONTH: 'TOTAL',
+        MTH: '',
+        YR: '',
+        MM: '',
+        OP_BAL: rows[0].OP_BAL,
+        CASH_ADD: rows.reduce((s, r) => s + num(r.CASH_ADD), 0),
+        BANK_DEP: rows.reduce((s, r) => s + num(r.BANK_DEP), 0),
+        CASH_EXP: rows.reduce((s, r) => s + num(r.CASH_EXP), 0),
+        CASH_PUR: rows.reduce((s, r) => s + num(r.CASH_PUR), 0),
+        CASH_DRAW: rows.reduce((s, r) => s + num(r.CASH_DRAW), 0),
+        CASH_OTH: rows.reduce((s, r) => s + num(r.CASH_OTH), 0),
+        CL_BAL: rows[rows.length - 1].CL_BAL,
+        _isGrandTotal: true,
+      });
+    }
     return { rows, columns: inferColumnsFromRows(rows) };
   }
 
   async function runExpensesMonthly(comp_code, comp_uid, p) {
+    if (String(p.detail_mode || '').trim().toLowerCase() === 'month') {
+      return runExpensesMonthlyDetail(comp_code, comp_uid, p);
+    }
     const sql = `
       SELECT EXTRACT(MONTH FROM A.VR_DATE) AS MTH, TO_CHAR(A.VR_DATE, 'MONTH') AS CMTH,
         EXTRACT(YEAR FROM A.VR_DATE) AS MYEAR,
@@ -1207,6 +1696,54 @@ function createIncomeTaxReports(runQuery) {
     const rows = pivotExpensesMonthly(raw);
     const columns = cols(['HEAD_NAME', ...FISCAL_MONTHS.map((m) => m.key), 'TOT']);
     return { rows, columns };
+  }
+
+  async function runExpensesMonthlyDetail(comp_code, comp_uid, p) {
+    const monthKey = String(p.month_key || '').trim().toUpperCase();
+    const expType = String(p.exp_type || '').trim().toLowerCase();
+    const cal = fiscalMonthCalendar(p.s_date, p.e_date, monthKey);
+    if (!cal) throw new Error('Invalid month for expense detail');
+    if (expType !== 'cash' && expType !== 'noncash') {
+      throw new Error('exp_type must be cash or noncash');
+    }
+    const cashFilter =
+      expType === 'cash'
+        ? `TRIM(NVL(A.VR_TYPE, '')) = 'CV'`
+        : `TRIM(NVL(A.VR_TYPE, '')) <> 'CV'`;
+    const sql = `
+      SELECT TRIM(A.CODE) AS CODE, B.NAME,
+        A.VR_DATE,
+        NVL(A.VR_NO, 0) AS VR_NO,
+        TRIM(NVL(A.VR_TYPE, '')) AS VR_TYPE,
+        NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0) AS AMOUNT
+      FROM LEDGER A
+      INNER JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND TRIM(A.CODE) = TRIM(B.CODE)
+      WHERE A.COMP_CODE = :comp_code
+        AND B.SCHEDULE >= 15.1
+        AND ${betweenDatesSql('A.VR_DATE')}
+        AND EXTRACT(MONTH FROM A.VR_DATE) = :mth
+        AND EXTRACT(YEAR FROM A.VR_DATE) = :myear
+        AND ${cashFilter}
+        AND (NVL(A.DR_AMT, 0) - NVL(A.CR_AMT, 0)) <> 0
+      ORDER BY TRIM(A.CODE), A.VR_DATE, A.VR_NO, A.VR_TYPE`;
+    const raw = await q(
+      sql,
+      {
+        comp_code,
+        s_date: p.s_date,
+        e_date: p.e_date,
+        mth: cal.mth,
+        myear: cal.myear,
+      },
+      comp_uid
+    );
+    let rows = raw.map((r) => ({ ...r, AMOUNT: num(r.AMOUNT) }));
+    rows = appendGrandTotalRow(rows, {
+      labelKey: 'VR_DATE',
+      labelValue: 'GRAND TOTAL',
+      sumKeys: ['AMOUNT'],
+    });
+    return { rows, columns: inferColumnsFromRows(rows) };
   }
 
   async function runCustPmt(comp_code, comp_uid, p, mds) {
@@ -1284,7 +1821,7 @@ function createIncomeTaxReports(runQuery) {
       INNER JOIN MASTER B ON A.COMP_CODE = B.COMP_CODE AND A.CODE = B.CODE
       WHERE A.COMP_CODE = :comp_code AND ${betweenDatesSql('A.VR_DATE')}
         AND B.SCHEDULE > 11 AND B.SCHEDULE < 12
-      ORDER BY CODE, BILL_DATE, BILL_NO`;
+      ORDER BY B.NAME, A.CODE, A.BILL_DATE, A.BILL_NO`;
     const x1 = await q(sql, { comp_code, s_date: p.s_date, e_date: p.e_date }, comp_uid);
     const map = new Map();
     for (const r of x1) {
@@ -1311,7 +1848,7 @@ function createIncomeTaxReports(runQuery) {
   async function runBrokSale(comp_code, comp_uid, p) {
     const bk_code = String(p.bk_code || '').trim();
     const sql = `
-      SELECT A.BK_CODE, B.NAME AS BK_NAME, A.CODE, C.NAME, C.CITY,
+      SELECT A.BK_CODE, B.NAME AS BK_NAME, A.CODE, C.NAME, C.STATE_CODE, C.STATE, C.CITY,
         SUM(CASE WHEN A.TYPE = 'CN' THEN A.QNTY * -1 ELSE A.QNTY END) AS QNTY,
         SUM(CASE WHEN A.TYPE = 'CN' THEN A.WEIGHT * -1 ELSE A.WEIGHT END) AS WEIGHT,
         SUM(CASE WHEN A.TYPE = 'CN' THEN A.BILL_AMT * -1 ELSE A.BILL_AMT END) AS AMOUNT
@@ -1321,8 +1858,8 @@ function createIncomeTaxReports(runQuery) {
       WHERE A.COMP_CODE = :comp_code
         AND ${billBetweenDatesSql('A.BILL_DATE')}
         AND (:bk_code IS NULL OR :bk_code = '' OR A.BK_CODE = :bk_code)
-      GROUP BY A.BK_CODE, B.NAME, A.CODE, C.NAME, C.CITY
-      ORDER BY BK_NAME, BK_CODE, NAME, CODE`;
+      GROUP BY A.BK_CODE, B.NAME, A.CODE, C.NAME, C.STATE_CODE, C.STATE, C.CITY
+      ORDER BY B.NAME, A.BK_CODE, C.STATE_CODE, C.CITY, C.NAME, A.CODE`;
     const rows = await q(sql, {
       comp_code,
       s_date: p.s_date,
@@ -1337,9 +1874,10 @@ function createIncomeTaxReports(runQuery) {
     'broker-list': (cc, cu, p) => runDalaliRpt(cc, cu, p),
     'party-wise-purchase': (cc, cu, p) => runItaxPur(cc, cu, p),
     'party-wise-sales': (cc, cu, p) => runItaxSale(cc, cu, p),
+    'top-party-sales': (cc, cu, p) => runItaxTopPartySale(cc, cu, p),
     'month-schedule-wise-list': (cc, cu, p) => runItaxSch(cc, cu, p),
     'customer-arhat': (cc, cu, p) => runItaxArh(cc, cu, p),
-    'dami-wise-sales': (cc, cu, p) => runSaleRpt(cc, cu),
+    'dami-wise-sales': (cc, cu, p) => runDamiWiseSales(cc, cu, p),
     'monthly-purchase-report': (cc, cu, p) => runPurRpt(cc, cu, p),
     'monthly-sales-report': (cc, cu, p) => runSaleRpt1(cc, cu, p),
     'item-wise-purchase-sale': (cc, cu, p) => runItmSalPur(cc, cu, p),

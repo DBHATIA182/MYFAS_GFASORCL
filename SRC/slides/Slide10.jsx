@@ -4,7 +4,7 @@ import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { downloadExcelRows } from '../utils/excelExport';
 import { toInputDateString, toOracleDate, toDisplayDate, formatLedgerDateDisplay } from '../utils/dateFormat';
 import { formatApiOrigin } from '../utils/apiLabel';
-import ReportHelpButton from '../components/ReportHelpButton';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 
 function n(row, upper, lower) {
   const v = row?.[upper] ?? row?.[lower];
@@ -264,32 +264,20 @@ export default function Slide10({ apiBase, formData, onPrev, onReset }) {
       <div className="slide slide-report slide-10">
         <div className="report-toolbar">
           <h2>Stock lot</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="stock-lot" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setShowReport(false)}>
-              ← Back
-            </button>
-            <button type="button" className="btn btn-export" onClick={downloadPdf}>
-              Pdf
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  downloadExcelRows(rows, 'StockLot', `${compName}_StockLot`);
-                } catch (e) {
-                  alert(String(e?.message || e));
-                }
-              }}
-            >
-              📊 Excel
-            </button>
-            <button type="button" className="btn btn-whatsapp" onClick={shareWa}>
-              💬 WhatsApp
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="stock-lot"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={() => setShowReport(false)}
+            onPdf={downloadPdf}
+            onExcel={() => {
+              try {
+                downloadExcelRows(rows, 'StockLot', `${compName}_StockLot`);
+              } catch (e) {
+                alert(String(e?.message || e));
+              }
+            }}
+            onWhatsApp={shareWa}
+          />
         </div>
         <div className="report-info">
           <p>

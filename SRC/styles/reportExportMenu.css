@@ -1,0 +1,201 @@
+/* Shared ⋮ export menu — ledger-style dropdown (all reports, desktop + mobile) */
+
+.report-export-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.report-export-menu__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.report-export-menu__btn:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+}
+
+.report-export-menu--dark .report-export-menu__btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.report-export-menu--dark .report-export-menu__btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.report-export-menu__panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 148px;
+  background: #fff;
+  border: 1px solid var(--fas-border, #d8e0ec);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 30, 60, 0.15);
+  z-index: 120;
+  overflow: hidden;
+}
+
+.report-export-menu__panel--portal {
+  position: fixed;
+  top: auto;
+  right: auto;
+  z-index: 10050;
+}
+
+.report-export-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: #fff;
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fas-navy, #0f1e3c);
+  cursor: pointer;
+}
+
+.report-export-menu__item + .report-export-menu__item {
+  border-top: 1px solid var(--fas-border, #d8e0ec);
+}
+
+.report-export-menu__item:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.report-export-menu__item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.report-export-menu__item-icon {
+  width: 1.1rem;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+/* Export-menu toolbars — no horizontal scroll strip */
+.toolbar-actions.toolbar-actions--export-menu {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  overflow: visible !important;
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+  max-height: none !important;
+  -webkit-overflow-scrolling: auto;
+}
+
+.toolbar-actions--export-menu .btn-report-help--icon-only {
+  flex-shrink: 0;
+}
+
+.toolbar-actions--export-menu .btn-toolbar-back {
+  margin-right: auto;
+  flex: 0 0 auto;
+  width: auto !important;
+  max-width: 55%;
+}
+
+.toolbar-actions--export-menu .btn-secondary {
+  flex: 0 0 auto;
+}
+
+/* Mobile income tax + other compact report toolbars: Back | ? | ⋮ only */
+@media (max-width: 640px) {
+  .toolbar-actions--export-menu.toolbar-actions--compact-mobile {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    width: 100%;
+    overflow: visible !important;
+  }
+
+  .toolbar-actions--compact-mobile .btn-toolbar-back {
+    margin-right: auto;
+    flex: 0 0 auto;
+    width: auto !important;
+    max-width: 48%;
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+    font-size: 0.72rem !important;
+  }
+
+  .toolbar-actions--compact-mobile .report-export-menu__btn {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    font-size: 18px;
+  }
+
+  .toolbar-actions--compact-mobile .btn-report-help--icon-only {
+    width: 32px;
+    height: 32px;
+  }
+
+  .toolbar-actions--compact-mobile .btn-report-help--icon-only .btn-report-help__icon {
+    width: 1.55rem;
+    height: 1.55rem;
+  }
+}
+
+.fas-tb-export-bar--menu {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--fas-surface, #fff);
+  border-bottom: 1px solid var(--fas-border, #d8e0ec);
+  flex-shrink: 0;
+}
+
+.ledger-new-mobile__header-actions .report-export-menu__btn,
+.tb-mobile__header-actions .report-export-menu__btn {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  font-size: 18px;
+}
+
+/* Legacy alias — desktop ledger header */
+.fas-ledger-export-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Income tax mobile report toolbar */
+.slide-89-itax.itax-screen--mobile-toolbar .report-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
+}
+
+.slide-89-itax.itax-screen--mobile-toolbar .toolbar-actions--export-menu {
+  width: 100%;
+}
+
+.slide-89-itax.itax-screen--mobile-toolbar .report-export-menu__panel {
+  z-index: 200;
+}

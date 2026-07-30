@@ -13,6 +13,7 @@ import {
   focusNextReportField,
   handleReportDateEnter,
 } from '../utils/reportFormFocus';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 
 const DEFAULT_HISTORY_START_DATE = '2001-04-01';
 
@@ -331,48 +332,20 @@ export default function Slide6({ apiBase, onPrev, onReset, formData }) {
         <SessionInfoLine formData={formData} helpReportId="customer-ledger" />
         <div className="report-toolbar">
           <h2>{ledgerTitle}</h2>
-          <div className="toolbar-actions">
-            <button
-              type="button"
-              className="btn btn-toolbar-back"
-              aria-label={openedFromOverdue ? 'Back to overdue' : 'Back'}
-              onClick={handleReportBack}
-            >
-              <span className="report-toolbar-back-full">
-                {openedFromOverdue ? '← Back to overdue' : '← Back'}
-              </span>
-              <span className="report-toolbar-back-short" aria-hidden="true">
-                ←
-              </span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-export"
-              onClick={() => downloadPDF().catch((err) => alert(err?.message || String(err)))}
-            >
-              Pdf
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  downloadExcelRows(reportData, ledgerTitle, `${compName}_${ledgerTitle}_${selectedCode}`);
-                } catch (e) {
-                  alert(String(e?.message || e));
-                }
-              }}
-            >
-              📊 Excel
-            </button>
-            <button
-              type="button"
-              className="btn btn-whatsapp"
-              onClick={() => shareWhatsApp().catch((err) => alert(err?.message || String(err)))}
-            >
-              💬 WhatsApp
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="customer-ledger"
+            onBack={handleReportBack}
+            backLabel={openedFromOverdue ? '← Back to overdue' : '← Back'}
+            onPdf={() => downloadPDF().catch((err) => alert(err?.message || String(err)))}
+            onExcel={() => {
+              try {
+                downloadExcelRows(reportData, ledgerTitle, `${compName}_${ledgerTitle}_${selectedCode}`);
+              } catch (e) {
+                alert(String(e?.message || e));
+              }
+            }}
+            onWhatsApp={() => shareWhatsApp().catch((err) => alert(err?.message || String(err)))}
+          />
         </div>
 
         <div className="report-info">

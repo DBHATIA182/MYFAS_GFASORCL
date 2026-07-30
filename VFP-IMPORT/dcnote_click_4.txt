@@ -1,0 +1,7 @@
+
+vtp=THISFORM.TYPE.VALUE
+vdt=thisform.R_date.Value
+vno=thisform.R_no.Value
+XTP=''
+DO FORM DCNOTE_PRINT WITH THISFORM.TYPE.VALUE,THISFORM.R_DATE.Value,THISFORM.R_NO.VALUE
+

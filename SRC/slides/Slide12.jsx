@@ -4,7 +4,7 @@ import ReportTable from '../components/ReportTable';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { downloadExcelRows } from '../utils/excelExport';
 import { toDisplayDate, toInputDateString, toOracleDate } from '../utils/dateFormat';
-import ReportHelpButton from '../components/ReportHelpButton';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 
 function todayInputValue() {
   const d = new Date();
@@ -194,27 +194,22 @@ export default function Slide12({ apiBase, onPrev, onReset, formData }) {
       <div className="slide slide-report">
         <div className="report-toolbar">
           <h2>{mlb === 'B' ? 'Pending bill entries' : 'Pending ledger entries'}</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="ageing" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setViewMode(VIEW.REPORT)}>
-              ← Back to ageing
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  const tag = String(detailTitle || 'detail').replace(/\s+/g, '_');
-                  downloadExcelRows(detailRows, 'AgeingDetail', `${compName}_Ageing_${tag}`);
-                } catch (e) {
-                  alert(String(e?.message || e));
-                }
-              }}
-            >
-              📊 Excel
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="ageing"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={() => setViewMode(VIEW.REPORT)}
+            backLabel="← Back to ageing"
+            showPdf={false}
+            showWhatsApp={false}
+            onExcel={() => {
+              try {
+                const tag = String(detailTitle || 'detail').replace(/\s+/g, '_');
+                downloadExcelRows(detailRows, 'AgeingDetail', `${compName}_Ageing_${tag}`);
+              } catch (e) {
+                alert(String(e?.message || e));
+              }
+            }}
+          />
         </div>
 
         <div className="report-info">
@@ -246,40 +241,20 @@ export default function Slide12({ apiBase, onPrev, onReset, formData }) {
       <div className="slide slide-report">
         <div className="report-toolbar">
           <h2>Ageing report</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="ageing" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setViewMode(VIEW.FORM)}>
-              ← Back
-            </button>
-            <button
-              type="button"
-              className="btn btn-export"
-              onClick={() => generatePDF('ageing', reportData, pdfMeta).catch((err) => alert(err?.message || String(err)))}
-            >
-              Pdf
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  downloadExcelRows(reportData, 'Ageing', `${compName}_Ageing`);
-                } catch (e) {
-                  alert(String(e?.message || e));
-                }
-              }}
-            >
-              📊 Excel
-            </button>
-            <button
-              type="button"
-              className="btn btn-whatsapp"
-              onClick={() => shareWhatsApp().catch((err) => alert(err?.message || String(err)))}
-            >
-              💬 WhatsApp
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="ageing"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={() => setViewMode(VIEW.FORM)}
+            onPdf={() => generatePDF('ageing', reportData, pdfMeta).catch((err) => alert(err?.message || String(err)))}
+            onExcel={() => {
+              try {
+                downloadExcelRows(reportData, 'Ageing', `${compName}_Ageing`);
+              } catch (e) {
+                alert(String(e?.message || e));
+              }
+            }}
+            onWhatsApp={() => shareWhatsApp().catch((err) => alert(err?.message || String(err)))}
+          />
         </div>
 
         <div className="report-info">

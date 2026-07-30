@@ -1,0 +1,407 @@
+/* Income tax report entry — centered card (same pattern as Trial Balance) */
+
+.app-main:has(> .slide-89-itax.itax-screen--entry) {
+  align-items: stretch !important;
+  justify-content: stretch !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.app-main:has(> .slide-89-itax.itax-screen--entry) > .slide-89-itax.itax-screen--entry {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  align-self: stretch !important;
+  height: 100% !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.app-main:has(> .slide-89-itax.itax-screen--entry) .fas-tb-flow {
+  width: 100% !important;
+  max-width: none !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+@media (min-width: 641px) {
+  .app--desktop .app-main:has(> .slide-89-itax.itax-screen--entry) {
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 28px 24px !important;
+    overflow: auto !important;
+    background: linear-gradient(160deg, #e8eef8 0%, #eef2f7 45%, #f4f6fb 100%) !important;
+  }
+
+  .app--desktop .app-main:has(> .slide-89-itax.itax-screen--entry) > .slide-89-itax.itax-screen--entry {
+    width: min(560px, calc(100vw - 48px)) !important;
+    max-width: 560px !important;
+    height: auto !important;
+    max-height: min(720px, calc(100dvh - 96px)) !important;
+    flex: 0 1 auto !important;
+    align-self: center !important;
+    margin: auto !important;
+    border-radius: 18px !important;
+    box-shadow:
+      0 20px 50px rgba(15, 30, 60, 0.12),
+      0 0 0 1px rgba(15, 30, 60, 0.06) !important;
+    background: #fff !important;
+    overflow: hidden !important;
+  }
+
+  .app--desktop .slide-89-itax.itax-screen--entry .fas-tb-flow {
+    height: auto !important;
+    max-height: min(720px, calc(100dvh - 96px)) !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+
+  .app--desktop .slide-89-itax.itax-screen--entry .fas-report-header {
+    border-radius: 18px 18px 0 0 !important;
+  }
+
+  .app--desktop .slide-89-itax.itax-screen--entry .fas-tb-body {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 10px 14px 12px !important;
+  }
+
+  .app--desktop .slide-89-itax.itax-screen--entry .fas-tb-form-shell {
+    gap: 8px;
+  }
+
+  .app--desktop .slide-89-itax.itax-screen--entry .fas-tb-session-card {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    padding: 8px 10px;
+  }
+
+  .app--desktop .slide-89-itax.itax-screen--entry .fas-tb-form-footer {
+    margin-top: 0;
+    padding-top: 4px;
+  }
+
+  .app--desktop .slide-89-itax.itax-screen--entry .fas-tb-run-bottom {
+    min-height: 42px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .slide-89-itax.itax-screen--entry {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .slide-89-itax.itax-screen--entry .fas-tb-flow {
+    height: 100% !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+  }
+}
+
+.itax-entry-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+  align-items: start;
+}
+
+.itax-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+}
+
+.itax-field--full {
+  grid-column: 1 / -1;
+}
+
+.itax-field__label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.itax-field__ctl {
+  width: 100%;
+  min-width: 0;
+}
+
+.itax-field__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.32rem 0.5rem;
+  font-family: inherit;
+  font-size: 13px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.itax-field__input:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+  border-color: #3b82f6;
+}
+
+.itax-field__hint {
+  margin: 0;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.itax-entry-form-shell .fas-tb-form-footer {
+  margin-top: 0;
+  padding-top: 4px;
+}
+
+.itax-entry-form-shell .fas-tb-run-bottom {
+  min-height: 42px;
+  font-size: 14px;
+}
+
+.itax-entry-form-shell .inttrf-screen__error {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.itax-field__ctl .master-party-pick {
+  width: 100%;
+}
+
+.itax-field__ctl .master-party-pick__trigger {
+  min-height: 2.1rem;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .itax-entry-filters {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .itax-field--full {
+    grid-column: auto;
+  }
+
+  .slide-89-itax.itax-screen--entry .fas-tb-body {
+    padding: 10px 12px 12px !important;
+    overflow-y: auto !important;
+  }
+
+  .itax-screen--compact-entry .itax-entry-filters {
+    grid-template-columns: 1fr;
+    gap: 5px 8px;
+  }
+
+  .itax-screen--compact-entry .itax-field {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .itax-screen--compact-entry .itax-field__label {
+    flex: 0 0 5.5rem;
+    width: 5.5rem;
+    font-size: 9px;
+  }
+}
+
+/* Compact entry — broker date-wise (no scroll on desktop) */
+.app--desktop .app-main:has(> .slide-89-itax.itax-screen--compact-entry) {
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px 20px !important;
+  overflow: hidden !important;
+}
+
+.app--desktop .app-main:has(> .slide-89-itax.itax-screen--compact-entry) > .slide-89-itax.itax-screen--compact-entry {
+  width: min(760px, calc(100vw - 40px)) !important;
+  max-width: 760px !important;
+  max-height: min(580px, calc(100dvh - 80px)) !important;
+}
+
+.app--desktop .slide-89-itax.itax-screen--compact-entry .fas-tb-flow {
+  max-height: min(580px, calc(100dvh - 80px)) !important;
+}
+
+.app--desktop .slide-89-itax.itax-screen--compact-entry .fas-tb-body {
+  overflow-y: hidden !important;
+  padding: 8px 12px 10px !important;
+}
+
+.itax-screen--compact-entry .itax-entry-filters {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+  align-items: center;
+}
+
+/* Label left of input — fits more fields in frame */
+.itax-screen--compact-entry .itax-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.itax-screen--compact-entry .itax-field__label {
+  flex: 0 0 6.75rem;
+  width: 6.75rem;
+  font-size: 10px;
+  font-weight: 700;
+  margin: 0;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.15;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.itax-screen--compact-entry .itax-field__ctl {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.itax-screen--compact-entry .itax-field--full {
+  grid-column: 1 / -1;
+}
+
+.itax-screen--compact-entry .itax-field__hint {
+  display: none;
+}
+
+.itax-screen--compact-entry .itax-field__input,
+.itax-screen--compact-entry .itax-field__ctl .master-party-pick__trigger {
+  min-height: 1.95rem;
+  font-size: 12px;
+  padding-top: 0.24rem;
+  padding-bottom: 0.24rem;
+}
+
+.itax-screen--compact-entry .fas-tb-session-card {
+  padding: 6px 8px;
+  margin-bottom: 2px;
+}
+
+.itax-screen--compact-entry .fas-tb-form-shell {
+  gap: 6px;
+}
+
+.itax-screen--compact-entry .fas-tb-run-bottom {
+  min-height: 38px;
+  font-size: 13px;
+}
+
+/* Manual code entry — type code + optional help (search btn not in tab order) */
+.itax-manual-code {
+  display: flex;
+  gap: 0.25rem;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.itax-manual-code__input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.itax-manual-code .master-party-pick {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.itax-manual-code .master-party-pick__trigger {
+  display: none !important;
+}
+
+.itax-manual-code .master-party-pick__search-btn {
+  min-height: 1.95rem;
+  width: 2rem;
+  padding: 0;
+  border-radius: 8px;
+}
+
+.itax-screen--compact-entry .itax-manual-code .master-party-pick__search-btn {
+  min-height: 1.95rem;
+}
+
+.itax-table tbody tr.itax-row--sale-bill {
+  cursor: pointer;
+}
+
+.itax-table tbody tr.itax-row--sale-bill:hover td {
+  background: #eff6ff;
+}
+
+.itax-table tbody tr.itax-row--broker-drill {
+  cursor: pointer;
+}
+
+.itax-table tbody tr.itax-row--broker-drill:hover td {
+  background: #f0fdf4;
+}
+
+.itax-entry-filters--ledger-dr-cr {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.itax-entry-section {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px 10px;
+  background: #f8fafc;
+}
+
+.itax-entry-section__title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #334155;
+}
+
+.itax-entry-section__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px 10px;
+}
+
+.itax-entry-section__grid--dates {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+  .itax-entry-section__grid--dates {
+    grid-template-columns: 1fr;
+  }
+}

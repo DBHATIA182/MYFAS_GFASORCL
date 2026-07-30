@@ -153,6 +153,25 @@ export const REPORT_HELP = {
     },
   },
 
+  'ledger-dr-cr-date': {
+    title: 'Ledger Dr/Cr Date',
+    summary:
+      'Account ledger with separate date ranges for debit lines and credit lines (VFP MYLEGER mode 1).',
+    sections: [
+      section('Parameters', [
+        'Account code (required) — search by code or name.',
+        'Debit (Dr) — Starting and ending dates apply to lines with a debit amount.',
+        'Credit (Cr) — Starting and ending dates apply to lines with a credit amount only.',
+      ]),
+      section('On screen', [
+        'Ledger lines sorted by date and voucher number.',
+        'Debit and credit totals with grand total row.',
+        'Tap a row to open the full account ledger (optional drill).',
+        'Pdf / Excel / WhatsApp from toolbar.',
+      ]),
+    ],
+  },
+
   'ledger-interest': {
     title: 'Ledger With Interest',
     summary: 'Same as ledger plus interest columns (rate, grace days, interest date).',
@@ -316,6 +335,76 @@ export const REPORT_HELP = {
     ],
   },
 
+  'purchase-tds-detail': {
+    title: 'Party Wise Purchase Detail (TDS)',
+    summary: 'Bill-wise purchase TDS from PURCHASE NTDS fields (VFP DO FORM tcs_rpt WITH 3).',
+    sections: [
+      section('Parameters', [
+        'Starting date and ending date on R_DATE (defaults from financial year).',
+        'Party code — optional F1 help filter; leave blank for all parties.',
+      ]),
+      section('Columns', [
+        'Party code, name, PAN, R date, R no, type, amount, TDS on amount, TDS %, TDS amount, city, state.',
+        'Debit notes (TYPE DN) show negative amount and TDS figures.',
+      ]),
+      section('Actions', [
+        'Click a bill row to open purchase bill print.',
+        'Export Pdf / Excel / WhatsApp from the toolbar.',
+      ]),
+    ],
+  },
+
+  'purchase-tds-summary': {
+    title: 'Party Wise Purchase Summary (TDS)',
+    summary: 'Party-wise totals of purchase amount and NTDS (VFP DO FORM tcs_rpt WITH 4).',
+    sections: [
+      section('Parameters', [
+        'Starting date and ending date on R_DATE.',
+        'Optional party filter — one supplier or all parties.',
+      ]),
+      section('Columns', [
+        'Party code, name, PAN, address, city, state, total amount, TDS on amount, TDS %, TDS amount.',
+        'Totals include debit note sign reversal per VFP logic.',
+        'Click a party row to open bill-wise detail for that party.',
+      ]),
+    ],
+  },
+
+  'sale-tds-detail': {
+    title: 'Party Wise Sale Detail (TDS)',
+    summary: 'Bill-wise sale TDS from SALE TDS fields (VFP DO FORM tcs_rpt WITH 5).',
+    sections: [
+      section('Parameters', [
+        'Starting date and ending date on BILL_DATE (defaults from financial year).',
+        'Party code is optional; leave blank for all parties.',
+      ]),
+      section('Columns', [
+        'Party code, name, PAN, bill date, bill no, type, btype, amount, TDS on amount, TDS %, TDS amount, city, state.',
+        'Credit notes (TYPE CN) show negative amount and TDS figures.',
+      ]),
+      section('Actions', [
+        'Click a bill row to open sale bill print preview.',
+        'Export Pdf / Excel / WhatsApp from the toolbar.',
+      ]),
+    ],
+  },
+
+  'sale-tds-summary': {
+    title: 'Party Wise Sale Summary (TDS)',
+    summary: 'Party-wise totals of sale amount and TDS (VFP DO FORM tcs_rpt WITH 6).',
+    sections: [
+      section('Parameters', [
+        'Starting date and ending date on BILL_DATE.',
+        'Optional party filter — one customer or all parties.',
+      ]),
+      section('Columns', [
+        'Party code, name, PAN, address, city, state, total amount, TDS on amount, TDS %, TDS amount.',
+        'Totals include credit note sign reversal per VFP logic.',
+        'Click a party row to open bill-wise detail for that party.',
+      ]),
+    ],
+  },
+
   'sale-bill-printing': {
     title: 'Sale Bill Printing',
     summary: 'Find sale bills and open print layout.',
@@ -355,9 +444,12 @@ export const REPORT_HELP = {
     summary: 'Add, edit, delete sales orders (SORDER type SO).',
     sections: [
       section('Use', [
-        'F12 permissions: open/add/edit/delete from your user rights.',
-        'Enter party, lines, manual SO number on add; Prev/Next/List/Print on toolbar.',
-        'List screen: Pdf, Excel, WhatsApp.',
+        'F10 permissions: open/add/edit/delete from your user rights.',
+        'Enter party, broker, D/E, lines (USD/Conv rate for export), GST totals; Save posts to SORDER.',
+            'Toolbar: New, Edit, Delete, Save, List, CheckList, PndSum, PndDet, PndDate, SO/DO, Refresh, Print, Close. Enter moves field-to-field; F1 opens help.',
+            'CheckList (SOCHK): filter by date/no. range, party, item, broker, Rake/Truck, D/E, loading location.',
+            'Pending (SOPND): Summary / Detail / Date Wise / SO-DO-Sale — balance SORDER vs SALE (and INWARD for SO/DO/Sale).',
+            'Print (SOPNT): bill no. range + D/E; export orders print in SORDER_EXPORT format with USD rate/amount.',
       ]),
     ],
   },
@@ -398,7 +490,7 @@ export const REPORT_HELP = {
   },
 
   'voucher-list': {
-    title: 'Voucher List',
+    title: 'Voucher Checklist',
     summary: 'Cash, bank, and journal vouchers in a date range.',
     sections: [
       section('Use', [
@@ -456,8 +548,8 @@ export const REPORT_HELP = {
       'Income tax and related analysis reports from the legacy VFP BW_MENU popup incometaxr (34 reports).',
     sections: [
       section('Source', [
-        'Mapped from menu/BW_MENU.MPR — Income Tax Reports popup.',
-        'Forms in GFASORCL/forms, report layouts in GFASORCL/reports.',
+        'Mapped from e:\\gfasorcl\\menu\\BW_MENU.MPR — Income Tax Reports popup.',
+        'Forms in e:\\gfasorcl\\forms, report layouts in e:\\gfasorcl\\reports, programs in e:\\gfasorcl\\prg.',
         'Most reports use DO FORM ITAXRPT WITH a mode letter (A–Y); others use dedicated forms (loaner, lotpursale, ledger_dc_code, cashflow, expenses_monthly, cust_pmt, broksale).',
       ]),
       section('Categories', [
@@ -471,6 +563,287 @@ export const REPORT_HELP = {
       section('Web status', [
         'All 34 income tax menu reports open on the web (Slide 89) with Proceed and Back on the entry screen.',
         'Pdf, Excel, and WhatsApp are available after Proceed on the report screen.',
+      ]),
+    ],
+  },
+
+  'other-reports-module': {
+    title: 'Other Reports',
+    summary:
+      'Miscellaneous reports from the legacy VFP BW_MENU popup otherreports (24 reports) — labour, brokerage, chant, and outstanding.',
+    sections: [
+      section('Source', [
+        'Mapped from e:\\gfasorcl\\menu\\BW_MENU.MPR — Other Reports popup (pad ALT+O).',
+        'Router: e:\\gfasorcl\\prg\\other_rpt.prg (DO OTHER_RPT WITH A–Z).',
+        'Forms: e:\\gfasorcl\\forms · Reports: e:\\gfasorcl\\reports · Programs: e:\\gfasorcl\\prg.',
+      ]),
+      section('Categories', [
+        'Labour — Labour report (lot stock labour/dalali).',
+        'Brokerage — Date, item, category, purchase, scheme, dalali less freight, Excel dalali.',
+        'Broker accounts — Summary, ledger, trial, paploo.',
+        'Chant — Formats 1–3 and summary.',
+        'Party ledgers — Freight and indent party ledgers.',
+        'Outstanding — Month-wise purchase and sale outstanding.',
+        'Export — Combined sale/purchase report.',
+      ]),
+      section('Web status', [
+        'All 24 other reports open on the web (Slide 91) with date filters and Proceed.',
+        'Pdf, Excel, and WhatsApp export available after Proceed.',
+        'Logic ported from e:\\gfasorcl\\prg (labour.prg, broker.prg, insrpt.prg, ledger.prg, chant.prg, etc.).',
+      ]),
+    ],
+  },
+
+  'voucher-books-module': {
+    title: 'Voucher Books',
+    summary:
+      'Cash book, bank book, journal book, day book, bank statement and bank reconciliation — from VFP BW_MENU books popup.',
+    sections: [
+      section('Source', [
+        'Mapped from e:\\gfasorcl\\menu\\BW_MENU.MPR — Books popup.',
+        'Forms: rptcasbk, rptbanbk, rptjoubk, daybook · Program: e:\\gfasorcl\\prg\\BOOKS.PRG.',
+      ]),
+      section('Reports', [
+        'Cash Book / Bank Book — account ledger with opening balance (schedule 9.10 / 9.20).',
+        'CashBookSum / BankBookSum — date-wise debit/credit summary.',
+        'Journal Book / JournalBookSum — journal voucher detail or grouped by date and number.',
+        'DayBook — all voucher types for the period (cash account as base).',
+        'BankStatement — bank ledger statement with opening balance.',
+        'BankReconc — bank reconciliation from BANKSTMT cleared/uncleared entries.',
+      ]),
+      section('Filters', [
+        'From / To date — financial year defaults on open.',
+        'Cash or Bank A/c — required for cash/bank/day book and bank reports; use ? to pick account.',
+        'Journal books need only the date range.',
+      ]),
+    ],
+  },
+
+  'cash-book': {
+    title: 'Cash Book',
+    summary: 'Cash account ledger — day-wise with CASH IN HAND, Day Total and Closing Balance (VFP CASHBK_1).',
+    sections: [
+      section('Filters', ['Cash A/c (schedule 9.10)', 'From date', 'To date']),
+      section('Layout', [
+        'Each day: CASH IN HAND (opening) → vouchers → Day Total → Closing Balance.',
+        'Next day opening equals previous day closing balance.',
+        'Tap a voucher line to open Cash / Bank / Journal entry; Back returns to this report.',
+      ]),
+    ],
+  },
+
+  'bank-book': {
+    title: 'Bank Book',
+    summary: 'Bank account ledger — day-wise with opening balance, Day Total and Closing Balance (VFP BANBK_1).',
+    sections: [
+      section('Filters', ['Bank A/c (schedule 9.20)', 'From date', 'To date']),
+      section('Layout', [
+        'Each day: OPENING BALANCE → vouchers → Day Total → Closing Balance.',
+        'Next day opening equals previous day closing balance.',
+        'Tap a voucher line to open Cash / Bank / Journal entry; Back returns to this report.',
+      ]),
+    ],
+  },
+
+  'journal-book': {
+    title: 'Journal Book',
+    summary: 'Journal voucher lines (VFP DO FORM rptjoubk).',
+    sections: [section('Filters', ['From date', 'To date']), section('Output', ['JV lines with account name and amounts.'])],
+  },
+
+  'day-book': {
+    title: 'Day Book',
+    summary: 'Day book for cash, bank and journal vouchers (VFP DO FORM DAYBOOK).',
+    sections: [
+      section('Filters', ['Cash A/c (schedule 9.10)', 'From date', 'To date']),
+      section('Note', ['Includes CV, BV and JV by default (VFP DAYBOOK form defaults).']),
+    ],
+  },
+
+  'bank-statement': {
+    title: 'Bank Statement',
+    summary: 'Bank statement with opening balance (VFP rptbanbk with A).',
+    sections: [section('Filters', ['Bank A/c', 'From date', 'To date'])],
+  },
+
+  'bank-reconc': {
+    title: 'Bank Reconciliation',
+    summary: 'Bank reconciliation statement (VFP rptbanbk with B).',
+    sections: [section('Filters', ['Bank A/c', 'From date', 'To date']), section('Data', ['Uses BANKSTMT cleared and uncleared entries.'])],
+  },
+
+  'transaction-module': {
+    title: 'Transaction',
+    summary:
+      'Voucher, purchase, sale, production, bikri, TDS, bank reconciliation, and freight entry screens from the legacy VFP BW_MENU popup transactio (ALT+T).',
+    sections: [
+      section('Source', [
+        'Mapped from e:\\gfasorcl\\menu\\BW_MENU.MPR — Transaction popup (pad ALT+T).',
+        'Forms: e:\\gfasorcl\\forms · Programs: e:\\gfasorcl\\prg · Reports: e:\\gfasorcl\\reports.',
+      ]),
+      section('Categories', [
+        'Cash / Bank / Journal vouchers — entry, checklist, printing, receipts.',
+        'Purchase Records — orders, inward, consignment, purchase bill, debit/credit notes, import sauda.',
+        'Sale Records — sales order, dispatch, sale bill, export, consignment, performa.',
+        'Production — stock convert, jobwork, dharra, cold store.',
+        'Supplier & Customer Bikri — bikri entry and lists.',
+        'TDS Voucher — TDS/TCS vouchers, deposits, returns, brokerage.',
+        'Bank Reconciliation & Freight Voucher — recon, freight entry and reports.',
+        'Reverse Charge Invoice & Indent Voucher — direct form entry.',
+      ]),
+      section('Web status', [
+        'Cash, bank, and journal voucher screens are under the Vouchers module.',
+        'Purchase and sale entry screens are under Purchase and Sales modules.',
+        'This Transaction module keeps production, bikri, TDS, bank reconciliation, freight, reverse charge, and indent.',
+        'Implemented checklist/print screens link to existing voucher, purchase, and sale list pages.',
+      ]),
+    ],
+  },
+
+  'broker-ledger': {
+    title: 'Broker Ledger',
+    summary: 'Broker account ledger from LEDGER and BROKLEG for the selected date range (VFP DO FORM BROKLEG).',
+    sections: [
+      section('Parameters', [
+        'From Date and To Date — voucher date range (required).',
+        'Broker Code — required; tap ? to pick from broker master.',
+      ]),
+      section('Report layout', [
+        'Voucher lines with date, number, type, detail, debit, credit, and broker name.',
+        'GRAND TOTAL row at the end with total debit and credit.',
+      ]),
+      section('Export', [
+        'Pdf, Excel, and WhatsApp from the toolbar after Proceed.',
+        'Mobile shows voucher cards with grand total.',
+      ]),
+    ],
+  },
+
+  'trading-exp': {
+    title: 'Trading Exp.',
+    summary: 'Trading expense vouchers from ledger for schedules 12.10 and 14.10 (VFP DO FORM TDGEXP).',
+    sections: [
+      section('Parameters', [
+        'From Date and To Date — voucher date range (required).',
+        'Account Code — optional; tap ? to pick from account master. Leave blank for all trading expense accounts.',
+      ]),
+      section('Report layout', [
+        'Grouped by account — account header once, then CV/BV/JV lines with type, date, voucher no., detail, debit and credit.',
+        'ACCOUNT TOTAL after each account; GRAND TOTAL at the end.',
+        'Tap a voucher line to view all ledger entries for that voucher only.',
+      ]),
+      section('Export', [
+        'Pdf, Excel, and WhatsApp from the toolbar after Proceed.',
+        'Mobile shows account headers and voucher cards.',
+      ]),
+    ],
+  },
+
+  'broker-summary': {
+    title: 'Broker Summary',
+    summary: 'Broker-wise sale brokerage totals with bill detail drill-down (VFP DO FORM BROKRPT WITH 5).',
+    sections: [
+      section('Date & broker range', [
+        'From Date and To Date — bill date range (required).',
+        'Broker From / Broker To — optional range; defaults B00000–B99999. Tap ? to pick from broker master.',
+      ]),
+      section('Optional filters', [
+        'Supplier Code — tap ? to pick supplier; leave blank for all.',
+        'Party Code — tap ? to pick customer/party; leave blank for all.',
+        'Item Code — tap ? to pick item; leave blank for all.',
+      ]),
+      section('Report layout', [
+        'One row per broker with bags, katta, weight, amount, brokerage, dane, P-amt, total, and freight.',
+        'GRAND TOTAL at the end.',
+        'Tap a broker row to view bill-wise detail for that broker.',
+        'In detail, tap a bill line to open the sale bill.',
+      ]),
+      section('Mobile & export', [
+        'Broker cards on mobile; bill detail as cards after drill.',
+        'Pdf, Excel, and WhatsApp from the toolbar after Proceed.',
+      ]),
+    ],
+  },
+
+  'dalali-excel': {
+    title: 'Bill Wise Dalali Report Excel',
+    summary:
+      'Bill-wise trading and consignment dalali (brokerage + dane) from sale bills for Excel export (VFP DO OTHER_RPT WITH \'Y\' / BROKRPT 9).',
+    sections: [
+      section('Date & broker range', [
+        'From Date and To Date — bill date range (required).',
+        'Broker From / Broker To — optional broker code range; defaults B00000–B99999. Tap ? / F1 on each field to search broker master.',
+      ]),
+      section('Optional filters', [
+        'Supplier Code — tap ? / F1 to pick supplier; leave blank for all suppliers.',
+        'Party Code — tap ? / F1 to pick customer/party; leave blank for all parties.',
+        'Item Code — tap ? / F1 to pick item; leave blank for all items.',
+      ]),
+      section('Report columns', [
+        'Date, Bill No, Customer, Supplier, Item, Tdg Brok, Consg Brok, Tdg Dane, Consg Dane, Broker.',
+        'Trading dalali uses schedule 12.10; consignment dalali uses other supplier schedules.',
+        'Only bills with brokerage or dane amount are listed.',
+      ]),
+      section('Export', [
+        'GRAND TOTAL row is included on screen and in Excel for Tdg Brok, Consg Brok, Tdg Dane, and Consg Dane.',
+        'Use Excel from the toolbar after Proceed.',
+      ]),
+    ],
+  },
+
+  'cash-voucher-entry': {
+    title: 'Cash Voucher — Add/Edit/Delete',
+    summary:
+      'Web cash voucher entry (type CV) with New, Save, Load, and Delete. Hub shortcuts open checklist, printing, receipts, and cash discount.',
+    sections: [
+      section('Entry form', [
+        'Toolbar: New, Edit, Delete, Save, Load — matches VFP voucher form.',
+        'Header: Vr. Date, (R)eceipt type (N/R), Counter No., Vr. No., Pan, Cash A/c, A/c Bal., Tot.Cash.',
+        'Grid columns: Sno, Code, Name, Val.Date, Lot No, Chq.No., Particulars, Bill Date, No., T, Dr/Cr, Int., C.D., Broker.',
+        'Press Enter in any field to move to the next field (VFP-style).',
+        'Receipt type R posts to HI_RECEIPT on save (new vouchers).',
+      ]),
+      section('Actions', [
+        'Cash List — opens voucher checklist for type CV (live).',
+        'Cash Print — print cash vouchers (VFP voupnt CV).',
+        'Cash Receipt — receipt printing (VFP receipt CV).',
+        'Receipt Upd — update cash receipts.',
+        'Cash Rec List — cash receipt received list.',
+        'Cash Disc — cash discount list.',
+      ]),
+      section('VFP', [
+        'Entry form: DO FORM voucher WITH …,0,\'CV\' (F3).',
+        'Submenu: BW_MENU.MPR popup cashvouche.',
+      ]),
+    ],
+  },
+
+  'brokerage-item-cat-wise': {
+    title: 'Brokerage Report Item Cat Wise',
+    summary:
+      'Sale brokerage grouped by broker, then item category, with item category totals, broker totals, and grand total (VFP BROKRPT2 in broker.prg).',
+    sections: [
+      section('Date & broker range', [
+        'From Date and To Date — bill date range (required).',
+        'Broker From / Broker To — optional range; defaults B00000–B99999. Tap ? to pick from broker master.',
+        'Detail/Sum. — Detail shows bill lines grouped by broker and category; Summary shows category totals per broker.',
+      ]),
+      section('Optional filters', [
+        'Supplier Code — tap ? to pick supplier; leave blank for all.',
+        'Party Code — tap ? to pick customer/party; leave blank for all.',
+        'Item Code — tap ? to pick item; leave blank for all.',
+        'Item Category — category code; leave blank for all categories.',
+        'L / C — All, Local, or Central.',
+      ]),
+      section('Report layout', [
+        'Detail: broker header, each item category with bill lines, ITEM CAT TOTAL, BROKER TOTAL, GRAND TOTAL.',
+        'Summary: broker header, one row per category with totals, BROKER TOTAL, GRAND TOTAL.',
+        'In summary, tap a category row to drill to bill detail for that broker and category.',
+        'Tap a bill line in detail view to open the sale bill (when enabled).',
+      ]),
+      section('Mobile', [
+        'Same grouping on mobile cards — broker header, category header, line cards, and total cards.',
+        'Pdf, Excel, and WhatsApp export from the toolbar after Proceed.',
       ]),
     ],
   },
@@ -1302,6 +1675,10 @@ const PDF_ORDER = [
   'hsn-purchase',
   'state-wise-sales',
   'state-wise-purchase',
+  'purchase-tds-detail',
+  'purchase-tds-summary',
+  'sale-tds-detail',
+  'sale-tds-summary',
   'sale-bill-printing',
   'sale-list',
   'gstr1',

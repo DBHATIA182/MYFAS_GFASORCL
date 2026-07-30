@@ -1,0 +1,16 @@
+
+select a.R_date,a.R_no,a.BILL_date,A.BILL_NO,a.code,b.name,a.bK_code,a.item_code,C.ITEM_NAME,;
+a.status,a.qnty,a.weight,a.rate,a.cal,a.amount,;
+a.dami,a.DAMIAMT,A.P_CODE,A.STK_DATE,;
+a.tax_type,a.tax_per,a.tax_amt,a.freight,a.ADDEXP,A.LESSEXP,a.bill_amt,A.TOT_COMM,A.TDS_PER,A.SUR_PER,A.EDU_PER,;
+A.TDS_AMT,A.SUR_AMT,A.EDU_AMT,A.TOT_TDS,A.TDS_CODE,A.INT_NO from PURCHASE a,;
+master b,ITEMMAST c where a.code=b.code and a.ITEM_code=c.ITEM_code;
+and a.type=thisform.type.value order by 1,2 into cursor SEARCH
+do form search with 'SEARCH' TO SR_XX
+IF SR_XX
+ THISFORM.R_NO.VALUE=R_NO
+ THISFORM.R_DATE.VALUE=R_DATE
+ SELECT R_DATE,R_NO FROM XSEARCH GROUP BY 1,2 ORDER BY 1,2 INTO CURSOR FSEARCH
+ THISFORM.BACKKEY='Y'
+ THISFORM.HELPBTN.CLICK
+ENDI

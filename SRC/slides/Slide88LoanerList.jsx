@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import SessionInfoLine from '../components/SessionInfoLine';
-import ReportHelpButton from '../components/ReportHelpButton';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 import { downloadExcelRows } from '../utils/excelExport';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { toDisplayDate, toInputDateString, toOracleDate } from '../utils/dateFormat';
@@ -190,24 +190,14 @@ export default function Slide88LoanerList({ apiBase, formData, userName, onPrev,
         <div className="loaner-list-screen__scroll">
           <div className="report-toolbar">
             <h2>Loaner List</h2>
-            <div className="toolbar-actions">
-              <ReportHelpButton reportId="loaner-list" />
-              <button type="button" className="btn btn-toolbar-back" onClick={() => setShowReport(false)}>
-                ← Back
-              </button>
-              <button type="button" className="btn btn-export" onClick={handlePdf}>
-                Pdf
-              </button>
-              <button type="button" className="btn btn-excel" onClick={handleExcel}>
-                Excel
-              </button>
-              <button type="button" className="btn btn-whatsapp" onClick={handleWhatsApp}>
-                WhatsApp
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={onPrev}>
-                Menu
-              </button>
-            </div>
+            <ReportToolbarActions
+              reportId="loaner-list"
+              onBack={() => setShowReport(false)}
+              onPdf={handlePdf}
+              onExcel={handleExcel}
+              onWhatsApp={handleWhatsApp}
+              onMenu={onPrev}
+            />
           </div>
 
           <p className="loaner-list-screen__meta">

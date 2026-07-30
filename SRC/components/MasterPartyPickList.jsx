@@ -1,4 +1,13 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 const MOBILE_MQ = '(max-width: 640px)';
@@ -25,36 +34,40 @@ function visibleViewport() {
 }
 
 /** Searchable dropdown — portal + viewport clamp; touch-safe selection on mobile. */
-export default function MasterPartyPickList({
-  options,
-  value,
-  onChange,
-  disabled,
-  title = 'Select',
-  placeholder = '— select —',
-  filterPlaceholder = 'Type to filter…',
-  dataMpField,
-  onKeyDown,
-  getValue = (o) => String(o.value ?? o.NO ?? o.no ?? ''),
-  getLabel = (o) => String(o.label ?? o.NAME ?? o.name ?? o.value ?? ''),
-  getTriggerLabel,
-  getOptionLabel,
-  getOptionHint,
-  getOptionCity,
-  getOptionGst,
-  getOptionPan,
-  getOptionTel,
-  getFilterText,
-  getOptionTitle,
-  panelVariant,
-  openOnFocus = false,
-  showSearchIcon = false,
-  showAllWhenEmpty = false,
-  searchBtnTabIndex,
-  onAfterSelect,
-  onFilterChange,
-  onOpen,
-}) {
+const MasterPartyPickList = forwardRef(function MasterPartyPickList(
+  {
+    options,
+    value,
+    onChange,
+    disabled,
+    title = 'Select',
+    placeholder = '— select —',
+    filterPlaceholder = 'Type to filter…',
+    dataMpField,
+    onKeyDown,
+    getValue = (o) => String(o.value ?? o.NO ?? o.no ?? ''),
+    getLabel = (o) => String(o.label ?? o.NAME ?? o.name ?? o.value ?? ''),
+    getTriggerLabel,
+    getOptionLabel,
+    getOptionHint,
+    getOptionCity,
+    getOptionGst,
+    getOptionPan,
+    getOptionTel,
+    getFilterText,
+    getOptionTitle,
+    panelVariant,
+    openOnFocus = false,
+    showSearchIcon = false,
+    showAllWhenEmpty = false,
+    openFilterSeed,
+    searchBtnTabIndex,
+    onAfterSelect,
+    onFilterChange,
+    onOpen,
+  },
+  ref
+) {
   const triggerLabel = getTriggerLabel ?? getLabel;
   const optionLabel = getOptionLabel ?? getLabel;
   const filterFor = getFilterText
@@ -358,11 +371,14 @@ export default function MasterPartyPickList({
 
   const openSearch = useCallback(() => {
     if (disabled) return;
-    setFilter('');
+    const seed = String(openFilterSeed ?? '').trim();
+    setFilter(seed);
     setHighlightIndex(0);
     setOpen(true);
-    onOpen?.();
-  }, [disabled, onOpen]);
+    onOpen?.(seed);
+  }, [disabled, onOpen, openFilterSeed]);
+
+  useImperativeHandle(ref, () => ({ openSearch }), [openSearch]);
 
   const handleHelpKeyDown = useCallback(
     (e) => {
@@ -645,4 +661,6 @@ export default function MasterPartyPickList({
       {panel}
     </div>
   );
-}
+});
+
+export default MasterPartyPickList;

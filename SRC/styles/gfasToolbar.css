@@ -6,8 +6,8 @@
 
 .gfas-toolbar,
 .account-master-screen__toolbar,
-.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar .toolbar-actions,
-.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar .toolbar-actions:not(.toolbar-actions--export-menu),
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions:not(.toolbar-actions--export-menu),
 .dc-list-results__toolbar,
 .dc-print-results__toolbar,
 .overdue-toolbar__actions {
@@ -37,8 +37,8 @@
 .gfas-toolbar-btn,
 .gfas-toolbar .btn,
 .account-master-screen__toolbar .btn,
-.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar .toolbar-actions .btn,
-.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions .btn,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .report-toolbar .toolbar-actions:not(.toolbar-actions--export-menu) .btn,
+.slide:not(.slide-21-state-wise):not(.slide-22-state-wise-purchase) .toolbar-actions:not(.toolbar-actions--export-menu) .btn,
 .dc-list-results__toolbar .btn,
 .dc-print-results__toolbar .btn,
 .overdue-toolbar__actions .btn {

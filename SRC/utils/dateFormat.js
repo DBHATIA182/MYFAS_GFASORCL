@@ -31,9 +31,26 @@ export function toInputDateString(raw) {
     const mm = dmy[2].padStart(2, '0');
     return `${dmy[3]}-${mm}-${dd}`;
   }
+  const dmySlash = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+  if (dmySlash) {
+    const dd = dmySlash[1].padStart(2, '0');
+    const mm = dmySlash[2].padStart(2, '0');
+    return `${dmySlash[3]}-${mm}-${dd}`;
+  }
   const parsed = new Date(s);
   if (!isNaN(parsed.getTime())) return localYmd(parsed);
   return '';
+}
+
+/** Add calendar days to yyyy-mm-dd (local). */
+export function addDaysToYmd(ymd, days) {
+  const base = toInputDateString(ymd);
+  if (!base) return '';
+  const [y, m, d] = base.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + (Number(days) || 0));
+  return localYmd(dt);
 }
 
 /** yyyy-mm-dd → DD-MM-YYYY for Oracle APIs */
@@ -43,6 +60,11 @@ export function toOracleDate(yyyyMmDd) {
   if (parts.length !== 3 || parts[0].length !== 4) return '';
   const [y, m, d] = parts;
   return `${d}-${m}-${y}`;
+}
+
+/** Display (dd/mm/yyyy), DD-MM-YYYY, or yyyy-mm-dd → DD-MM-YYYY for Oracle APIs */
+export function toOracleDateFromAny(raw) {
+  return toOracleDate(toInputDateString(raw));
 }
 
 /**
@@ -84,6 +106,25 @@ export function toDisplayDate(yyyyMmDd) {
   if (parts.length !== 3) return '';
   const [y, m, d] = parts;
   return `${d}/${m}/${y}`;
+}
+
+/** Parse dd/mm/yyyy (or dd-mm-yyyy) display text → yyyy-mm-dd. Empty if invalid. */
+export function parseDmyDisplay(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  return toInputDateString(s);
+}
+
+/** Insert slashes while typing digits: 31032026 → 31/03/2026 */
+export function formatDmyTyping(raw) {
+  const digits = String(raw ?? '').replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+export function isCompleteDmyDisplay(text) {
+  return /^\d{2}\/\d{2}\/\d{4}$/.test(String(text ?? '').trim());
 }
 
 /** Keep only a valid yyyy-mm-dd for `<input type="date">` (rejects pasted dd/mm/yyyy garbage). */

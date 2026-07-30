@@ -3,7 +3,7 @@ import axios from 'axios';
 import { downloadExcelWorkbook } from '../utils/excelExport';
 import { toDisplayDate, toInputDateString, toOracleDate } from '../utils/dateFormat';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
-import ReportHelpButton from '../components/ReportHelpButton';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 
 function num(v) {
   const n = Number(v);
@@ -671,22 +671,15 @@ export default function Slide16({ apiBase, formData, onPrev, onReset, reportMode
         <div className="slide slide-report slide-16">
           <div className="report-toolbar">
             <h2>{titleBase} Detail</h2>
-            <div className="toolbar-actions">
-            <ReportHelpButton reportId={reportMode === 'purchase' ? 'hsn-purchase' : 'hsn-sales'} />
-            
-              <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen('main')}>
-                ← Back
-              </button>
-              <button type="button" className="btn btn-excel" onClick={exportDetailExcel} disabled={!detailRows.length}>
-                📊 Excel
-              </button>
-              <button type="button" className="btn btn-export" onClick={exportDetailPdf} disabled={!detailRows.length}>
-                Pdf
-              </button>
-              <button type="button" className="btn btn-whatsapp" onClick={shareDetailWa} disabled={!detailRows.length}>
-                💬 WhatsApp
-              </button>
-            </div>
+            <ReportToolbarActions
+              reportId={reportMode === 'purchase' ? 'hsn-purchase' : 'hsn-sales'}
+              onBack={() => setScreen('main')}
+              onPdf={exportDetailPdf}
+              onExcel={exportDetailExcel}
+              onWhatsApp={shareDetailWa}
+              pdfDisabled={!detailRows.length}
+              whatsAppDisabled={!detailRows.length}
+            />
           </div>
           <div className="report-info">
             <p>
@@ -746,22 +739,14 @@ export default function Slide16({ apiBase, formData, onPrev, onReset, reportMode
       <div className="slide slide-report slide-16">
         <div className="report-toolbar">
           <h2>{titleBase}</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId={reportMode === 'purchase' ? 'hsn-purchase' : 'hsn-sales'} />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setReport(null)}>
-              ← Back
-            </button>
-            <button type="button" className="btn btn-excel" onClick={exportMainExcel}>
-              📊 Excel
-            </button>
-            <button type="button" className="btn btn-export" onClick={exportMainPdf} disabled={pdfBusy}>
-              {pdfBusy ? 'Preparing PDF…' : 'Pdf'}
-            </button>
-            <button type="button" className="btn btn-whatsapp" onClick={shareMainWa}>
-              💬 WhatsApp
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId={reportMode === 'purchase' ? 'hsn-purchase' : 'hsn-sales'}
+            onBack={() => setReport(null)}
+            onPdf={exportMainPdf}
+            onExcel={exportMainExcel}
+            onWhatsApp={shareMainWa}
+            pdfDisabled={pdfBusy}
+          />
         </div>
         <div className="report-sort-switch report-sort-switch--hsn-sales" role="group" aria-label={`${titleBase} tabs`}>
           {Object.keys(TAB_LABELS).map((tab) => (

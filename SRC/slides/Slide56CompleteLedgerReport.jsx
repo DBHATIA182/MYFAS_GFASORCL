@@ -4,6 +4,7 @@ import ReportTable from '../components/ReportTable';
 import SaleBillPrintModal from '../components/SaleBillPrintModal';
 import LedgerReportHeader from '../components/LedgerReportHeader';
 import SessionInfoLine from '../components/SessionInfoLine';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 import {
   generatePDF,
   sharePdfWithWhatsApp,
@@ -307,25 +308,21 @@ export default function Slide56CompleteLedgerReport({ apiBase, onPrev, onReset, 
           <SessionInfoLine formData={formData} helpReportId="complete-ledger" />
           <div className="report-toolbar">
             <h2>Voucher entries</h2>
-            <div className="toolbar-actions">
-              <button type="button" className="btn btn-toolbar-back" onClick={() => setVoucherRows(null)}>
-                ← Back to complete ledger
-              </button>
-              <button
-                type="button"
-                className="btn btn-excel"
-                onClick={() => {
-                  try {
-                    const tag = String(voucherTitle || 'voucher').replace(/\s+/g, '_');
-                    downloadExcelRows(voucherRows, 'Voucher', `${formData.comp_name ?? 'Company'}_${tag}`);
-                  } catch (err) {
-                    alert(String(err?.message || err));
-                  }
-                }}
-              >
-                📊 Excel
-              </button>
-            </div>
+            <ReportToolbarActions
+              reportId="complete-ledger"
+              onBack={() => setVoucherRows(null)}
+              backLabel="← Back to complete ledger"
+              showPdf={false}
+              showWhatsApp={false}
+              onExcel={() => {
+                try {
+                  const tag = String(voucherTitle || 'voucher').replace(/\s+/g, '_');
+                  downloadExcelRows(voucherRows, 'Voucher', `${formData.comp_name ?? 'Company'}_${tag}`);
+                } catch (err) {
+                  alert(String(err?.message || err));
+                }
+              }}
+            />
           </div>
 
           <LedgerReportHeader
@@ -362,42 +359,27 @@ export default function Slide56CompleteLedgerReport({ apiBase, onPrev, onReset, 
         <SessionInfoLine formData={formData} helpReportId="complete-ledger" />
         <div className="report-toolbar">
           <h2>Complete Ledger</h2>
-          <div className="toolbar-actions">
-            <button type="button" className="btn btn-toolbar-back" onClick={closeReport}>
-              ← Back
-            </button>
-            <button
-              type="button"
-              onClick={() => downloadPDF().catch((e) => alert(e?.message || String(e)))}
-              className="btn btn-export"
-              disabled={pdfBusy}
-            >
-              {pdfBusy ? 'Generating PDF…' : 'Pdf'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  const flat = sections.flatMap((sec) =>
-                    (sec.rows || []).map((r) => ({
-                      ...r,
-                      ACCOUNT_CODE: sec.code,
-                      ACCOUNT_NAME: sec.name,
-                    }))
-                  );
-                  downloadExcelRows(flat, 'CompleteLedger', `${formData.comp_name ?? 'Company'}_Complete_Ledger`);
-                } catch (err) {
-                  alert(String(err?.message || err));
-                }
-              }}
-            >
-              📊 Excel
-            </button>
-            <button type="button" onClick={() => shareWhatsApp().catch((e) => alert(e?.message || String(e)))} className="btn btn-whatsapp">
-              💬 WhatsApp
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="complete-ledger"
+            onBack={closeReport}
+            onPdf={() => downloadPDF().catch((e) => alert(e?.message || String(e)))}
+            onExcel={() => {
+              try {
+                const flat = sections.flatMap((sec) =>
+                  (sec.rows || []).map((r) => ({
+                    ...r,
+                    ACCOUNT_CODE: sec.code,
+                    ACCOUNT_NAME: sec.name,
+                  }))
+                );
+                downloadExcelRows(flat, 'CompleteLedger', `${formData.comp_name ?? 'Company'}_Complete_Ledger`);
+              } catch (err) {
+                alert(String(err?.message || err));
+              }
+            }}
+            onWhatsApp={() => shareWhatsApp().catch((e) => alert(e?.message || String(e)))}
+            pdfDisabled={pdfBusy}
+          />
         </div>
 
         <p className="complete-ledger-report-meta">

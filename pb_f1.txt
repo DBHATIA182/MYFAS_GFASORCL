@@ -1,0 +1,473 @@
+RID1.ACTIVEROW
+ TVALUE=THISFORM.GRID2.ActiveRow
+ MYCOL=THISFORM.GRID1.RelativeColumn
+ IF GVALUE<>0
+  IF thisform.grid1.RelativeColumn=2
+   THISFORM.SOHLP.Click
+  ENDI
+  IF THISFORM.GRID1.RELATIVECOLUMN = 3
+   THISFORM.ITMHLP.CLICK
+  ENDI 
+  IF THISFORM.GRID1.RelativeColumn = 5
+   THISFORM.PCDHLP.CLICK
+  ENDI 
+  IF THISFORM.GRID1.Relati
+
+=====
+
+
+  THISFORM.ROUND_OFF_HLP.CLICK()
+ endi
+ENDPROC
+       ÆFontBold = .F.
+FontItalic = .F.
+FontName = "Tahoma"
+FontSize = 8
+FontUnderline = .F.
+Alignment = 3
+BackStyle = 1
+BorderStyle = 1
+Value = 
+Enabled = .T.
+Format = ""
+Height = 21
+InputMask = ""
+Left = 1147
+MaxLength = 6
+SelectOnEntry = .T.
+SpecialEffect = 1
+TabIndex = 87
+Top
+
+=====
+
+
+  THISFORM.TULwai_hlp.Click
+ endi
+ENDPROC
+PROCEDURE LostFocus
+if !EMPTY(THISFORM.TULWAI_CODE.VALUE) .AND. THISFORM.TULWAI_eXP.VALUE<>0
+ MCODE=RTRIM(THISFORM.TULWAI_CODE.VALUE)
+ MVAR='SELECT * FROM MASTER WHERE COMP_CODE=?G_COMPCODE AND CODE=?MCODE'
+ If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			           
+
+=====
+
+
+  THISFORM.DHARAM_KANTA_HLP.CLICK()
+ endi
+ENDPROC
+       ÉFontBold = .F.
+FontItalic = .F.
+FontName = "Tahoma"
+FontSize = 8
+FontUnderline = .F.
+Alignment = 3
+BackStyle = 1
+BorderStyle = 1
+Value = 
+Enabled = .T.
+Format = ""
+Height = 21
+InputMask = ""
+Left = 1147
+MaxLength = 6
+SelectOnEntry = .T.
+SpecialEffect = 1
+TabIndex = 83
+
+
+=====
+
+
+  THISFORM.CD_AMOUNT_HLP.CLICK()
+ endi
+ENDPROC
+PROCEDURE LostFocus
+if !EMPTY(THISFORM.CD_AMOUNT_CODE.VALUE) .AND. THISFORM.CD_AMOUNT.VALUE<>0
+ MCODE=RTRIM(THISFORM.CD_AMOUNT_CODE.VALUE)
+ MVAR='SELECT * FROM MASTER WHERE COMP_CODE=?G_COMPCODE AND CODE=?MCODE'
+ If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			 
+
+=====
+
+
+  THISFORM.FREIGHT_PAID_HLP.CLICK()
+ endi
+ENDPROC
+       ÉFontBold = .F.
+FontItalic = .F.
+FontName = "Tahoma"
+FontSize = 8
+FontUnderline = .F.
+Alignment = 3
+BackStyle = 1
+BorderStyle = 1
+Value = 
+Enabled = .T.
+Format = ""
+Height = 21
+InputMask = ""
+Left = 1147
+MaxLength = 6
+SelectOnEntry = .T.
+SpecialEffect = 1
+TabIndex = 78
+
+
+=====
+
+P
+ENDI
+ENDPROC
+PROCEDURE GotFocus
+THISFORM.VRKey='N'
+ENDPROC
+       ³FontBold = .F.
+FontItalic = .F.
+FontName = "Arial"
+FontSize = 9
+FontUnderline = .F.
+Alignment = 3
+BackStyle = 1
+BorderStyle = 1
+Value = 0
+Format = "9999999999.99R"
+Height = 21
+InputMask = "9999999999.99"
+Left = 1219
+SelectOnEntry = .T.
+SpecialEffect = 1
+TabInd
+
+=====
+
+
+  G_TMP_SCH_NO=11.10
+  G_PUBCODE=''
+  THISFORM.cdHLP.CLICK()
+ endi
+ENDPROC
+PROCEDURE LostFocus
+IF !EMPTY(THISFORM.MCODE.VALUE)
+ MCODE=THISFORM.MCODE.VALUE
+ mlen=LEN(RTRIM(THISFORM.MCODE.Value))
+ IF MLEN<6
+  M1=SUBSTR(MCODE,1,1)
+  M2=VAL(SUBSTR(MCODE,2,5))
+  M3=LEN(LTRIM(STR(M2,5)))
+  M4=M1+REPLICATE("0",5-M3)+RTRIM(SUBSTR(MCODE,2,5))
+
+=====
+
+
+  THISFORM.BARDANA_eXP_HLP.CLICK()
+ endi
+ENDPROC
+PROCEDURE LostFocus
+if !EMPTY(THISFORM.BARDANA_EXP_CODE.VALUE) .AND. THISFORM.BARDANA_eXP.VALUE<>0
+ MCODE=RTRIM(THISFORM.BARDANA_EXP_CODE.VALUE)
+ MVAR='SELECT * FROM MASTER WHERE COMP_CODE=?G_COMPCODE AND CODE=?MCODE'
+ If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laAr
+
+=====
+
+
+ G_TMP_SCH_NO=11.20
+ G_PUBCODE=''
+ THISFORM.bcdHLP.CLICK()
+endi
+ENDPROC
+PROCEDURE LostFocus
+if !empty(THISFORM.b_CODE.VALUE)
+ MCODE=THISFORM.B_CODE.VALUE
+ mlen=LEN(RTRIM(THISFORM.B_CODE.Value))
+ IF MLEN<6
+  M1=SUBSTR(MCODE,1,1)
+  M2=VAL(SUBSTR(MCODE,2,5))
+  M3=LEN(LTRIM(STR(M2,5)))
+  M4=M1+REPLICATE("0",5-M3)+RTRIM(SUBSTR(MCODE,2,5))
+
+=====
+
+
+  THISFORM.LABOUR_EXP_HLP.CLICK()
+ endi
+ENDPROC
+       ±FontBold = .F.
+FontItalic = .F.
+FontName = "Arial"
+FontSize = 9
+FontUnderline = .F.
+Alignment = 3
+BackStyle = 1
+BorderStyle = 1
+Value = 0
+Format = "9999999999.99R"
+Height = 21
+InputMask = "9999999999.99"
+Left = 1219
+SelectOnEntry = .T.
+SpecialEffect = 1
+TabIndex = 73
+Top =
+
+=====
+
+
+       commandbutton       commandbutton        mandi_exp_code        textbox        textbox       ¬FontBold = .F.
+FontName = "Tahoma"
+FontSize = 8
+BackStyle = 0
+Caption = "Mandi Exp"
+Height = 21
+Left = 1022
+Top = 365
+Width = 53
+TabIndex = 180
+Name = "Label79"
+        Form1        Label79        label        label       3PROCEDURE Los
+
+=====
+
+
+  THISFORM.MANDI_EXP_HLP.CLICK()
+ endi
+ENDPROC
+PROCEDURE LostFocus
+if !EMPTY(THISFORM.mandi_exp_code.VALUE) .AND. THISFORM.mandi_exp.VALUE<>0
+ MCODE=RTRIM(THISFORM.mandi_Exp_code.VALUE)
+ MVAR='SELECT * FROM MASTER WHERE COMP_CODE=?G_COMPCODE AND CODE=?MCODE'
+ If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			 
+
+=====
+
+
+  THISFORM.BROK_PAID_HLP.CLICK()
+ endi
+ENDPROC
+       ÆFontBold = .F.
+FontItalic = .F.
+FontName = "Tahoma"
+FontSize = 8
+FontUnderline = .F.
+Alignment = 3
+BackStyle = 1
+BorderStyle = 1
+Value = 
+Enabled = .T.
+Format = ""
+Height = 21
+InputMask = ""
+Left = 1147
+MaxLength = 6
+SelectOnEntry = .T.
+SpecialEffect = 1
+TabIndex = 70
+Top
+
+=====
+
+
+  THISFORM.commhlp.CLICK()
+ endi
+
+
+ENDPROC
+       ¢FontBold = .F.
+FontItalic = .F.
+FontName = "Arial"
+FontSize = 9
+FontUnderline = .F.
+Alignment = 3
+BackStyle = 1
+BorderStyle = 1
+Value = 
+Format = "!"
+Height = 21
+InputMask = ""
+Left = 827
+MaxLength = 6
+SelectOnEntry = .T.
+SpecialEffect = 1
+TabIndex = 30
+Top = 323
+Width = 52
+
+=====
+
+
+  THISFORM.OTH8HLP.CLICK()
+ endi
+ENDPROC
+PROCEDURE LostFocus
+if !EMPTY(THISFORM.OTH_CD_8.VALUE) .AND. THISFORM.OTH_EXP_8.VALUE<>0
+ MCODE=RTRIM(THISFORM.OTH_CD_8.VALUE)
+ MVAR='SELECT * FROM MASTER WHERE COMP_CODE=?G_COMPCODE AND CODE=?MCODE'
+ If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			                  M
+
+=====
+
+
+  THISFORM.OTH7HLP.CLICK()
+ endi
+ENDPROC
+        Form1        OTH_CD_7        textbox        textbox       ªFontBold = .F.
+FontName = "Tahoma"
+FontSize = 8
+BackStyle = 0
+Caption = "Others "
+Height = 21
+Left = 1021
+Top = 279
+Width = 53
+TabIndex = 172
+Name = "Label74"
+        Form1        Label74        label        label        Form1
+
+=====
+
+C
+       PROCEDURE KeyPress
+LPARAMETERS nKeyCode, nShiftAltCtrl
+if NKEYCODE=28     && F1 HELP
+  THISFORM.HELPKEY='Y'
+  THISFORM.OTH6HLP.CLICK()
+ endi
+ENDPROC
+PROCEDURE LostFocus
+if !EMPTY(THISFORM.OTH_CD_6.VALUE) .AND. THISFORM.OTH_EXP_6.VALUE<>0
+ MCODE=RTRIM(THISFORM.OTH_CD_6.VALUE)
+ MVAR='SELECT * FROM MASTER WHERE COMP_CODE=?G_COMPCO
+
+=====
+
+
+  THISFORM.OTH6HLP.CLICK()
+ endi
+ENDPROC
+PROCEDURE LostFocus
+if !EMPTY(THISFORM.OTH_CD_6.VALUE) .AND. THISFORM.OTH_EXP_6.VALUE<>0
+ MCODE=RTRIM(THISFORM.OTH_CD_6.VALUE)
+ MVAR='SELECT * FROM MASTER WHERE COMP_CODE=?G_COMPCODE AND CODE=?MCODE'
+ If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			                  M
+
+=====
+
+()
+endi
+ENDPROC
+       ¿FontBold = .F.
+FontItalic = .F.
+FontName = "Tahoma"
+FontSize = 8
+FontUnderline = .F.
+Alignment = 3
+BackStyle = 1
+BorderStyle = 1
+Value = 
+Enabled = .T.
+Format = ""
+Height = 21
+InputMask = ""
+Left = 827
+MaxLength = 6
+SelectOnEntry = .T.
+SpecialEffect = 1
+TabIndex = 53
+Top = 565
+Visible = .T.
+Width = 52
+
+=====
+
+
+  THISFORM.OTH1HLP.CLICK()
+ endi
+ENDPROC
+       PROCEDURE LostFocus
+if !EMPTY(THISFORM.OTH_CD_5.VALUE) .AND. THISFORM.OTH_EXP_5.VALUE<>0
+ MCODE=RTRIM(THISFORM.OTH_CD_5.VALUE)
+ MVAR='SELECT * FROM MASTER WHERE COMP_CODE=?G_COMPCODE AND CODE=?MCODE'
+ If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			           
+
+=====
+
+
+  THISFORM.OTH5HLP.CLICK()
+ endi
+ENDPROC
+        textbox        Form1        Label66        label        label        Form1        CUR_BAL        textbox        textbox        textbox        oth_cd_2        Form1       ¿FontBold = .F.
+FontItalic = .F.
+FontName = "Tahoma"
+FontSize = 8
+FontUnderline = .F.
+Alignment = 3
+BackStyle = 1
+Borde
+
+=====
+
+
+  THISFORM.OTH2HLP.CLICK()
+ endi
+ENDPROC
+PROCEDURE LostFocus
+if !EMPTY(THISFORM.OTH_CD_2.VALUE) .AND. THISFORM.OTH_EXP_2.VALUE<>0
+ MCODE=RTRIM(THISFORM.OTH_CD_2.VALUE)
+ MVAR='SELECT * FROM MASTER WHERE COMP_CODE=?G_COMPCODE AND CODE=?MCODE'
+ If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			                  M
+
+=====
+
+
+  THISFORM.OTH3HLP.CLICK()
+ endi
+ENDPROC
+       ¯FontBold = .F.
+FontItalic = .F.
+FontName = "Arial"
+FontSize = 9
+FontUnderline = .F.
+Alignment = 3
+BackStyle = 1
+BorderStyle = 1
+Value = 0
+Format = "9999999999.99R"
+Height = 21
+InputMask = "9999999999.99"
+Left = 899
+SelectOnEntry = .T.
+SpecialEffect = 1
+TabIndex = 50
+Top = 543
+Wi
+
+=====
+
+
+  THISFORM.OTH4HLP.CLICK()
+ endi
+ENDPROC
+PROCEDURE LostFocus
+if !EMPTY(THISFORM.OTH_CD_4.VALUE) .AND. THISFORM.OTH_EXP_4.VALUE<>0
+ MCODE=RTRIM(THISFORM.OTH_CD_4.VALUE)
+ MVAR='SELECT * FROM MASTER WHERE COMP_CODE=?G_COMPCODE AND CODE=?MCODE'
+ If SQLExec(GNCONNHANDLE,Mvar,'X0') <=0
+			                  =Aerror(laArr)
+			                  M

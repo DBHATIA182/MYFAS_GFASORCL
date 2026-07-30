@@ -24,6 +24,10 @@ const Slide33SaleGraph = lazy(() => import('./slides/Slide33SaleGraph'));
 const Slide34OverdueCustomers = lazy(() => import('./slides/Slide34OverdueCustomers'));
 const Slide21StateWiseSales = lazy(() => import('./slides/Slide21StateWiseSales'));
 const Slide22StateWisePurchase = lazy(() => import('./slides/Slide22StateWisePurchase'));
+const Slide23PurchaseTdsDetail = lazy(() => import('./slides/Slide23PurchaseTdsDetail'));
+const Slide24PurchaseTdsSummary = lazy(() => import('./slides/Slide24PurchaseTdsSummary'));
+const Slide25SaleTdsDetail = lazy(() => import('./slides/Slide25SaleTdsDetail'));
+const Slide26SaleTdsSummary = lazy(() => import('./slides/Slide26SaleTdsSummary'));
 const Slide80TrialBalanceSummary = lazy(() => import('./slides/Slide80TrialBalanceSummary'));
 const Slide81TrialDateWise = lazy(() => import('./slides/Slide81TrialDateWise'));
 import Slide26AccountMaster from './slides/Slide26AccountMaster';
@@ -84,6 +88,29 @@ import Slide84SetSaleExp from './slides/Slide84SetSaleExp';
 import Slide85DefaultSetting from './slides/Slide85DefaultSetting';
 import Slide86SetTaskScheduler from './slides/Slide86SetTaskScheduler';
 import Slide89IncomeTaxReport from './slides/Slide89IncomeTaxReport';
+import Slide90OtherReportsPlaceholder from './slides/Slide90OtherReportsPlaceholder';
+import Slide91OtherReports from './slides/Slide91OtherReports';
+import Slide96LedgerReports from './slides/Slide96LedgerReports';
+import Slide92TransactionPlaceholder from './slides/Slide92TransactionPlaceholder';
+import Slide93CashVoucherEntry from './slides/Slide93CashVoucherEntry';
+import Slide94BankVoucherEntry from './slides/Slide94BankVoucherEntry';
+import Slide95JournalVoucherEntry from './slides/Slide95JournalVoucherEntry';
+import Slide97PurchaseOrder from './slides/Slide97PurchaseOrder';
+import Slide108SalesOrder from './slides/Slide108SalesOrder';
+import Slide109SalesOrderHub from './slides/Slide109SalesOrderHub';
+import Slide110DispatchChallan from './slides/Slide110DispatchChallan';
+import Slide111DispatchChallanHub from './slides/Slide111DispatchChallanHub';
+import Slide112SalesRecordsHub from './slides/Slide112SalesRecordsHub';
+import Slide113SaleBill from './slides/Slide113SaleBill';
+import Slide98GoodsInward from './slides/Slide98GoodsInward';
+import Slide107ConsignmentStock from './slides/Slide107ConsignmentStock';
+import Slide25PurchaseBill from './slides/Slide25PurchaseBill';
+import Slide26BardanaPurchaseBill from './slides/Slide26BardanaPurchaseBill';
+import Slide27DebitNote from './slides/Slide27DebitNote';
+import Slide28PurchaseOtherItems from './slides/Slide28PurchaseOtherItems';
+import Slide29DebitNoteOthers from './slides/Slide29DebitNoteOthers';
+import Slide30CreditNoteOthers from './slides/Slide30CreditNoteOthers';
+import Slide99VoucherBooks from './slides/Slide99VoucherBooks';
 import DesktopOnlyUtilityGate from './components/DesktopOnlyUtilityGate';
 import MasterSlideErrorBoundary from './components/MasterSlideErrorBoundary';
 
@@ -103,7 +130,99 @@ import {
   resolveIncomeTaxSlideNo,
   INCOME_TAX_PLACEHOLDER_SLIDE,
   INCOME_TAX_REPORT_SLIDE,
+  INCOME_TAX_MENU_MODULE_ID,
 } from './data/incomeTaxModuleConfig';
+import {
+  findOtherReportsModuleItem,
+  resolveOtherReportsSlideNo,
+  OTHER_REPORTS_PLACEHOLDER_SLIDE,
+  OTHER_REPORTS_REPORT_SLIDE,
+  OTHER_REPORTS_MENU_MODULE_ID,
+} from './data/otherReportsModuleConfig';
+import {
+  findLedgerModuleItem,
+  LEDGER_REPORT_SLIDE,
+  LEDGER_MENU_MODULE_ID,
+} from './data/ledgerModuleConfig';
+import {
+  findVoucherBooksModuleItem,
+  VOUCHER_BOOKS_REPORT_SLIDE,
+} from './data/voucherBooksModuleConfig';
+import { toInputDateString } from './utils/dateFormat';
+import {
+  findTransactionModuleItem,
+  resolveTransactionSlideNo,
+  resolveMenuModuleForReportType,
+  TRANSACTION_PLACEHOLDER_SLIDE,
+  TRANSACTION_MENU_MODULE_ID,
+  CASH_VOUCHER_ENTRY_SLIDE,
+  BANK_VOUCHER_ENTRY_SLIDE,
+  JOURNAL_VOUCHER_ENTRY_SLIDE,
+  PURCHASE_ORDER_SLIDE,
+  SALES_ORDER_SLIDE,
+  SALES_ORDER_HUB_SLIDE,
+  DISPATCH_CHALLAN_SLIDE,
+  DISPATCH_CHALLAN_HUB_SLIDE,
+  SALES_RECORDS_HUB_SLIDE,
+  SALE_BILL_SLIDE,
+  GOODS_INWARD_SLIDE,
+  CONSIGNMENT_STOCK_SLIDE,
+  PURCHASE_BILL_SLIDE,
+  BARDANA_PURCHASE_BILL_SLIDE,
+  DEBIT_NOTE_SLIDE,
+  EXP_VOUCHER_SLIDE,
+  DEBIT_NOTE_OTHERS_SLIDE,
+  CREDIT_NOTE_OTHERS_SLIDE,
+  PURCHASE_MENU_MODULE_ID,
+  SALES_MENU_MODULE_ID,
+  voucherEntrySlideForEntryId,
+  VOUCHER_MENU_MODULE_ID,
+} from './data/transactionModuleConfig';
+import { categoryForReport } from './data/reportMenuConfig';
+
+function readVoucherHubReturn(formData) {
+  const hub = formData?.voucherHubReturn;
+  if (!hub || typeof hub !== 'object') return null;
+  const slide = Number(hub.slide);
+  const reportType = String(hub.reportType ?? '').trim().toLowerCase();
+  if (!Number.isFinite(slide) || !reportType) return null;
+  return { slide, reportType };
+}
+
+function readSalesOrderHubReturn(formData) {
+  const hub = formData?.salesOrderHubReturn;
+  if (!hub || typeof hub !== 'object') return null;
+  const slide = Number(hub.slide);
+  const reportType = String(hub.reportType ?? '').trim().toLowerCase();
+  if (!Number.isFinite(slide) || !reportType) return null;
+  return { slide, reportType };
+}
+
+function readDispatchChallanHubReturn(formData) {
+  const hub = formData?.dispatchChallanHubReturn;
+  if (!hub || typeof hub !== 'object') return null;
+  const slide = Number(hub.slide);
+  const reportType = String(hub.reportType ?? '').trim().toLowerCase();
+  if (!Number.isFinite(slide) || !reportType) return null;
+  return { slide, reportType };
+}
+
+function readSalesRecordsHubReturn(formData) {
+  const hub = formData?.salesRecordsHubReturn;
+  if (!hub || typeof hub !== 'object') return null;
+  const slide = Number(hub.slide);
+  const reportType = String(hub.reportType ?? '').trim().toLowerCase();
+  if (!Number.isFinite(slide) || !reportType) return null;
+  return { slide, reportType };
+}
+
+function resolveVoucherEntryTarget(vrType) {
+  const t = String(vrType ?? '').trim().toUpperCase();
+  if (t === 'CV') return { entryId: 'cash-voucher-entry', vrType: 'CV', slide: CASH_VOUCHER_ENTRY_SLIDE };
+  if (t === 'BV' || t === 'BI') return { entryId: 'bank-voucher-entry', vrType: 'BV', slide: BANK_VOUCHER_ENTRY_SLIDE };
+  if (t === 'JV') return { entryId: 'journal-voucher-entry', vrType: 'JV', slide: JOURNAL_VOUCHER_ENTRY_SLIDE };
+  return null;
+}
 
 const MASTER_SLIDE_NOS = new Set([26, 27, 28, 29, 30, 31, 32, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, MASTER_PLACEHOLDER_SLIDE]);
 import { AppSessionContext } from './components/AppSessionContext';
@@ -115,15 +234,20 @@ import './styles/fasFlowTheme.css';
 import './styles/windalInitialFlow.css';
 import './styles/windalDashboard.css';
 import './styles/gfasToolbar.css';
+import './styles/reportExportMenu.css';
 import './styles/stateWiseSales.css';
 import './styles/scheduleMasterScreen.css';
 import './styles/ledgerMobile.css';
 import './styles/trialBalanceMobile.css';
 import './styles/trialBalanceDesktop.css';
+import './styles/incomeTaxEntryDesktop.css';
 import './styles/ledgerDesktop.css';
 import './styles/ledgerFullBleed.css';
 import './styles/saleBillPrinting.css';
 import './styles/saleListForm.css';
+import './styles/voucherEntryHub.css';
+import './styles/voucherEntryForm.css';
+import './styles/purchaseTdsReport.css';
 import { getGfasDocumentTitle } from './utils/gfasBrand';
 import {
   formatApiBaseForDisplay,
@@ -323,6 +447,21 @@ function App() {
   const [voiceListening, setVoiceListening] = useState(false);
   const [loginUserName, setLoginUserName] = useState('');
   const [companiesRevision, setCompaniesRevision] = useState(0);
+
+  /** Options when opening checklist from an entry form (e.g. TYPE PB for bardana). */
+  const navigateToSlide = useCallback((slideNo, opts = {}) => {
+    const n = Number(slideNo);
+    if (!Number.isFinite(n)) return;
+    if (opts && typeof opts === 'object' && 'purchaseListType' in opts) {
+      const plt = String(opts.purchaseListType ?? '').trim().toUpperCase();
+      setFormData((prev) => ({
+        ...prev,
+        purchaseListType: plt,
+        purchaseListReturnSlide: n === 11 ? currentSlide : prev.purchaseListReturnSlide,
+      }));
+    }
+    setCurrentSlide(n);
+  }, [currentSlide]);
 
   /* Always open on login (do not skip to company from saved session). */
   useEffect(() => {
@@ -693,6 +832,22 @@ function App() {
       setCurrentSlide(target);
     }
   }, [currentSlide, formData?.reportType]);
+
+  useEffect(() => {
+    if (currentSlide !== OTHER_REPORTS_PLACEHOLDER_SLIDE) return;
+    const target = resolveOtherReportsSlideNo(String(formData?.reportType ?? '').trim().toLowerCase());
+    if (target != null && target !== OTHER_REPORTS_PLACEHOLDER_SLIDE && target !== currentSlide) {
+      setCurrentSlide(target);
+    }
+  }, [currentSlide, formData?.reportType]);
+
+  useEffect(() => {
+    if (currentSlide !== TRANSACTION_PLACEHOLDER_SLIDE) return;
+    const target = resolveTransactionSlideNo(String(formData?.reportType ?? '').trim().toLowerCase());
+    if (target != null && target !== TRANSACTION_PLACEHOLDER_SLIDE && target !== currentSlide) {
+      setCurrentSlide(target);
+    }
+  }, [currentSlide, formData?.reportType]);
   const handleNewYearCreated = async (yearRow) => {
     const code = formData.comp_code ?? formData.COMP_CODE;
     try {
@@ -728,22 +883,31 @@ function App() {
 
   const handleSlide3Next = (data) => {
     const reportType = String(data?.reportType ?? '').trim().toLowerCase();
-    if (reportType === 'ledger' || reportType === 'ledger-interest') {
+    if (reportType === 'ledger' || reportType === 'ledger-interest' || reportType === 'ledger-dr-cr-date') {
       setFormData((prev) => {
         const { ledgerDrilldown, ...rest } = prev;
-        return { ...rest, ...data, ledgerReturnSlide: 3 };
+        const menuModule = categoryForReport(reportType);
+        return { ...rest, ...data, ledgerReturnSlide: 3, menuReturnModule: menuModule };
       });
       setCurrentSlide(5);
       return;
     }
-    setFormData((prev) => ({ ...prev, ...data }));
+    setFormData((prev) => {
+      const requestedMenuModule = String(data?.menuReturnModule ?? '').trim();
+      const menuModule =
+        requestedMenuModule || resolveMenuModuleForReportType(reportType) || categoryForReport(reportType);
+      return { ...prev, ...data, menuReturnModule: menuModule };
+    });
     if (reportType === 'complete-ledger') setCurrentSlide(56);
     else if (reportType === 'bill-ledger' || reportType === 'customer-ledger' || reportType === 'supplier-ledger') setCurrentSlide(6);
     else if (reportType === 'broker-os') setCurrentSlide(7);
     else if (reportType === 'sale-list') setCurrentSlide(8);
     else if (reportType === 'stock-sum') setCurrentSlide(9);
     else if (reportType === 'stock-lot') setCurrentSlide(10);
-    else if (reportType === 'purchase-list') setCurrentSlide(11);
+    else if (reportType === 'purchase-list') {
+      setFormData((prev) => ({ ...prev, purchaseListType: '', purchaseListReturnSlide: 3 }));
+      setCurrentSlide(11);
+    }
     else if (reportType === 'ageing') setCurrentSlide(12);
     else if (reportType === 'sale-bill-printing') setCurrentSlide(13);
     else if (reportType === 'voucher-list') setCurrentSlide(14);
@@ -752,6 +916,10 @@ function App() {
     else if (reportType === 'hsn-purchase') setCurrentSlide(17);
     else if (reportType === 'state-wise-sales') setCurrentSlide(21);
     else if (reportType === 'state-wise-purchase') setCurrentSlide(22);
+    else if (reportType === 'purchase-tds-detail') setCurrentSlide(23);
+    else if (reportType === 'purchase-tds-summary') setCurrentSlide(24);
+    else if (reportType === 'sale-tds-detail') setCurrentSlide(105);
+    else if (reportType === 'sale-tds-summary') setCurrentSlide(106);
     else if (reportType === 'trading-ac') setCurrentSlide(18);
     else if (reportType === 'pl-profit-loss') setCurrentSlide(19);
     else if (reportType === 'balance-sheet') setCurrentSlide(20);
@@ -793,6 +961,38 @@ function App() {
       const incomeTaxItem = findIncomeTaxModuleItem(reportType);
       if (incomeTaxItem) {
         setCurrentSlide(INCOME_TAX_REPORT_SLIDE);
+        return;
+      }
+      const otherReportsItem = findOtherReportsModuleItem(reportType);
+      if (otherReportsItem) {
+        setCurrentSlide(OTHER_REPORTS_REPORT_SLIDE);
+        return;
+      }
+      const ledgerReportItem = findLedgerModuleItem(reportType);
+      if (ledgerReportItem) {
+        setCurrentSlide(LEDGER_REPORT_SLIDE);
+        return;
+      }
+      const voucherBookItem = findVoucherBooksModuleItem(reportType);
+      if (voucherBookItem) {
+        setCurrentSlide(VOUCHER_BOOKS_REPORT_SLIDE);
+        return;
+      }
+      const transactionItem = findTransactionModuleItem(reportType);
+      if (transactionItem) {
+        const menuModule = resolveMenuModuleForReportType(reportType) ?? TRANSACTION_MENU_MODULE_ID;
+        if (transactionItem.implemented && transactionItem.slide) {
+          setFormData((prev) => ({
+            ...prev,
+            ...data,
+            ...(transactionItem.defaultFormData || {}),
+            menuReturnModule: menuModule,
+          }));
+          setCurrentSlide(transactionItem.slide);
+          return;
+        }
+        setFormData((prev) => ({ ...prev, ...data, menuReturnModule: menuModule }));
+        setCurrentSlide(TRANSACTION_PLACEHOLDER_SLIDE);
         return;
       }
       const masterSlide = resolveMasterSlideNo(reportType);
@@ -901,9 +1101,290 @@ function App() {
     setCurrentSlide(5);
   };
 
+  const backFromIncomeTaxReport = () => {
+    setFormData((prev) => ({
+      ...prev,
+      menuReturnModule: INCOME_TAX_MENU_MODULE_ID,
+    }));
+    setCurrentSlide(3);
+  };
+
+  const backFromOtherReports = () => {
+    setFormData((prev) => ({
+      ...prev,
+      menuReturnModule: OTHER_REPORTS_MENU_MODULE_ID,
+    }));
+    setCurrentSlide(3);
+  };
+
+  const backFromLedgerReports = () => {
+    setFormData((prev) => ({
+      ...prev,
+      menuReturnModule: LEDGER_MENU_MODULE_ID,
+    }));
+    setCurrentSlide(3);
+  };
+
+  const backFromVoucherHubChild = () => {
+    const hub = readVoucherHubReturn(formData);
+    if (hub) {
+      setFormData((prev) => {
+        const { voucherHubReturn, voucherEdit, ...rest } = prev;
+        return { ...rest, reportType: hub.reportType, menuReturnModule: VOUCHER_MENU_MODULE_ID };
+      });
+      setCurrentSlide(hub.slide);
+      return;
+    }
+    setFormData((prev) => ({ ...prev, menuReturnModule: VOUCHER_MENU_MODULE_ID }));
+    setCurrentSlide(3);
+  };
+
+  const openVoucherEntryFromReport = (row, ctx = {}) => {
+    const returnReportType = String(ctx.reportType ?? formData?.reportType ?? 'cash-book')
+      .trim()
+      .toLowerCase();
+    let vrType = String(row?.VR_TYPE ?? row?.vr_type ?? '').trim().toUpperCase();
+    if (!vrType) {
+      if (returnReportType === 'cash-book') vrType = 'CV';
+      else if (returnReportType === 'bank-book') vrType = 'BV';
+      else if (returnReportType === 'journal-book') vrType = 'JV';
+    }
+    const target = resolveVoucherEntryTarget(vrType);
+    const vrNo = Number(row?.VR_NO ?? row?.vr_no);
+    const ymd = toInputDateString(row?.VR_DATE ?? row?.vr_date);
+    if (!target || !Number.isFinite(vrNo) || vrNo <= 0 || !ymd) {
+      alert('Cannot open voucher: missing type, date, or voucher number.');
+      return;
+    }
+    const returnSlide = Number(ctx.returnSlide) || VOUCHER_BOOKS_REPORT_SLIDE;
+    const filters = ctx.filters && typeof ctx.filters === 'object' ? ctx.filters : {};
+    const cbCode = String(filters.mcode ?? '').trim().toUpperCase();
+    const restoreAt = Date.now();
+    setFormData((prev) => ({
+      ...prev,
+      reportType: target.entryId,
+      menuReturnModule: VOUCHER_MENU_MODULE_ID,
+      voucherHubReturn: { slide: returnSlide, reportType: returnReportType },
+      voucherBookReturn: {
+        reportType: returnReportType,
+        restoreReport: true,
+        restoreAt,
+        filters,
+      },
+      voucherEdit: {
+        autoLoad: true,
+        vr_type: target.vrType,
+        vr_date: ymd,
+        vr_no: String(vrNo),
+        cb_code: cbCode || undefined,
+        at: restoreAt,
+      },
+    }));
+    setCurrentSlide(target.slide);
+  };
+
+  const openVoucherHubAction = (actionReportType, hubReportType = 'cash-voucher-entry') => {
+    const rt = String(actionReportType ?? '').trim().toLowerCase();
+    const item = findTransactionModuleItem(rt);
+    if (!item) return;
+    const hubSlide = voucherEntrySlideForEntryId(hubReportType);
+    setFormData((prev) => ({
+      ...prev,
+      reportType: rt,
+      menuReturnModule: VOUCHER_MENU_MODULE_ID,
+      voucherHubReturn: { slide: hubSlide, reportType: hubReportType },
+      ...(item.defaultFormData || {}),
+    }));
+    if (item.implemented && item.slide) {
+      setCurrentSlide(item.slide);
+      return;
+    }
+    setCurrentSlide(TRANSACTION_PLACEHOLDER_SLIDE);
+  };
+
+  const openSalesOrderHubAction = (actionReportType) => {
+    const rt = String(actionReportType ?? '').trim().toLowerCase();
+    const item = findTransactionModuleItem(rt);
+    if (!item) return;
+    setFormData((prev) => ({
+      ...prev,
+      reportType: rt,
+      menuReturnModule: SALES_MENU_MODULE_ID,
+      salesOrderHubReturn: { slide: SALES_ORDER_HUB_SLIDE, reportType: 'sales-order' },
+      openSoChecklist: false,
+      openSoPrint: false,
+      openSoPending: false,
+      ...(item.defaultFormData || {}),
+    }));
+    setCurrentSlide(item.implemented && item.slide ? item.slide : TRANSACTION_PLACEHOLDER_SLIDE);
+  };
+
+  const openDispatchChallanHubAction = (actionReportType) => {
+    const rt = String(actionReportType ?? '').trim().toLowerCase();
+    const item = findTransactionModuleItem(rt);
+    if (!item) return;
+    setFormData((prev) => ({
+      ...prev,
+      reportType: rt,
+      menuReturnModule: SALES_MENU_MODULE_ID,
+      dispatchChallanHubReturn: { slide: DISPATCH_CHALLAN_HUB_SLIDE, reportType: 'dispatch-challan' },
+      ...(item.defaultFormData || {}),
+    }));
+    setCurrentSlide(item.implemented && item.slide ? item.slide : TRANSACTION_PLACEHOLDER_SLIDE);
+  };
+
+  const openSalesRecordsHubAction = (actionReportType) => {
+    const rt = String(actionReportType ?? '').trim().toLowerCase();
+    const returnData = {
+      reportType: rt,
+      menuReturnModule: SALES_MENU_MODULE_ID,
+      salesRecordsHubReturn: { slide: SALES_RECORDS_HUB_SLIDE, reportType: 'sales-records' },
+    };
+    const item = findTransactionModuleItem(rt);
+    if (item) {
+      setFormData((prev) => ({ ...prev, ...returnData, ...(item.defaultFormData || {}) }));
+      setCurrentSlide(item.implemented && item.slide ? item.slide : TRANSACTION_PLACEHOLDER_SLIDE);
+      return;
+    }
+    handleSlide3Next(returnData);
+  };
+
+  const backFromSalesRecordsChild = () => {
+    const hub = readSalesRecordsHubReturn(formData);
+    if (!hub) {
+      setCurrentSlide(3);
+      return;
+    }
+    setFormData((prev) => {
+      const { salesRecordsHubReturn, ...rest } = prev;
+      return {
+        ...rest,
+        reportType: hub.reportType,
+        menuReturnModule: SALES_MENU_MODULE_ID,
+      };
+    });
+    setCurrentSlide(hub.slide);
+  };
+
+  const backFromTransaction = () => {
+    const hub = readVoucherHubReturn(formData);
+    if (hub) {
+      setFormData((prev) => {
+        const { voucherHubReturn, ...rest } = prev;
+        return { ...rest, reportType: hub.reportType, menuReturnModule: VOUCHER_MENU_MODULE_ID };
+      });
+      setCurrentSlide(hub.slide);
+      return;
+    }
+    const salesOrderHub = readSalesOrderHubReturn(formData);
+    if (salesOrderHub) {
+      setFormData((prev) => {
+        const { salesOrderHubReturn, openSoChecklist, openSoPrint, openSoPending, ...rest } = prev;
+        return {
+          ...rest,
+          reportType: salesOrderHub.reportType,
+          menuReturnModule: SALES_MENU_MODULE_ID,
+        };
+      });
+      setCurrentSlide(salesOrderHub.slide);
+      return;
+    }
+    const dispatchChallanHub = readDispatchChallanHubReturn(formData);
+    if (dispatchChallanHub) {
+      setFormData((prev) => {
+        const { dispatchChallanHubReturn, ...rest } = prev;
+        return {
+          ...rest,
+          reportType: dispatchChallanHub.reportType,
+          menuReturnModule: SALES_MENU_MODULE_ID,
+        };
+      });
+      setCurrentSlide(dispatchChallanHub.slide);
+      return;
+    }
+    const salesRecordsHub = readSalesRecordsHubReturn(formData);
+    if (salesRecordsHub) {
+      setFormData((prev) => {
+        const { salesRecordsHubReturn, ...rest } = prev;
+        return {
+          ...rest,
+          reportType: salesRecordsHub.reportType,
+          menuReturnModule: SALES_MENU_MODULE_ID,
+        };
+      });
+      setCurrentSlide(salesRecordsHub.slide);
+      return;
+    }
+    const reportType = String(formData?.reportType ?? '').trim().toLowerCase();
+    const menuModule = resolveMenuModuleForReportType(reportType) ?? TRANSACTION_MENU_MODULE_ID;
+    setFormData((prev) => ({
+      ...prev,
+      menuReturnModule: menuModule,
+    }));
+    setCurrentSlide(3);
+  };
+
+  const openLedgerFromOtherReports = (payload) => {
+    setFormData((prev) => {
+      const { ledgerReturnSlide, ...rest } = prev;
+      return {
+        ...rest,
+        reportType: 'ledger',
+        ledgerDrilldown: {
+          code: String(payload?.code ?? '').trim(),
+          autoRun: true,
+          returnSlide: OTHER_REPORTS_REPORT_SLIDE,
+          otherReportType: String(payload?.reportType ?? rest.reportType ?? '').trim(),
+          startDate: payload?.sdt,
+          endDate: payload?.edt,
+          at: Date.now(),
+        },
+      };
+    });
+    setCurrentSlide(5);
+  };
+
+  const openLedgerFromLedgerReports = (payload) => {
+    setFormData((prev) => {
+      const { ledgerReturnSlide, ...rest } = prev;
+      return {
+        ...rest,
+        reportType: 'ledger',
+        ledgerDrilldown: {
+          code: String(payload?.code ?? '').trim(),
+          autoRun: true,
+          returnSlide: LEDGER_REPORT_SLIDE,
+          ledgerReportType: String(payload?.reportType ?? rest.reportType ?? '').trim(),
+          startDate: payload?.sdt,
+          endDate: payload?.edt,
+          at: Date.now(),
+        },
+      };
+    });
+    setCurrentSlide(5);
+  };
+
   const backFromLedger = () => {
     const d = formData.ledgerDrilldown;
     const returnSlide = d?.returnSlide ?? formData.ledgerReturnSlide ?? 3;
+    if (returnSlide === OTHER_REPORTS_REPORT_SLIDE) {
+      setFormData((prev) => {
+        const { ledgerDrilldown, ledgerReturnSlide, ...rest } = prev;
+        const rt = ledgerDrilldown?.otherReportType || rest.reportType;
+        return { ...rest, reportType: rt };
+      });
+      setCurrentSlide(OTHER_REPORTS_REPORT_SLIDE);
+      return;
+    }
+    if (returnSlide === LEDGER_REPORT_SLIDE) {
+      setFormData((prev) => {
+        const { ledgerDrilldown, ledgerReturnSlide, ...rest } = prev;
+        const rt = ledgerDrilldown?.ledgerReportType || rest.reportType;
+        return { ...rest, reportType: rt };
+      });
+      setCurrentSlide(LEDGER_REPORT_SLIDE);
+      return;
+    }
     if (returnSlide === INCOME_TAX_REPORT_SLIDE) {
       setFormData((prev) => {
         const { ledgerDrilldown, ledgerReturnSlide, ...rest } = prev;
@@ -1046,12 +1527,16 @@ function App() {
         { phrases: ['open stock lot wise', 'stock lot wise', 'open stock lot', 'stock lot'], reportType: 'stock-lot', slideNo: 10, title: 'Stock Lot Wise' },
         { phrases: ['open ageing report', 'ageing report', 'aging report', 'open aging report'], reportType: 'ageing', slideNo: 12, title: 'Ageing Report' },
         { phrases: ['open purchase list', 'purchase list'], reportType: 'purchase-list', slideNo: 11, title: 'Purchase List' },
-        { phrases: ['open voucher list', 'voucher list'], reportType: 'voucher-list', slideNo: 14, title: 'Voucher List' },
+        { phrases: ['open voucher list', 'voucher list', 'voucher checklist'], reportType: 'voucher-list', slideNo: 14, title: 'Voucher Checklist' },
         { phrases: ['open gstr1', 'gstr1', 'open gstr 1', 'gstr 1'], reportType: 'gstr1', slideNo: 15, title: 'GSTR1' },
         { phrases: ['open hsn sales', 'hsn sales', 'open hsn sale', 'hsn sale'], reportType: 'hsn-sales', slideNo: 16, title: 'HSN Sales' },
         { phrases: ['open hsn purchase', 'hsn purchase', 'open hsn purchases', 'hsn purchases'], reportType: 'hsn-purchase', slideNo: 17, title: 'HSN Purchase' },
         { phrases: ['open state wise sales', 'state wise sales', 'state sales', 'open state sales'], reportType: 'state-wise-sales', slideNo: 21, title: 'State Wise Sales' },
         { phrases: ['open state wise purchase', 'state wise purchase', 'state purchase', 'open state purchase'], reportType: 'state-wise-purchase', slideNo: 22, title: 'State Wise Purchase' },
+        { phrases: ['open purchase tds detail', 'party wise purchase detail tds', 'purchase tds detail'], reportType: 'purchase-tds-detail', slideNo: 23, title: 'Party Wise Purchase Detail (TDS)' },
+        { phrases: ['open purchase tds summary', 'party wise purchase summary tds', 'purchase tds summary'], reportType: 'purchase-tds-summary', slideNo: 24, title: 'Party Wise Purchase Summary (TDS)' },
+        { phrases: ['open sale tds detail', 'party wise sale detail tds', 'sale tds detail'], reportType: 'sale-tds-detail', slideNo: 105, title: 'Party Wise Sale Detail (TDS)' },
+        { phrases: ['open sale tds summary', 'party wise sale summary tds', 'sale tds summary'], reportType: 'sale-tds-summary', slideNo: 106, title: 'Party Wise Sale Summary (TDS)' },
         { phrases: ['open trading account', 'trading account', 'open trading a c', 'trading a c'], reportType: 'trading-ac', slideNo: 18, title: 'Trading Account' },
         { phrases: ['open p and l', 'p and l', 'open profit and loss', 'profit and loss', 'open p l', 'p l'], reportType: 'pl-profit-loss', slideNo: 19, title: 'P&L' },
         { phrases: ['open balance sheet', 'balance sheet'], reportType: 'balance-sheet', slideNo: 20, title: 'Balance Sheet' },
@@ -1618,7 +2103,7 @@ function App() {
           <Slide7 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
         {currentSlide === 8 && (
-          <Slide8 apiBase={API_BASE} formData={formData} viewMode={viewMode} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+          <Slide8 apiBase={API_BASE} formData={formData} viewMode={viewMode} onPrev={backFromSalesRecordsChild} onReset={handleReset} />
         )}
         {currentSlide === 9 && (
           <Slide9 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
@@ -1627,16 +2112,42 @@ function App() {
           <Slide10 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
         {currentSlide === 11 && (
-          <Slide11 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+          <Slide11
+            apiBase={API_BASE}
+            formData={formData}
+            billType={formData.purchaseListType || ''}
+            onPrev={() => {
+              const ret = Number(formData.purchaseListReturnSlide);
+              if (Number.isFinite(ret) && ret > 0 && ret !== 11) {
+                setFormData((prev) => {
+                  const { purchaseListType, purchaseListReturnSlide, ...rest } = prev;
+                  return rest;
+                });
+                setCurrentSlide(ret);
+                return;
+              }
+              setFormData((prev) => {
+                const { purchaseListType, purchaseListReturnSlide, ...rest } = prev;
+                return rest;
+              });
+              setCurrentSlide(3);
+            }}
+            onReset={handleReset}
+          />
         )}
         {currentSlide === 12 && (
           <Slide12 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
         {currentSlide === 13 && (
-          <Slide13 apiBase={API_BASE} formData={formData} viewMode={viewMode} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+          <Slide13 apiBase={API_BASE} formData={formData} viewMode={viewMode} onPrev={backFromSalesRecordsChild} onReset={handleReset} />
         )}
         {currentSlide === 14 && (
-          <Slide14 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
+          <Slide14
+            apiBase={API_BASE}
+            formData={formData}
+            onPrev={backFromVoucherHubChild}
+            onReset={handleReset}
+          />
         )}
         {currentSlide === 15 && (
           <Slide15 apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
@@ -1663,6 +2174,42 @@ function App() {
             onReset={handleReset}
           />
         )}
+        {currentSlide === 23 && (
+          <Slide23PurchaseTdsDetail
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+          />
+        )}
+        {currentSlide === 24 && (
+          <Slide24PurchaseTdsSummary
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+          />
+        )}
+        {currentSlide === 105 && (
+          <Slide25SaleTdsDetail
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+          />
+        )}
+        {currentSlide === 106 && (
+          <Slide26SaleTdsSummary
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => setCurrentSlide(3)}
+            onReset={handleReset}
+          />
+        )}
         {currentSlide === 18 && (
           <Slide17TradingAc apiBase={API_BASE} formData={formData} onPrev={() => setCurrentSlide(3)} onReset={handleReset} />
         )}
@@ -1676,7 +2223,7 @@ function App() {
           <Slide33SaleGraph
             apiBase={API_BASE}
             formData={formData}
-            onPrev={() => setCurrentSlide(3)}
+            onPrev={backFromSalesRecordsChild}
             onReset={handleReset}
             onOpenSaleList={openSaleListFromChart}
           />
@@ -2173,8 +2720,296 @@ function App() {
             formData={formData}
             viewMode={viewMode}
             userName={loginUserName}
-            onPrev={() => setCurrentSlide(3)}
+            onPrev={backFromIncomeTaxReport}
             onOpenLedger={openLedgerFromIncomeTax}
+          />
+        )}
+        {currentSlide === OTHER_REPORTS_PLACEHOLDER_SLIDE && (
+          <Slide90OtherReportsPlaceholder
+            formData={formData}
+            userName={loginUserName}
+            onPrev={backFromOtherReports}
+            onReset={handleResetToMenu}
+            onNavigateSlide={setCurrentSlide}
+          />
+        )}
+        {currentSlide === OTHER_REPORTS_REPORT_SLIDE && (
+          <Slide91OtherReports
+            apiBase={API_BASE}
+            formData={formData}
+            viewMode={viewMode}
+            userName={loginUserName}
+            onPrev={backFromOtherReports}
+            onOpenLedger={openLedgerFromOtherReports}
+          />
+        )}
+        {currentSlide === LEDGER_REPORT_SLIDE && (
+          <Slide96LedgerReports
+            apiBase={API_BASE}
+            formData={formData}
+            viewMode={viewMode}
+            userName={loginUserName}
+            onPrev={backFromLedgerReports}
+            onOpenLedger={openLedgerFromLedgerReports}
+          />
+        )}
+        {currentSlide === TRANSACTION_PLACEHOLDER_SLIDE && (
+          <Slide92TransactionPlaceholder
+            formData={formData}
+            userName={loginUserName}
+            onPrev={backFromTransaction}
+            onReset={handleResetToMenu}
+            onNavigateSlide={setCurrentSlide}
+          />
+        )}
+        {currentSlide === CASH_VOUCHER_ENTRY_SLIDE && (
+          <Slide93CashVoucherEntry
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={backFromVoucherHubChild}
+            onOpenAction={(actionId) => openVoucherHubAction(actionId, 'cash-voucher-entry')}
+          />
+        )}
+        {currentSlide === BANK_VOUCHER_ENTRY_SLIDE && (
+          <Slide94BankVoucherEntry
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={backFromVoucherHubChild}
+            onOpenAction={(actionId) => openVoucherHubAction(actionId, 'bank-voucher-entry')}
+          />
+        )}
+        {currentSlide === JOURNAL_VOUCHER_ENTRY_SLIDE && (
+          <Slide95JournalVoucherEntry
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={backFromVoucherHubChild}
+            onOpenAction={(actionId) => openVoucherHubAction(actionId, 'journal-voucher-entry')}
+          />
+        )}
+        {currentSlide === PURCHASE_ORDER_SLIDE && (
+          <Slide97PurchaseOrder
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => {
+              setFormData((prev) => ({ ...prev, menuReturnModule: PURCHASE_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === SALES_ORDER_SLIDE && (
+          <Slide108SalesOrder
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => {
+              const hub = readSalesOrderHubReturn(formData);
+              if (hub) {
+                setFormData((prev) => {
+                  const { salesOrderHubReturn, openSoChecklist, openSoPrint, openSoPending, ...rest } = prev;
+                  return {
+                    ...rest,
+                    reportType: hub.reportType,
+                    menuReturnModule: SALES_MENU_MODULE_ID,
+                  };
+                });
+                setCurrentSlide(hub.slide);
+                return;
+              }
+              setFormData((prev) => ({ ...prev, menuReturnModule: SALES_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === SALES_ORDER_HUB_SLIDE && (
+          <Slide109SalesOrderHub
+            formData={formData}
+            userName={loginUserName}
+            onOpenAction={openSalesOrderHubAction}
+            onPrev={() => {
+              setFormData((prev) => ({
+                ...prev,
+                reportType: 'sales-order',
+                menuReturnModule: SALES_MENU_MODULE_ID,
+              }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === DISPATCH_CHALLAN_SLIDE && (
+          <Slide110DispatchChallan
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => {
+              const hub = readDispatchChallanHubReturn(formData);
+              if (hub) {
+                setFormData((prev) => {
+                  const { dispatchChallanHubReturn, ...rest } = prev;
+                  return {
+                    ...rest,
+                    reportType: hub.reportType,
+                    menuReturnModule: SALES_MENU_MODULE_ID,
+                  };
+                });
+                setCurrentSlide(hub.slide);
+                return;
+              }
+              setFormData((prev) => ({ ...prev, menuReturnModule: SALES_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === DISPATCH_CHALLAN_HUB_SLIDE && (
+          <Slide111DispatchChallanHub
+            formData={formData}
+            userName={loginUserName}
+            onOpenAction={openDispatchChallanHubAction}
+            onPrev={() => {
+              setFormData((prev) => ({
+                ...prev,
+                reportType: 'dispatch-challan',
+                menuReturnModule: SALES_MENU_MODULE_ID,
+              }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === SALES_RECORDS_HUB_SLIDE && (
+          <Slide112SalesRecordsHub
+            formData={formData}
+            userName={loginUserName}
+            onOpenAction={openSalesRecordsHubAction}
+            onPrev={() => {
+              setFormData((prev) => ({
+                ...prev,
+                reportType: 'sales-records',
+                menuReturnModule: SALES_MENU_MODULE_ID,
+              }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === SALE_BILL_SLIDE && (
+          <Slide113SaleBill
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onNavigateSlide={navigateToSlide}
+            onPrev={backFromSalesRecordsChild}
+          />
+        )}
+        {currentSlide === GOODS_INWARD_SLIDE && (
+          <Slide98GoodsInward
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => {
+              setFormData((prev) => ({ ...prev, menuReturnModule: PURCHASE_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === CONSIGNMENT_STOCK_SLIDE && (
+          <Slide107ConsignmentStock
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onPrev={() => {
+              setFormData((prev) => ({ ...prev, menuReturnModule: PURCHASE_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === PURCHASE_BILL_SLIDE && (
+          <Slide25PurchaseBill
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onNavigateSlide={navigateToSlide}
+            onPrev={() => {
+              setFormData((prev) => ({ ...prev, menuReturnModule: PURCHASE_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === BARDANA_PURCHASE_BILL_SLIDE && (
+          <Slide26BardanaPurchaseBill
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onNavigateSlide={navigateToSlide}
+            onPrev={() => {
+              setFormData((prev) => ({ ...prev, menuReturnModule: PURCHASE_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === DEBIT_NOTE_SLIDE && (
+          <Slide27DebitNote
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onNavigateSlide={navigateToSlide}
+            onPrev={() => {
+              setFormData((prev) => ({ ...prev, menuReturnModule: PURCHASE_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === EXP_VOUCHER_SLIDE && (
+          <Slide28PurchaseOtherItems
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onNavigateSlide={navigateToSlide}
+            onPrev={() => {
+              setFormData((prev) => ({ ...prev, menuReturnModule: PURCHASE_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === DEBIT_NOTE_OTHERS_SLIDE && (
+          <Slide29DebitNoteOthers
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onNavigateSlide={navigateToSlide}
+            onPrev={() => {
+              setFormData((prev) => ({ ...prev, menuReturnModule: PURCHASE_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === CREDIT_NOTE_OTHERS_SLIDE && (
+          <Slide30CreditNoteOthers
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            onNavigateSlide={navigateToSlide}
+            onPrev={() => {
+              setFormData((prev) => ({ ...prev, menuReturnModule: PURCHASE_MENU_MODULE_ID }));
+              setCurrentSlide(3);
+            }}
+          />
+        )}
+        {currentSlide === VOUCHER_BOOKS_REPORT_SLIDE && (
+          <Slide99VoucherBooks
+            apiBase={API_BASE}
+            formData={formData}
+            userName={loginUserName}
+            returnSlide={VOUCHER_BOOKS_REPORT_SLIDE}
+            onOpenVoucher={openVoucherEntryFromReport}
+            onPrev={() => {
+              setFormData((prev) => {
+                const { voucherBookReturn, ...rest } = prev;
+                return { ...rest, menuReturnModule: VOUCHER_MENU_MODULE_ID };
+              });
+              setCurrentSlide(3);
+            }}
           />
         )}
         {currentSlide === 80 && (

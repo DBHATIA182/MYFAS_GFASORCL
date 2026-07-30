@@ -1,0 +1,152 @@
+/* Sale Bill entry — reuses Purchase Bill's pb-* layout/table styles (same tab-panel chrome). */
+@import './purchaseBillForm.css';
+
+.sb-entry-form .sb-mock-header {
+  --sb-header-accent: #0f766e;
+}
+
+/* ── Grid 1: wider columns (VFP GRID1 is dense but readable) ── */
+.sb-entry-form .sb-lines-table {
+  min-width: 220rem;
+  table-layout: auto;
+}
+
+.sb-entry-form .sb-lines-table thead th {
+  white-space: nowrap;
+  min-width: 5.5rem;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.78rem;
+}
+
+.sb-entry-form .sb-lines-table tbody td {
+  min-width: 5.5rem;
+  padding: 0.2rem 0.3rem;
+  vertical-align: middle;
+}
+
+.sb-entry-form .sb-lines-table .pb-col-sno {
+  min-width: 2.75rem;
+  width: 2.75rem;
+}
+
+.sb-entry-form .sb-lines-table .pb-col-name {
+  min-width: 14rem;
+  max-width: 22rem;
+}
+
+.sb-entry-form .sb-lines-table .form-input {
+  min-width: 5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sb-entry-form .sb-lines-table .pb-wgt-input {
+  min-width: 7rem;
+}
+
+.sb-entry-form .sb-lines-table .pb-rate-input {
+  min-width: 6.5rem;
+}
+
+.sb-entry-form .sb-lines-table .pb-amt-input {
+  min-width: 8rem;
+}
+
+.sb-entry-form .sb-lines-table .pb-col-pct {
+  min-width: 5rem;
+  max-width: none;
+}
+
+.sb-entry-form .sb-lines-table .pb-grid-cell-wrap {
+  min-width: 6.5rem;
+}
+
+.sb-entry-form .sb-lines-table .pb-grid-cell-wrap .form-input {
+  min-width: 5rem;
+}
+
+.sb-entry-form .pb-lines-table--full {
+  min-width: 220rem;
+}
+
+.sb-entry-form .pb-lines-wrap {
+  overflow-x: auto;
+}
+
+/* ── Bill Expenses: dense 3-col VFP footer strip ── */
+.sb-bill-exp-panel {
+  overflow: auto;
+  max-height: min(70vh, 640px);
+}
+
+.sb-bill-exp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(260px, 1fr));
+  gap: 0.75rem 1.25rem;
+  align-items: start;
+}
+
+.sb-bill-exp-grid--dense .pb-bill-exp-field {
+  margin-bottom: 0.35rem;
+}
+
+.sb-bill-exp-grid--dense .pb-bill-exp-field__label {
+  min-width: 6.5rem;
+  font-size: 0.78rem;
+}
+
+.sb-bill-exp-grid--dense .pb-bill-exp-field__control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.sb-bill-exp-grid--dense .pb-bill-exp-inp--pct {
+  width: 3.5rem;
+  min-width: 3.5rem;
+}
+
+.sb-bill-exp-grid--dense .pb-bill-exp-inp--qw {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  text-align: center;
+}
+
+.sb-bill-exp-grid--dense .pb-bill-exp-inp--amt {
+  width: 6.5rem;
+  min-width: 5.5rem;
+}
+
+.sb-bill-exp-grid--dense .pb-bill-exp-inp--code {
+  width: 5.5rem;
+  min-width: 4.5rem;
+}
+
+.pb-bill-exp-inp--wide {
+  min-width: 12rem;
+  flex: 1;
+}
+
+.sb-bill-exp-field--wide .pb-bill-exp-field__control {
+  width: 100%;
+}
+
+.sb-exp-hint {
+  margin-top: 0.5rem;
+  opacity: 0.8;
+}
+
+@media (max-width: 1100px) {
+  .sb-bill-exp-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .sb-bill-exp-grid {
+    grid-template-columns: 1fr;
+  }
+}

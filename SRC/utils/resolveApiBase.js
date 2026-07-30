@@ -118,8 +118,10 @@ export function resolveApiBase(options = {}) {
     return '';
   }
 
+  // Local browser (localhost / 127.0.0.1): use Vite /api proxy → Node :5002
+  // (avoids baked-in wrong ports like 5001 in production preview builds)
   if (isLoopback) {
-    return normalizeApiBase(config.local?.apiBase) || `http://localhost:${apiPort}`;
+    return '';
   }
 
   if (onLan) {

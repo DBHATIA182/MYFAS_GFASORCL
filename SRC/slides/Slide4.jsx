@@ -22,6 +22,7 @@ import { filterLedgerRows, countLedgerFilterStats, ledgerFilterIsActive, collect
 import { ledgerAccountCode as accountCodeFromRow } from '../utils/ledgerAccountCode';
 import SessionToolbarChrome from '../components/SessionToolbarChrome';
 import ReportHelpButton from '../components/ReportHelpButton';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 import { LEDGER_FLOW_STYLE, LEDGER_SHELL_STYLE, mountLedgerFullBleedLayout } from '../utils/ledgerFullBleedLayout';
 
 const VIEW = { FORM: 'form', TRIAL: 'trial', LEDGER: 'ledger', VOUCHER: 'voucher' };
@@ -353,25 +354,21 @@ export default function Slide4({ apiBase, formData, onPrev, onReset, viewMode: a
       <div className="slide slide-report">
         <div className="report-toolbar">
           <h2>Voucher entries</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="trial-balance" viewKey="voucher" />
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setViewMode(VIEW.LEDGER)}>
-              ← Back to ledger
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  downloadExcelRows(voucherRows, 'Voucher', `${compName}_Voucher_${voucherTitle.replace(/\s+/g, '_')}`);
-                } catch (e) {
-                  alert(String(e?.message || e));
-                }
-              }}
-            >
-              📊 Excel
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="trial-balance"
+            helpViewKey="voucher"
+            onBack={() => setViewMode(VIEW.LEDGER)}
+            backLabel="← Back to ledger"
+            showPdf={false}
+            showWhatsApp={false}
+            onExcel={() => {
+              try {
+                downloadExcelRows(voucherRows, 'Voucher', `${compName}_Voucher_${voucherTitle.replace(/\s+/g, '_')}`);
+              } catch (e) {
+                alert(String(e?.message || e));
+              }
+            }}
+          />
         </div>
         <LedgerReportHeader
           compHeader={compLedgerHeader}

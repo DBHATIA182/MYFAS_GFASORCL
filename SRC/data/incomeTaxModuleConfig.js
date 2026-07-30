@@ -8,6 +8,9 @@ export const INCOME_TAX_PLACEHOLDER_SLIDE = 87;
 /** Live income tax report screen (all BW_MENU incometaxr items). */
 export const INCOME_TAX_REPORT_SLIDE = 89;
 
+/** reportMenuConfig module id — restore this section when leaving an income tax report. */
+export const INCOME_TAX_MENU_MODULE_ID = 'income-tax-reports';
+
 export const INCOME_TAX_CATEGORIES = [
   { id: 'lists', label: 'Party lists' },
   { id: 'party-reports', label: 'Party-wise reports' },
@@ -65,6 +68,17 @@ export const INCOME_TAX_MODULE_ITEMS = [
     vfpCommand: "DO FORM ITAXRPT WITH 'B'",
     vfpFiles: [...ITAX_FORM, 'reports/itaxsale.frx'],
     vfpNote: 'Mode B — party-wise sales',
+  },
+  {
+    id: 'top-party-sales',
+    category: 'party-reports',
+    title: 'Top Party Sales',
+    shortTitle: 'Top Sales',
+    description: 'Top N parties by sales amount (default 10). Tap a row to open sale ledger.',
+    vfpCommand: '',
+    vfpFiles: [],
+    vfpNote: 'Web — top N party sales with ledger drill-down',
+    implemented: true,
   },
   {
     id: 'month-schedule-wise-list',

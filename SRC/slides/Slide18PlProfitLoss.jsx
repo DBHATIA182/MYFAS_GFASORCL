@@ -7,7 +7,7 @@ import SaleBillPrintModal from '../components/SaleBillPrintModal';
 import LedgerReportHeader from '../components/LedgerReportHeader';
 import { generatePDF, sharePdfWithWhatsApp } from '../utils/pdfgenerator';
 import { formatLedgerVoucherApiError } from '../utils/apiLabel';
-import ReportHelpButton from '../components/ReportHelpButton';
+import ReportToolbarActions from '../components/ReportToolbarActions';
 
 function num(v) {
   const n = Number(v);
@@ -406,26 +406,21 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
       <div className="slide slide-report slide-18 pl-profit-loss">
         <div className="report-toolbar">
           <h2>Voucher entries</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="pl-profit-loss" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen(SCREEN.LEDGER)}>
-              ← Back to ledger
-            </button>
-            <button
-              type="button"
-              className="btn btn-excel"
-              onClick={() => {
-                try {
-                  downloadExcelRows(voucherRows, 'Voucher', `${compName}_Voucher_${voucherTitle.replace(/\s+/g, '_')}`);
-                } catch (e) {
-                  alert(String(e?.message || e));
-                }
-              }}
-            >
-              📊 Excel
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="pl-profit-loss"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={() => setScreen(SCREEN.LEDGER)}
+            backLabel="← Back to ledger"
+            showPdf={false}
+            showWhatsApp={false}
+            onExcel={() => {
+              try {
+                downloadExcelRows(voucherRows, 'Voucher', `${compName}_Voucher_${voucherTitle.replace(/\s+/g, '_')}`);
+              } catch (e) {
+                alert(String(e?.message || e));
+              }
+            }}
+          />
         </div>
         <LedgerReportHeader
           compHeader={compLedgerHeader}
@@ -464,13 +459,12 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
       <div className="slide slide-report slide-18 pl-profit-loss">
         <div className="report-toolbar">
           <h2>Ledger Report</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="pl-profit-loss" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setScreen(SCREEN.REPORT)}>
-              ← Back to P&L
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="pl-profit-loss"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={() => setScreen(SCREEN.REPORT)}
+            backLabel="← Back to P&L"
+          />
         </div>
         <LedgerReportHeader
           compHeader={compLedgerHeader}
@@ -519,22 +513,14 @@ export default function Slide18PlProfitLoss({ apiBase, formData = {}, onPrev, on
       <div className="slide slide-report slide-18 pl-profit-loss">
         <div className="report-toolbar">
           <h2>Profit &amp; Loss</h2>
-          <div className="toolbar-actions">
-            <ReportHelpButton reportId="pl-profit-loss" includeSalesEntry={false} includeStockLot={true} appName="GFASORCL Accounting" />
-            
-            <button type="button" className="btn btn-toolbar-back" onClick={() => setPlData(null)}>
-              ← Back
-            </button>
-            <button type="button" className="btn btn-export" onClick={() => downloadPdf().catch((e) => alert(e?.message || String(e)))}>
-              Pdf
-            </button>
-            <button type="button" className="btn btn-excel" onClick={exportExcel}>
-              📊 Excel
-            </button>
-            <button type="button" className="btn btn-whatsapp" onClick={() => shareOnWhatsApp().catch((e) => alert(e?.message || String(e)))}>
-              WhatsApp
-            </button>
-          </div>
+          <ReportToolbarActions
+            reportId="pl-profit-loss"
+            helpProps={{ includeSalesEntry: false, includeStockLot: true, appName: 'GFASORCL Accounting' }}
+            onBack={() => setPlData(null)}
+            onPdf={() => downloadPdf().catch((e) => alert(e?.message || String(e)))}
+            onExcel={exportExcel}
+            onWhatsApp={() => shareOnWhatsApp().catch((e) => alert(e?.message || String(e)))}
+          />
         </div>
 
         <article className="pl-statement pl-doc" aria-label="Profit and loss statement">
