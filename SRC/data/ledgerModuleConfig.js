@@ -2,8 +2,8 @@
  * Ledger module reports (moved from Other Reports) — VFP MYLEGER, etc.
  */
 
-/** Live ledger report screen — Slide 5 (standard ledger layout). */
-export const LEDGER_REPORT_SLIDE = 5;
+/** Live ledger report screen — Slide 96 (Dr/Cr date etc.; classic party ledger stays Slide 5). */
+export const LEDGER_REPORT_SLIDE = 96;
 
 /** reportMenuConfig section id — restore when leaving a ledger module report. */
 export const LEDGER_MENU_MODULE_ID = 'ledger-reports';

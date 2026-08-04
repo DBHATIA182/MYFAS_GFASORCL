@@ -7106,6 +7106,7 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
     ? `\n\nDownload PDF:\n${publicUrl}`
     : `\n\nPDF saved as: ${filename}\nIn WhatsApp, tap Attach (paperclip) and select this file from your Downloads folder.`;
   const body = text + linkBlock;
+  const shareTitle = text.split('\n')[0] || reportLabel;
 
   let canShareFiles = false;
   try {
@@ -7118,13 +7119,34 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
     canShareFiles = false;
   }
 
-  // Prefer link-based WhatsApp (works for any recipient phone; matches VFP).
-  // Still offer native file share on mobile when no public URL was published.
-  if (canShareFiles && !publicUrl) {
+  const canShareText =
+    typeof navigator !== 'undefined' && typeof navigator.share === 'function' && shouldPreferNativeFileShare();
+
+  // Mobile: use OS share sheet first (WhatsApp appears in the list). Include link when published.
+  if (canShareText) {
+    try {
+      if (canShareFiles) {
+        await navigator.share({
+          files: [file],
+          title: shareTitle,
+          text: phoneHint + body,
+        });
+        return;
+      }
+      const payload = publicUrl
+        ? { title: shareTitle, text: body, url: publicUrl }
+        : { title: shareTitle, text: body };
+      await navigator.share(payload);
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+      // fall through to wa.me
+    }
+  } else if (canShareFiles && !publicUrl) {
     try {
       await navigator.share({
         files: [file],
-        title: text.split('\n')[0],
+        title: shareTitle,
         text: phoneHint + text,
       });
       return;

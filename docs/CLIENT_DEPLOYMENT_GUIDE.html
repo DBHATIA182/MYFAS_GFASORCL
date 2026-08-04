@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GRAINFAS (GFASORCL) — Client PC Deployment Guide (Tunnel Already Created)</title>
+  <style>
+    @page { margin: 14mm 12mm; }
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", Calibri, Arial, sans-serif; font-size: 10.5pt; line-height: 1.42; color: #1a1a1a; max-width: 210mm; margin: 0 auto; padding: 8mm; }
+    h1 { font-size: 16pt; color: #0f3d7a; border-bottom: 3px solid #1a5fb4; padding-bottom: 8px; margin: 0 0 10px; }
+    h2 { font-size: 12.5pt; color: #1a5fb4; margin: 1.2em 0 0.35em; page-break-after: avoid; border-bottom: 1px solid #d0e3f7; padding-bottom: 3px; }
+    h3 { font-size: 11pt; margin: 0.9em 0 0.3em; page-break-after: avoid; color: #333; }
+    p, li { margin: 0.28em 0; }
+    ul, ol { margin: 0.3em 0 0.5em 1.1em; }
+    code, .cmd { font-family: Consolas, "Courier New", monospace; font-size: 9.2pt; background: #f0f4f8; padding: 1px 4px; border-radius: 3px; }
+    pre { font-family: Consolas, "Courier New", monospace; font-size: 8.6pt; background: #f6f8fa; border: 1px solid #c5d0dc; padding: 8px 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; margin: 7px 0; }
+    .cover { text-align: center; padding: 20px 0 28px; page-break-after: always; }
+    .cover h1 { border: none; font-size: 20pt; }
+    .cover p { font-size: 11pt; color: #444; }
+    .note { background: #fff8e6; border-left: 4px solid #e6a800; padding: 7px 10px; margin: 8px 0; page-break-inside: avoid; }
+    .warn { background: #ffecec; border-left: 4px solid #c62828; padding: 7px 10px; margin: 8px 0; page-break-inside: avoid; }
+    .ok { background: #ecfdf5; border-left: 4px solid #059669; padding: 7px 10px; margin: 8px 0; page-break-inside: avoid; }
+    table { border-collapse: collapse; width: 100%; font-size: 9.3pt; margin: 7px 0; page-break-inside: avoid; }
+    th, td { border: 1px solid #b8c5d4; padding: 5px 6px; text-align: left; vertical-align: top; }
+    th { background: #e8f0fa; }
+    .toc { font-size: 10pt; page-break-after: always; }
+    .toc li { margin: 0.22em 0; }
+    footer { font-size: 8.5pt; color: #666; margin-top: 1.6em; border-top: 1px solid #ccc; padding-top: 7px; }
+    .step-num { display: inline-block; min-width: 1.4em; font-weight: 700; color: #0f3d7a; }
+    @media print { body { padding: 0; } a { color: #000; text-decoration: none; } }
+  </style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>GRAINFAS (GFASORCL)</h1>
+  <p><strong>Client PC deployment guide</strong></p>
+  <p>Scenario: Cloudflare tunnel already created on the server PC</p>
+  <p>Example client key: <code>rbak</code> · Example drive: <code>D:\</code></p>
+  <p style="margin-top:1.6em;font-size:9.5pt;color:#666;">
+    Public URL: https://rbak.fasaccountingsoftware.in<br/>
+    Local web: http://localhost:5173 · Local API: http://localhost:5002
+  </p>
+  <p style="margin-top:2em;font-size:9pt;color:#888;">Document date: August 2026 · Folder: GFASORCL\APPTEST\docs</p>
+</div>
+
+<div class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li>What this guide covers</li>
+    <li>Server vs client responsibility</li>
+    <li>Folder layout on the client PC</li>
+    <li>Copy files from server to client</li>
+    <li>Install Node.js and cloudflared (setup-client.ps1)</li>
+    <li>Confirm tunnel files (do not recreate tunnel)</li>
+    <li>Start services (grainfas_start_Services.bat)</li>
+    <li>Verify on PC and phone</li>
+    <li>Auto-start after reboot (Task Scheduler)</li>
+    <li>Update app from Git later</li>
+    <li>Optional: VFP remote invoice upload / WhatsApp PDF</li>
+    <li>Troubleshooting</li>
+    <li>Quick command cheat-sheet</li>
+  </ol>
+</div>
+
+<h1>Client deployment — tunnel already created</h1>
+
+<h2>1. What this guide covers</h2>
+<p>This is the process used when:</p>
+<ul>
+  <li>The Cloudflare tunnel (example: <code>rbak</code>) is <strong>already created</strong> on the main/server PC.</li>
+  <li>DNS routes already exist (<code>rbak.fasaccountingsoftware.in</code> and <code>rbak-api.fasaccountingsoftware.in</code>).</li>
+  <li>You are deploying GRAINFAS to a <strong>client PC</strong> so that PC runs API + web + tunnel connector.</li>
+</ul>
+<div class="ok">
+  <strong>Do not create a new tunnel on the client</strong> if the server already created <code>rbak</code>.
+  Copy <code>config.yml</code>, <code>connection.config.json</code>, and the tunnel <code>&lt;uuid&gt;.json</code> instead.
+</div>
+
+<h2>2. Server vs client responsibility</h2>
+<table>
+  <tr><th>Done on server / office PC</th><th>Done on client PC</th></tr>
+  <tr>
+    <td>
+      Create tunnel <code>rbak</code><br/>
+      DNS routes for app + API hosts<br/>
+      Prepare APPTEST build / Git repo<br/>
+      Prepare offline installers folder
+    </td>
+    <td>
+      Copy APPTEST + oracle_bridge + installers<br/>
+      Copy tunnel config files<br/>
+      Install Node + cloudflared<br/>
+      Start stack + optional Task Scheduler<br/>
+      Later: update from Git
+    </td>
+  </tr>
+</table>
+
+<h2>3. Folder layout on the client PC</h2>
+<p>Example using drive <code>D:</code> (change drive letter if needed):</p>
+<pre>D:\GFASORCL\
+  APPTEST\                          ← Application
+    server.cjs, package.json, SRC\
+    connection.config.json          ← client key, Oracle, connectingLabel
+    config.yml                      ← Cloudflare tunnel ingress
+    &lt;tunnel-uuid&gt;.json             ← Tunnel credentials (same UUID as in config.yml)
+    grainfas_start_Services.bat
+    setup-client.ps1
+    update-from-git.ps1
+  oracle_bridge\
+    instantclient_23_0\             ← Oracle Instant Client (required)
+
+D:\mobile application software\     ← Offline Node / cloudflared / Git installers
+</pre>
+<div class="note">
+  <code>setup-client.ps1</code> default offline path is <code>d:\mobile application software</code>.
+  Keep that folder name exactly, or pass <code>-OfflinePackageRoot "D:\your\path"</code>.
+</div>
+
+<h2>4. Copy files from server to client</h2>
+<ol>
+  <li>Copy whole <code>GFASORCL\APPTEST</code> folder to the client (example: <code>D:\GFASORCL\APPTEST</code>).</li>
+  <li>Copy <code>GFASORCL\oracle_bridge</code> next to APPTEST.</li>
+  <li>Copy offline installer folder to <code>D:\mobile application software</code>.</li>
+  <li><strong>Critical tunnel files</strong> (from the server APPTEST that already runs <code>rbak</code>) must be present in client APPTEST:
+    <ul>
+      <li><code>config.yml</code></li>
+      <li><code>connection.config.json</code> (clientName / connectingLabel = <code>rbak</code>)</li>
+      <li><code>&lt;tunnel-uuid&gt;.json</code> matching <code>credentials-file</code> in <code>config.yml</code></li>
+    </ul>
+  </li>
+</ol>
+<div class="warn">
+  Git does <strong>not</strong> keep secrets. Always copy <code>connection.config.json</code>, <code>config.yml</code>, and tunnel JSON by hand when refreshing from Git.
+</div>
+
+<h2>5. Install Node.js and cloudflared</h2>
+<p><code>setup-client.ps1</code> installs Node + cloudflared from the offline folder (or winget if offline install fails).</p>
+<ol>
+  <li>Open <strong>PowerShell as Administrator</strong>.</li>
+  <li>Go to APPTEST:</li>
+</ol>
+<pre>cd D:\GFASORCL\APPTEST</pre>
+<ol start="3">
+  <li>Run (replace password / Oracle connect string if different on this PC):</li>
+</ol>
+<pre>powershell -ExecutionPolicy Bypass -File .\setup-client.ps1 -ClientKey "rbak" -OracleConnectString "XE" -OraclePrimaryUser "GRAINFAS" -OraclePrimaryPassword "GRAINFAS" -OracleGrainUser "GRAIN" -OracleGrainPassword "GRAIN" -OfflinePackageRoot "D:\mobile application software"</pre>
+<div class="note">
+  In PowerShell you must use <code>.\</code> before script names, for example <code>.\setup-client.ps1</code>.
+  Typing only <code>setup-client.ps1</code> fails with “not recognized”.
+</div>
+<ol start="4">
+  <li><strong>Close PowerShell</strong>, open a <strong>new Admin</strong> window, then check:</li>
+</ol>
+<pre>node --version
+cloudflared --version
+npm --version</pre>
+
+<h2>6. Confirm tunnel files (do not recreate tunnel)</h2>
+<p>Because the tunnel already exists on the server, you normally <strong>skip</strong> <code>setup-new-client-tunnel.ps1</code>.</p>
+<p>Only confirm these files exist in <code>D:\GFASORCL\APPTEST</code>:</p>
+<ul>
+  <li><code>config.yml</code> — hostnames for <code>rbak</code> / <code>rbak-api</code>, ports <code>5173</code> (web) and <code>5002</code> (API), including <code>/api/*</code> and <code>/invoices/*</code> to API</li>
+  <li><code>connection.config.json</code> — <code>clientName</code> = <code>rbak</code>, <code>connectingLabel</code> = <code>rbak.fasaccountingsoftware.in</code>, API port 5002</li>
+  <li>Matching <code>&lt;uuid&gt;.json</code> credentials file</li>
+</ul>
+<div class="ok">
+  If those three are already copied, go to Step 7 (start services).
+</div>
+<p>Only if cloudflared is installed and you need to re-attach DNS/config to existing tunnel <code>rbak</code>:</p>
+<pre>powershell -ExecutionPolicy Bypass -File .\setup-new-client-tunnel.ps1 -ClientKey "rbak" -SkipClientSetup -OfflinePackageRoot "D:\mobile application software"</pre>
+<p>It will reuse the existing tunnel (will not create a second one with the same name).</p>
+
+<h2>7. Start services</h2>
+<pre>cd D:\GFASORCL\APPTEST
+.\grainfas_start_Services.bat</pre>
+<p>This starts in background:</p>
+<ul>
+  <li>API on port <strong>5002</strong></li>
+  <li>Production web preview on port <strong>5173</strong></li>
+  <li>Cloudflare tunnel using <code>config.yml</code></li>
+</ul>
+<p>Progress / errors: <code>logs\grainfas-stack.log</code>, <code>logs\server.log</code>, <code>logs\frontend.log</code>, <code>logs\tunnel.log</code></p>
+
+<h2>8. Verify on PC and phone</h2>
+<table>
+  <tr><th>Check</th><th>URL</th></tr>
+  <tr><td>Local API health</td><td><code>http://127.0.0.1:5002/api/health</code></td></tr>
+  <tr><td>Local web</td><td><code>http://localhost:5173</code></td></tr>
+  <tr><td>Public web (phone / internet)</td><td><code>https://rbak.fasaccountingsoftware.in</code></td></tr>
+  <tr><td>Public API health</td><td><code>https://rbak.fasaccountingsoftware.in/api/health</code></td></tr>
+</table>
+<div class="note">
+  On phone use the <strong>public tunnel hostname</strong>, not <code>localhost</code>.
+  If the page looks unstyled, clear site data / hard refresh (stale CSS after rebuild).
+</div>
+
+<h2>9. Auto-start after reboot (Task Scheduler)</h2>
+<p>Yes — register a scheduled task so API + web + tunnel start after Windows sign-in.</p>
+
+<h3>9A. If <code>setup-gfasorcl-autostart.cmd</code> exists</h3>
+<ol>
+  <li>Right-click <code>D:\GFASORCL\APPTEST\setup-gfasorcl-autostart.cmd</code></li>
+  <li><strong>Run as administrator</strong></li>
+  <li>Task name example: <code>GFAS-rbak-AppStack</code></li>
+</ol>
+
+<h3>9B. If that CMD is missing (common on older client copies)</h3>
+<p>Run this in <strong>Admin PowerShell</strong> (uses <code>grainfas_start_Services.bat</code>):</p>
+<pre>cd D:\GFASORCL\APPTEST
+$bat = "D:\GFASORCL\APPTEST\grainfas_start_Services.bat"
+$task = "GFAS-rbak-AppStack"
+$action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$bat`"" -WorkingDirectory "D:\GFASORCL\APPTEST"
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$trigger.Delay = "PT1M"
+$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Highest
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew
+Register-ScheduledTask -TaskName $task -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description "GFASORCL rbak stack at logon" -Force
+schtasks /Run /TN $task</pre>
+<p>Test after reboot, or run:</p>
+<pre>schtasks /Run /TN "GFAS-rbak-AppStack"</pre>
+
+<h2>10. Update app from Git later</h2>
+<p>Manual update anytime:</p>
+<pre>cd D:\GFASORCL\APPTEST
+powershell -ExecutionPolicy Bypass -File .\update-from-git.ps1 -Branch main
+.\grainfas_start_Services.bat</pre>
+<p>Optional scheduled Git update (if file exists): right-click <code>setup-gfasorcl-git-update.cmd</code> → Run as administrator.<br/>
+Task name: <code>git_dal_update</code></p>
+<div class="warn">
+  After Git update, re-check that <code>connection.config.json</code>, <code>config.yml</code>, and tunnel JSON were not overwritten. Restore from backup if needed.
+</div>
+
+<h2>11. Optional: VFP remote invoice upload / WhatsApp PDF</h2>
+<p>Remote FoxPro PCs cannot use <code>E:\</code> or UNC shares. They upload PDF over HTTP:</p>
+<table>
+  <tr><th>Item</th><th>Value</th></tr>
+  <tr><td>Upload API</td><td><code>POST https://rbak.fasaccountingsoftware.in/api/upload-invoice</code></td></tr>
+  <tr><td>JSON body</td><td><code>comp_code</code>, <code>file_name</code>, <code>file_base64</code></td></tr>
+  <tr><td>Saved on disk</td><td><code>APPTEST\public\invoices\&lt;comp_code&gt;\&lt;file_name&gt;</code></td></tr>
+  <tr><td>WhatsApp download link</td><td><code>https://rbak.fasaccountingsoftware.in/invoices/&lt;comp_code&gt;/&lt;file_name&gt;</code></td></tr>
+  <tr><td>Auto cleanup</td><td>PDFs older than 15 days are deleted by the API</td></tr>
+</table>
+
+<h2>12. Troubleshooting</h2>
+<table>
+  <tr><th>Problem</th><th>Fix</th></tr>
+  <tr>
+    <td><code>setup-....ps1</code> is not recognized</td>
+    <td>Use <code>.\script.ps1</code> (dot-slash). Example: <code>.\setup-client.ps1</code></td>
+  </tr>
+  <tr>
+    <td>cloudflared.exe not found</td>
+    <td>Run <code>setup-client.ps1</code> with correct <code>-OfflinePackageRoot</code>, then open a <strong>new</strong> PowerShell. Or: <code>winget install --id Cloudflare.cloudflared --exact</code></td>
+  </tr>
+  <tr>
+    <td>Offline package path wrong</td>
+    <td>Script looked under <code>D:\GFASORCL\mobile application software</code>. Put installers in <code>D:\mobile application software</code> or pass the path explicitly.</td>
+  </tr>
+  <tr>
+    <td>Login: Cannot reach API at port 5001</td>
+    <td>GFASORCL API is <strong>5002</strong>. Check <code>connection.config.json</code> and restart <code>grainfas_start_Services.bat</code>.</td>
+  </tr>
+  <tr>
+    <td>Phone page unstyled / plain HTML</td>
+    <td>Clear website data for the tunnel host, hard refresh. Ensure stack is production preview, not broken CSS cache.</td>
+  </tr>
+  <tr>
+    <td>Public site error 1033</td>
+    <td>Tunnel connector not running on this PC. Start <code>grainfas_start_Services.bat</code> and check <code>logs\tunnel.log</code>.</td>
+  </tr>
+  <tr>
+    <td><code>setup-gfasorcl-autostart.cmd</code> missing</td>
+    <td>Use Task Scheduler PowerShell in section 9B, or copy autostart files from master APPTEST.</td>
+  </tr>
+</table>
+
+<h2>13. Quick command cheat-sheet</h2>
+<pre>cd D:\GFASORCL\APPTEST
+
+REM Install Node + cloudflared + npm build
+powershell -ExecutionPolicy Bypass -File .\setup-client.ps1 -ClientKey "rbak" -OfflinePackageRoot "D:\mobile application software"
+
+REM Start stack
+.\grainfas_start_Services.bat
+
+REM Update from Git later
+powershell -ExecutionPolicy Bypass -File .\update-from-git.ps1 -Branch main
+.\grainfas_start_Services.bat
+
+REM Test autostart task
+schtasks /Run /TN "GFAS-rbak-AppStack"
+</pre>
+
+<div class="ok">
+  <strong>Replace <code>rbak</code></strong> with the real client key everywhere (folder labels, Task Scheduler name, public URL).
+  Ports for GFASORCL stay: web <strong>5173</strong>, API <strong>5002</strong>.
+</div>
+
+<footer>
+  GRAINFAS / GFASORCL · Client deployment guide (tunnel pre-created on server) · Keep with APPTEST\docs · Generate PDF with build-client-deploy-guide-pdf.ps1
+</footer>
+
+</body>
+</html>

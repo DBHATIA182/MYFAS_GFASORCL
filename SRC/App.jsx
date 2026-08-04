@@ -883,7 +883,7 @@ function App() {
 
   const handleSlide3Next = (data) => {
     const reportType = String(data?.reportType ?? '').trim().toLowerCase();
-    if (reportType === 'ledger' || reportType === 'ledger-interest' || reportType === 'ledger-dr-cr-date') {
+    if (reportType === 'ledger' || reportType === 'ledger-interest') {
       setFormData((prev) => {
         const { ledgerDrilldown, ...rest } = prev;
         const menuModule = categoryForReport(reportType);
