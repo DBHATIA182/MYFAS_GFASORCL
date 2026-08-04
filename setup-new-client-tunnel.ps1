@@ -31,18 +31,54 @@ function Quote-Arg {
     return $Value
 }
 
+function Resolve-CloudflaredExePath {
+    # Prefer real installs — PATH often hits C:\Windows\System32\cloudflared.exe (invalid stub).
+    $candidateExePaths = @(
+        (Join-Path $env:ProgramFiles "Cloudflared\cloudflared.exe"),
+        (Join-Path $env:ProgramFiles "cloudflared\cloudflared.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "Cloudflared\cloudflared.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "cloudflared\cloudflared.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Cloudflared\cloudflared.exe")
+    )
+    foreach ($exePath in $candidateExePaths) {
+        if (Test-Path -LiteralPath $exePath) {
+            return (Resolve-Path -LiteralPath $exePath).Path
+        }
+    }
+    $winDir = [Environment]::GetFolderPath([Environment+SpecialFolder]::Windows).TrimEnd("\")
+    $blocked = @(
+        $(Join-Path $winDir "System32"),
+        $(Join-Path $winDir "SysWOW64")
+    ) | ForEach-Object { $_.TrimEnd("\") }
+
+    $cmd = Get-Command cloudflared.exe -ErrorAction SilentlyContinue
+    if ($cmd) {
+        $src = $cmd.Source
+        $parent = (Split-Path -Parent $src).TrimEnd("\")
+        foreach ($b in $blocked) {
+            if ($parent -ieq $b) {
+                $src = $null
+                break
+            }
+        }
+        if ($src -and (Test-Path -LiteralPath $src)) {
+            return (Resolve-Path -LiteralPath $src).Path
+        }
+    }
+    throw "cloudflared.exe not found. Install with: winget install Cloudflare.cloudflared"
+}
+
 function Invoke-Cloudflared {
     param([Parameter(Mandatory = $true)][string[]]$Args)
-    $argLine = (($Args | ForEach-Object { Quote-Arg $_ }) -join ' ')
     $stdoutPath = [System.IO.Path]::GetTempFileName()
     $stderrPath = [System.IO.Path]::GetTempFileName()
     try {
-        $p = Start-Process -FilePath "cloudflared.exe" -ArgumentList $argLine -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $p = Start-Process -FilePath $script:CfExe -ArgumentList $Args -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
         $stdout = if (Test-Path $stdoutPath) { Get-Content -Path $stdoutPath -Raw } else { "" }
         $stderr = if (Test-Path $stderrPath) { Get-Content -Path $stderrPath -Raw } else { "" }
         $output = (($stdout, $stderr) -join [Environment]::NewLine).Trim()
         if ($p.ExitCode -ne 0) {
-            throw "cloudflared failed (cloudflared.exe $argLine):`n$output"
+            throw "cloudflared failed (`"$script:CfExe`" $($Args -join ' ')):`n$output"
         }
         return $output
     }
@@ -56,11 +92,10 @@ function Ensure-TunnelDnsRoute {
         [Parameter(Mandatory = $true)][string]$TunnelIdOrName,
         [Parameter(Mandatory = $true)][string]$Hostname
     )
-    $argLine = "tunnel route dns -f $(Quote-Arg $TunnelIdOrName) $(Quote-Arg $Hostname)"
     $stdoutPath = [System.IO.Path]::GetTempFileName()
     $stderrPath = [System.IO.Path]::GetTempFileName()
     try {
-        $p = Start-Process -FilePath "cloudflared.exe" -ArgumentList $argLine -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $p = Start-Process -FilePath $script:CfExe -ArgumentList @("tunnel", "route", "dns", "-f", $TunnelIdOrName, $Hostname) -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
         $stdout = if (Test-Path $stdoutPath) { Get-Content -Path $stdoutPath -Raw } else { "" }
         $stderr = if (Test-Path $stderrPath) { Get-Content -Path $stderrPath -Raw } else { "" }
         $output = (($stdout, $stderr) -join [Environment]::NewLine).Trim()
@@ -88,7 +123,20 @@ $appRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $appRoot
 
 if ([string]::IsNullOrWhiteSpace($OfflinePackageRoot)) {
-    $OfflinePackageRoot = Join-Path (Split-Path -Parent $appRoot) "mobile application software"
+    $candidates = @(
+        "d:\mobile application software",
+        "e:\mobile application software",
+        (Join-Path (Split-Path -Parent $appRoot) "mobile application software")
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path -LiteralPath $c) {
+            $OfflinePackageRoot = $c
+            break
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($OfflinePackageRoot)) {
+        $OfflinePackageRoot = "d:\mobile application software"
+    }
 }
 
 Write-Step "Using app root: $appRoot"
@@ -96,7 +144,7 @@ Write-Step "Client key: $ClientKey"
 Write-Step "Offline package root: $OfflinePackageRoot"
 
 if (-not $SkipClientSetup) {
-    Write-Step "Running setup-client.ps1"
+    Write-Step "Running setup-client.ps1 (installs Node / cloudflared if missing)"
     .\setup-client.ps1 `
         -ClientKey $ClientKey `
         -OraclePrimaryUser $OraclePrimaryUser `
@@ -106,6 +154,9 @@ if (-not $SkipClientSetup) {
         -OracleConnectString $OracleConnectString `
         -OfflinePackageRoot $OfflinePackageRoot
 }
+
+$script:CfExe = Resolve-CloudflaredExePath
+Write-Host "Using cloudflared: $script:CfExe" -ForegroundColor DarkGray
 
 Write-Step "Creating tunnel (or validating existing tunnel)"
 $createOutput = ""
@@ -175,10 +226,17 @@ tunnel: $tunnelUuid
 credentials-file: ./$tunnelUuid.json
 
 ingress:
+  # API first - prefer 127.0.0.1 (cloudflared often dials [::1] for localhost)
   - hostname: $appHost
-    service: http://localhost:5173
+    path: /api/*
+    service: http://127.0.0.1:5002
+  - hostname: $appHost
+    path: /invoices/*
+    service: http://127.0.0.1:5002
+  - hostname: $appHost
+    service: http://127.0.0.1:5173
   - hostname: $apiHost
-    service: http://localhost:5002
+    service: http://127.0.0.1:5002
   - service: http_status:404
 "@
 $configContent | Set-Content -Path $configPath -Encoding UTF8

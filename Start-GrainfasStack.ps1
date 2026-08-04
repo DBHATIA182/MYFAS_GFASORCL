@@ -20,7 +20,8 @@
 [CmdletBinding()]
 param(
     [string]$AppRoot = '',
-    [int[]]$Ports = @(5002, 5173, 5001),
+    # Do not free 5001 — Windal on the same PC uses API :5001.
+    [int[]]$Ports = @(5002, 5173),
     [switch]$KillAllCloudflared,
     [int]$WaitSeconds = 3,
     [switch]$ProductionWeb = $true

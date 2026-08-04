@@ -37,7 +37,7 @@ param(
     [bool]$AutoInstallCloudflared = $true,
 
     [Parameter(Mandatory = $false)]
-    [string]$OfflinePackageRoot = "e:\mobile application software"
+    [string]$OfflinePackageRoot = "d:\mobile application software"
 )
 
 $ErrorActionPreference = "Stop"

@@ -105,6 +105,10 @@ export default defineConfig({
         target: API_PROXY_TARGET,
         changeOrigin: true,
       },
+      '/invoices': {
+        target: API_PROXY_TARGET,
+        changeOrigin: true,
+      },
     },
   },
   preview: {
@@ -113,6 +117,10 @@ export default defineConfig({
     headers: assetHeaders,
     proxy: {
       '/api': {
+        target: API_PROXY_TARGET,
+        changeOrigin: true,
+      },
+      '/invoices': {
         target: API_PROXY_TARGET,
         changeOrigin: true,
       },

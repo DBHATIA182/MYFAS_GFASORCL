@@ -19,6 +19,8 @@ import {
   labourGroupColSpan,
   sortLabourRowsByVrDate,
 } from '../data/labourReportLayout';
+import { apiUrl, getPublicWebOrigin } from './resolveApiBase';
+import axios from 'axios';
 
 function safeFilenamePart(name) {
   return String(name || 'report').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
@@ -6943,6 +6945,49 @@ function shouldPreferNativeFileShare() {
   return likelyMobile;
 }
 
+/** Convert PDF blob → base64 for /api/invoices/upload. */
+async function blobToPdfBase64(blob) {
+  const buf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Publish PDF under public/invoices/<comp>/file.pdf and return public HTTPS URL for WhatsApp.
+ * Falls back to '' if API/tunnel is unavailable (caller keeps attach-from-Downloads behaviour).
+ */
+async function publishInvoiceForWhatsApp(blob, filename, metadata = {}, apiBase = '') {
+  try {
+    const folder = String(
+      metadata.invoiceFolder ??
+        metadata.comp_code ??
+        metadata.compCode ??
+        metadata.COMP_CODE ??
+        '1',
+    )
+      .trim() || '1';
+    const pdfBase64 = await blobToPdfBase64(blob);
+    const { data } = await axios.post(
+      apiUrl(apiBase, '/api/invoices/upload'),
+      { folder, filename, pdfBase64 },
+      { timeout: 120000, withCredentials: true },
+    );
+    if (data?.ok && data?.publicUrl) return String(data.publicUrl);
+    if (data?.ok && data?.path) {
+      const origin = getPublicWebOrigin();
+      return origin ? `${origin}${data.path}` : String(data.path);
+    }
+  } catch (err) {
+    console.warn('Invoice publish for WhatsApp failed:', err?.response?.data || err?.message || err);
+  }
+  return '';
+}
+
 /** Download PDF (browser save dialog). */
 export const generatePDF = async (reportType, data, metadata) => {
   const { blob, filename } = await getPdfBlob(reportType, data, metadata);
@@ -6952,13 +6997,10 @@ export const generatePDF = async (reportType, data, metadata) => {
 
 /**
  * WhatsApp + PDF:
- * - On mobile-like devices with Web Share support, shares the PDF file so WhatsApp can receive
- *   the attachment (user picks WhatsApp, then the contact). A wa.me link is included in the message
- *   text when we have partyTel / accountTel so the right chat is one tap away.
- * - On desktop, skips the OS share sheet (often no WhatsApp target), downloads the PDF, and opens
- *   wa.me (with phone when known).
- * - If mobile sharing is not available or fails: downloads the PDF and opens wa.me (with phone when known)
- *   and explains attaching from Downloads / Files (URLs cannot attach files by themselves).
+ * 1) Uploads PDF to server public/invoices/<comp>/… and puts a public HTTPS download link in the chat text
+ *    (same pattern as VFP → Cloudflare → /invoices/…).
+ * 2) On mobile with Web Share, also offers the PDF file as an attachment when possible.
+ * 3) If upload fails: downloads PDF locally and opens wa.me with attach-from-Downloads hint.
  */
 export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText, options = {}) {
   let blob;
@@ -7059,10 +7101,11 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
     ? `Send to +${waDigits}\nOpen chat: https://wa.me/${waDigits}\n\n`
     : '';
 
-  const attachHint = hasTargetPhone
-    ? `\n\nPDF saved as: ${filename}\nTap Attach (paperclip), choose this PDF from Downloads, then send.`
+  const publicUrl = await publishInvoiceForWhatsApp(blob, filename, metadata || {}, options.apiBase || '');
+  const linkBlock = publicUrl
+    ? `\n\nDownload PDF:\n${publicUrl}`
     : `\n\nPDF saved as: ${filename}\nIn WhatsApp, tap Attach (paperclip) and select this file from your Downloads folder.`;
-  const body = text + attachHint;
+  const body = text + linkBlock;
 
   let canShareFiles = false;
   try {
@@ -7075,7 +7118,9 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
     canShareFiles = false;
   }
 
-  if (canShareFiles) {
+  // Prefer link-based WhatsApp (works for any recipient phone; matches VFP).
+  // Still offer native file share on mobile when no public URL was published.
+  if (canShareFiles && !publicUrl) {
     try {
       await navigator.share({
         files: [file],
@@ -7088,10 +7133,10 @@ export async function sharePdfWithWhatsApp(reportType, data, metadata, shareText
     }
   }
 
-  downloadBlob(blob, filename);
+  if (!publicUrl) {
+    downloadBlob(blob, filename);
+  }
   const url = buildWhatsAppWebUrl(hasTargetPhone ? waDigits : '', body);
-  /* Mobile: avoid window.open right on the heels of a large download — some WebViews navigate or reload the SPA tab.
-     Short delay + <a target="_blank"> keeps the accounting tab in place more reliably than window.open after async work. */
   await new Promise((r) => setTimeout(r, 200));
   try {
     const a = document.createElement('a');

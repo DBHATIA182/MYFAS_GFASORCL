@@ -112,6 +112,235 @@ app.use(cors({
 app.use(express.json({ limit: '40mb' }));
 app.use(express.urlencoded({ extended: true, limit: '40mb' }));
 
+// Public invoice PDFs (VFP + React WhatsApp download links)
+// Disk:  <APPTEST>/public/invoices/<comp>/FILE.PDF
+// URL:   https://<client>.fasaccountingsoftware.in/invoices/<comp>/FILE.PDF
+const invoicesDir = path.join(__dirname, 'public', 'invoices');
+if (!fs.existsSync(invoicesDir)) {
+  fs.mkdirSync(invoicesDir, { recursive: true });
+}
+
+function sanitizeInvoiceFolder(raw) {
+  const s = String(raw ?? '1').trim() || '1';
+  const safe = s.replace(/[^\w.-]+/g, '_').replace(/^\.+/, '').slice(0, 64);
+  return safe || '1';
+}
+
+function sanitizeInvoiceFilename(raw) {
+  const base = path.basename(String(raw || 'document.pdf').trim() || 'document.pdf');
+  const safe = base.replace(/[^\w.\- ()]+/g, '_').replace(/^\.+/, '').slice(0, 180);
+  if (!safe) return 'document.pdf';
+  return /\.pdf$/i.test(safe) ? safe : `${safe}.pdf`;
+}
+
+function buildPublicWebOrigin() {
+  const label = String(connectionConfig.local?.connectingLabel || '').trim();
+  if (label) {
+    if (/^https?:\/\//i.test(label)) return label.replace(/\/+$/, '');
+    return `https://${label.replace(/^\/+|\/+$/g, '')}`;
+  }
+  if (configuredClientName) return `https://${configuredClientName}.${rootDomain}`;
+  const web = String(connectionConfig.local?.webOrigin || '').trim();
+  return web.replace(/\/+$/, '');
+}
+
+app.use(
+  '/invoices',
+  express.static(invoicesDir, {
+    index: false,
+    fallthrough: false,
+    setHeaders(res, filePath) {
+      if (/\.pdf$/i.test(filePath)) {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${path.basename(filePath)}"`);
+        res.setHeader('Cache-Control', 'public, max-age=300');
+      }
+    },
+  }),
+);
+
+/**
+ * Save PDF under public/invoices/<comp>/<file>.
+ * Used by React (/api/invoices/upload) and remote VFP9 (/api/upload-invoice).
+ */
+function saveUploadedInvoicePdf({ compCode, fileName, fileBase64 }) {
+  const folder = sanitizeInvoiceFolder(compCode);
+  const filename = sanitizeInvoiceFilename(fileName);
+  const b64 = String(fileBase64 ?? '')
+    .replace(/^data:application\/pdf;base64,/i, '')
+    .replace(/\s+/g, '')
+    .trim();
+  if (!folder) {
+    const err = new Error('comp_code is required');
+    err.status = 400;
+    throw err;
+  }
+  if (!filename) {
+    const err = new Error('file_name is required');
+    err.status = 400;
+    throw err;
+  }
+  if (!b64) {
+    const err = new Error('file_base64 is required');
+    err.status = 400;
+    throw err;
+  }
+
+  let buf;
+  try {
+    buf = Buffer.from(b64, 'base64');
+  } catch {
+    const err = new Error('Invalid base64 PDF');
+    err.status = 400;
+    throw err;
+  }
+  if (!buf.length) {
+    const err = new Error('Empty PDF');
+    err.status = 400;
+    throw err;
+  }
+  // PDF magic "%PDF"
+  if (buf.length < 5 || buf[0] !== 0x25 || buf[1] !== 0x50 || buf[2] !== 0x44 || buf[3] !== 0x46) {
+    const err = new Error('Not a PDF file');
+    err.status = 400;
+    throw err;
+  }
+
+  const dir = path.join(invoicesDir, folder);
+  fs.mkdirSync(dir, { recursive: true });
+  const abs = path.resolve(dir, filename);
+  const rootResolved = path.resolve(invoicesDir);
+  if (abs !== rootResolved && !abs.startsWith(rootResolved + path.sep)) {
+    const err = new Error('Invalid path');
+    err.status = 400;
+    throw err;
+  }
+  fs.writeFileSync(abs, buf);
+
+  const publicPath = `/invoices/${folder}/${filename}`.replace(/\\/g, '/');
+  const origin = buildPublicWebOrigin();
+  const publicUrl = origin ? `${origin}${publicPath}` : publicPath;
+  return { folder, filename, path: publicPath, publicUrl, bytes: buf.length };
+}
+
+/** React / internal upload (folder, filename, pdfBase64). */
+app.post('/api/invoices/upload', (req, res) => {
+  try {
+    const saved = saveUploadedInvoicePdf({
+      compCode: req.body?.folder ?? req.body?.comp_code ?? req.body?.compCode,
+      fileName: req.body?.filename ?? req.body?.file_name ?? req.body?.name,
+      fileBase64: req.body?.pdfBase64 ?? req.body?.file_base64 ?? req.body?.base64,
+    });
+    return res.json({ ok: true, ...saved });
+  } catch (err) {
+    const status = Number(err?.status) || 500;
+    if (status >= 500) console.error('invoice upload failed:', err);
+    return res.status(status).json({ ok: false, error: err?.message || String(err) });
+  }
+});
+
+/**
+ * Remote VFP9 workstations (Static IP / WAN) — no UNC/E: drive access.
+ * POST JSON: { comp_code, file_name, file_base64 }
+ * Then WhatsApp: https://<client>.fasaccountingsoftware.in/invoices/<comp_code>/<file_name>
+ */
+app.post('/api/upload-invoice', (req, res) => {
+  try {
+    const { comp_code, file_name, file_base64 } = req.body || {};
+    if (!comp_code || !file_name || !file_base64) {
+      return res.status(400).json({ error: 'comp_code, file_name, and file_base64 are required' });
+    }
+    const saved = saveUploadedInvoicePdf({
+      compCode: comp_code,
+      fileName: file_name,
+      fileBase64: file_base64,
+    });
+    return res.json({
+      ok: true,
+      message: 'PDF uploaded successfully',
+      publicUrl: saved.publicUrl,
+      path: saved.path,
+      comp_code: saved.folder,
+      file_name: saved.filename,
+    });
+  } catch (err) {
+    console.error('Upload invoice error:', err.message);
+    const status = Number(err?.status) || 500;
+    return res.status(status).json({ error: err.message });
+  }
+});
+
+/** Auto-delete uploaded invoice PDFs after 15 days (mtime = upload/overwrite time). */
+const INVOICE_RETENTION_DAYS = 15;
+const INVOICE_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // every 6 hours
+
+function cleanupExpiredInvoiceFiles() {
+  const cutoff = Date.now() - INVOICE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  let deletedFiles = 0;
+  let deletedDirs = 0;
+
+  function walk(dir) {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        walk(full);
+        try {
+          if (
+            fs.readdirSync(full).length === 0 &&
+            path.resolve(full) !== path.resolve(invoicesDir)
+          ) {
+            fs.rmdirSync(full);
+            deletedDirs += 1;
+          }
+        } catch {
+          /* ignore */
+        }
+      } else if (ent.isFile()) {
+        try {
+          const st = fs.statSync(full);
+          const uploadedAt = Number(st.mtimeMs || st.birthtimeMs || 0);
+          if (uploadedAt > 0 && uploadedAt < cutoff) {
+            fs.unlinkSync(full);
+            deletedFiles += 1;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  if (!fs.existsSync(invoicesDir)) return { deletedFiles: 0, deletedDirs: 0 };
+  walk(invoicesDir);
+  if (deletedFiles || deletedDirs) {
+    console.log(
+      `Invoice cleanup: removed ${deletedFiles} file(s), ${deletedDirs} empty folder(s) older than ${INVOICE_RETENTION_DAYS} days`,
+    );
+  }
+  return { deletedFiles, deletedDirs };
+}
+
+function scheduleInvoiceCleanup() {
+  const run = () => {
+    try {
+      cleanupExpiredInvoiceFiles();
+    } catch (err) {
+      console.warn('Invoice cleanup failed:', err?.message || err);
+    }
+  };
+  run();
+  const timer = setInterval(run, INVOICE_CLEANUP_INTERVAL_MS);
+  if (typeof timer.unref === 'function') timer.unref();
+}
+
+scheduleInvoiceCleanup();
+
 app.get('/api/client-identity', (req, res) => {
   res.json({
     ok: true,

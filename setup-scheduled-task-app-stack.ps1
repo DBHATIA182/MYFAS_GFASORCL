@@ -47,8 +47,20 @@ if ([string]::IsNullOrWhiteSpace($AppRoot)) {
 $AppRoot = (Resolve-Path -LiteralPath $AppRoot).Path
 
 $launcher = Join-Path $AppRoot 'run-autostart-stack.cmd'
+$grainfasBat = Join-Path $AppRoot 'grainfas_start_Services.bat'
 if (-not (Test-Path -LiteralPath $launcher)) {
-    throw "Missing launcher: $launcher"
+    if (Test-Path -LiteralPath $grainfasBat) {
+        # Minimal launcher so Task Scheduler can call grainfas_start_Services.bat
+        @(
+            '@echo off',
+            'cd /d "%~dp0"',
+            'call "%~dp0grainfas_start_Services.bat"',
+            'exit /b 0'
+        ) | Set-Content -LiteralPath $launcher -Encoding ASCII
+        Write-Host "Created missing launcher: $launcher" -ForegroundColor Yellow
+    } else {
+        throw "Missing launcher: $launcher (and grainfas_start_Services.bat not found)"
+    }
 }
 if (-not (Test-Path -LiteralPath (Join-Path $AppRoot 'server.cjs'))) {
     throw "Missing server.cjs at $AppRoot"

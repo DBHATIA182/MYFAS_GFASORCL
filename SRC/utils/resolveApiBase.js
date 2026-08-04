@@ -137,6 +137,30 @@ export function formatApiBaseForDisplay(apiBase) {
   return s;
 }
 
+/**
+ * Public HTTPS origin for WhatsApp invoice links (tunnel hostname).
+ * Prefer current fas* host; else connection.config connectingLabel / clientName.
+ */
+export function getPublicWebOrigin(config = connectionConfig) {
+  try {
+    const host = getSafeHostname().toLowerCase();
+    if (isFasWebAppHost(host, config)) {
+      return `https://${host}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  const label = String(config.local?.connectingLabel || '').trim();
+  if (label) {
+    if (/^https?:\/\//i.test(label)) return label.replace(/\/+$/, '');
+    return `https://${label.replace(/^\/+|\/+$/g, '')}`;
+  }
+  const key = String(config.clientName || config.defaultClientKey || '').trim().toLowerCase();
+  const root = String(config.domain?.rootDomain || 'fasaccountingsoftware.in').trim().toLowerCase();
+  if (key && key !== 'auto' && root) return `https://${key}.${root}`;
+  return '';
+}
+
 export function readApiBaseOverride() {
   return readApiOverride();
 }
