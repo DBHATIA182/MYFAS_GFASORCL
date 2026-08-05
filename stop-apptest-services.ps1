@@ -23,7 +23,7 @@
 
 .PARAMETER ReleasePorts
   After the normal stop, stop node.exe listeners on these TCP ports.
-  Pass as comma/space-separated values (cmd-safe): -ReleasePorts "5002,5173"
+  Accepts: -ReleasePorts "5002,5173"  or  -ReleasePorts 5002,5173  or  -ReleasePorts @(5002,5173)
 
 .PARAMETER ReleaseApiPort5001
   After the normal stop, find anything listening on TCP port 5001 and stop it if the
@@ -44,7 +44,7 @@ param(
     [switch]$StopScheduledTasks,
     [switch]$StopWindowsServices,
     [switch]$ReleaseApiPort5001,
-    [string]$ReleasePorts = "",
+    [object]$ReleasePorts = $null,
     [int]$WaitSeconds = 2
 )
 
@@ -162,9 +162,15 @@ if ($ReleaseApiPort5001) {
     Stop-NodeListenersOnPort -Port 5001
 }
 
-foreach ($portToken in @(($ReleasePorts -split '[,;\s]+') | Where-Object { $_ })) {
+foreach ($portToken in @(
+    $(
+      if ($null -eq $ReleasePorts -or $ReleasePorts -eq '') { @() }
+      elseif ($ReleasePorts -is [System.Array]) { $ReleasePorts }
+      else { @(($ReleasePorts.ToString()) -split '[,;\s]+') }
+    ) | Where-Object { $_ -ne $null -and "$_".Trim() -ne '' }
+)) {
     $port = 0
-    if (-not [int]::TryParse($portToken, [ref]$port) -or $port -le 0) { continue }
+    if (-not [int]::TryParse(("$portToken").Trim(), [ref]$port) -or $port -le 0) { continue }
     Stop-NodeListenersOnPort -Port $port
 }
 
