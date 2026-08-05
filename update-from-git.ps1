@@ -49,29 +49,32 @@ function Invoke-Npm([string[]]$npmArgs) {
 }
 
 function Stop-AppNodeLocks {
-    Write-Host '==> Releasing Node locks on this app folder...' -ForegroundColor Cyan
-    $likeRoot = '*' + $AppRoot + '*'
+    Write-Host '==> Releasing Node locks (stops node.exe so oracledb .node can be replaced)...' -ForegroundColor Cyan
+
+    # Kill every node whose command line mentions this app (any path casing).
+    $rootNorm = $AppRoot.TrimEnd('\').ToLowerInvariant()
     $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
         Where-Object {
             $_.Name -eq 'node.exe' -and
             $_.CommandLine -and
-            $_.CommandLine -like $likeRoot
+            $_.CommandLine.ToLowerInvariant().Contains($rootNorm)
         }
-    foreach ($p in $procs) {
+    foreach ($p in @($procs)) {
         try {
             Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop
-            Write-Host ("Stopped node.exe (PID {0})" -f $p.ProcessId) -ForegroundColor Green
+            Write-Host ("Stopped app node.exe (PID {0})" -f $p.ProcessId) -ForegroundColor Green
         } catch {
             Write-Host ("Could not stop node.exe PID {0}: {1}" -f $p.ProcessId, $_.Exception.Message) -ForegroundColor Yellow
         }
     }
+
     foreach ($port in @(5002, 5173, 5001)) {
         try {
             Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
                 Select-Object -ExpandProperty OwningProcess -Unique |
                 ForEach-Object {
                     $owningPid = [int]$_
-                    if ($owningPid -le 0) { return }
+                    if ($owningPid -le 4) { return }
                     $proc = Get-Process -Id $owningPid -ErrorAction SilentlyContinue
                     if ($proc -and $proc.ProcessName -eq 'node') {
                         Stop-Process -Id $owningPid -Force -ErrorAction SilentlyContinue
@@ -80,34 +83,62 @@ function Stop-AppNodeLocks {
                 }
         } catch { }
     }
-    Start-Sleep -Seconds 2
+
+    # Last resort for locked oracledb native binary: stop ALL node.exe on this PC.
+    $anyNode = @(Get-Process -Name node -ErrorAction SilentlyContinue)
+    if ($anyNode.Count -gt 0) {
+        Write-Host ("==> Stopping all remaining node.exe ({0}) for clean npm ci..." -f $anyNode.Count) -ForegroundColor Yellow
+        foreach ($p in $anyNode) {
+            try {
+                Stop-Process -Id $p.Id -Force -ErrorAction Stop
+                Write-Host ("Stopped node.exe (PID {0})" -f $p.Id) -ForegroundColor Green
+            } catch {
+                Write-Host ("Could not stop node.exe PID {0}: {1}" -f $p.Id, $_.Exception.Message) -ForegroundColor Yellow
+            }
+        }
+    }
+
+    Start-Sleep -Seconds 3
 }
 
 function Clear-NodeModulesForInstall {
     $nm = Join-Path $AppRoot 'node_modules'
     if (-not (Test-Path -LiteralPath $nm)) { return }
-    Write-Host '==> Removing node_modules (unlocks oracledb .node for npm ci)...' -ForegroundColor Yellow
+    Write-Host '==> Removing node_modules before npm ci...' -ForegroundColor Yellow
     $stamp = Get-Date -Format 'yyyyMMddHHmmss'
     $trash = Join-Path $AppRoot ("node_modules.__trash_$stamp")
     try {
         Move-Item -LiteralPath $nm -Destination $trash -Force -ErrorAction Stop
-    } catch {
-        Write-Host ("Move failed ({0}); trying Remove-Item..." -f $_.Exception.Message) -ForegroundColor Yellow
-        Remove-Item -LiteralPath $nm -Recurse -Force -ErrorAction SilentlyContinue
-        if (Test-Path -LiteralPath $nm) {
-            throw @'
-Could not remove node_modules (file locked). Close all GRAINFAS windows, run:
-  taskkill /F /IM node.exe /T
-Then delete node_modules and run Update-APPTEST-From-Desktop.cmd again.
-'@
-        }
+        Start-Job -ScriptBlock {
+            param($path)
+            Start-Sleep -Seconds 1
+            cmd.exe /c "rd /s /q `"$path`"" | Out-Null
+            if (Test-Path -LiteralPath $path) {
+                Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        } -ArgumentList $trash | Out-Null
         return
+    } catch {
+        Write-Host ("Move failed ({0}); trying rd /s /q..." -f $_.Exception.Message) -ForegroundColor Yellow
     }
-    Start-Job -ScriptBlock {
-        param($path)
-        Start-Sleep -Seconds 1
-        Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
-    } -ArgumentList $trash | Out-Null
+
+    cmd.exe /c "rd /s /q `"$nm`"" | Out-Null
+    Start-Sleep -Seconds 1
+    if (Test-Path -LiteralPath $nm) {
+        Remove-Item -LiteralPath $nm -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path -LiteralPath $nm) {
+        throw @'
+Could not remove node_modules (file locked — usually oracledb .node).
+
+Close all GRAINFAS / Cursor terminals using this folder, then run:
+  taskkill /F /IM node.exe /T
+  rd /s /q node_modules
+  npm ci
+  npm run build
+  .\grainfas_start_Services.bat
+'@
+    }
 }
 
 if (-not $SkipProcessStop) {
@@ -115,10 +146,10 @@ if (-not $SkipProcessStop) {
     if (Test-Path -LiteralPath $stopScript) {
         Write-Host ''
         Write-Host '==> Ensuring no GFASORCL processes lock files...' -ForegroundColor Cyan
-        & $stopScript -AppRoot $AppRoot -ReleaseApiPort5001 -ReleasePorts 5002,5173 -WaitSeconds 2
+        # Pass ports as separate args — cmd.exe eats commas in "5002,5173".
+        & $stopScript -AppRoot $AppRoot -ReleaseApiPort5001 -ReleasePorts 5002 -ReleasePorts 5173 -WaitSeconds 2
     }
 }
-Stop-AppNodeLocks
 
 Write-Host ''
 Write-Host "==> GFASORCL update-from-git ($Branch)" -ForegroundColor Cyan
@@ -153,7 +184,7 @@ Write-Host $Branch -ForegroundColor Cyan
 git reset --hard "origin/$Branch"
 if ($LASTEXITCODE -ne 0) {
     Write-Host 'reset blocked; removing untracked files that conflict (keeps gitignored client config)...' -ForegroundColor Yellow
-    git clean -fd
+    git clean -fd -e "public/invoices" -e "logs"
     if ($LASTEXITCODE -ne 0) { throw 'git clean failed.' }
     git reset --hard "origin/$Branch"
     if ($LASTEXITCODE -ne 0) { throw 'git reset --hard failed after clean.' }
@@ -179,16 +210,13 @@ foreach ($name in $vfpSkipDirs) {
 }
 
 Write-Host ''
-Write-Host '==> npm ci' -ForegroundColor Cyan
+Write-Host '==> Preparing clean npm install...' -ForegroundColor Cyan
 Stop-AppNodeLocks
-try {
-    Invoke-Npm @('ci')
-} catch {
-    Write-Host 'npm ci failed (often oracledb .node file lock). Retrying after clearing node_modules...' -ForegroundColor Yellow
-    Stop-AppNodeLocks
-    Clear-NodeModulesForInstall
-    Invoke-Npm @('ci')
-}
+Clear-NodeModulesForInstall
+
+Write-Host ''
+Write-Host '==> npm ci' -ForegroundColor Cyan
+Invoke-Npm @('ci')
 
 Write-Host ''
 Write-Host '==> npm run build' -ForegroundColor Cyan
