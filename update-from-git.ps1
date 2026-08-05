@@ -146,8 +146,7 @@ if (-not $SkipProcessStop) {
     if (Test-Path -LiteralPath $stopScript) {
         Write-Host ''
         Write-Host '==> Ensuring no GFASORCL processes lock files...' -ForegroundColor Cyan
-        # Pass ports as separate args — cmd.exe eats commas in "5002,5173".
-        & $stopScript -AppRoot $AppRoot -ReleaseApiPort5001 -ReleasePorts 5002 -ReleasePorts 5173 -WaitSeconds 2
+        & $stopScript -AppRoot $AppRoot -ReleaseApiPort5001 -ReleasePorts '5002,5173' -WaitSeconds 2
     }
 }
 

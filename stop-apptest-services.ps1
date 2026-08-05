@@ -21,12 +21,13 @@
   Also stop Windows services with names:
   GFAS-<client>-API or GFAS-<client>-AllServices (if present).
 
+.PARAMETER ReleasePorts
+  After the normal stop, stop node.exe listeners on these TCP ports.
+  Pass as comma/space-separated values (cmd-safe): -ReleasePorts "5002,5173"
+
 .PARAMETER ReleaseApiPort5001
   After the normal stop, find anything listening on TCP port 5001 and stop it if the
   process is node.exe (frees the API port when a stray Node process was missed).
-
-.PARAMETER ReleasePorts
-  After the normal stop, stop node.exe listeners on these TCP ports (e.g. 5002 API, 5173 Vite).
 
 .EXAMPLE
   .\stop-apptest-services.ps1
@@ -35,7 +36,7 @@
   .\stop-apptest-services.ps1 -StopScheduledTasks -StopWindowsServices
 
 .EXAMPLE
-  .\stop-apptest-services.ps1 -ReleaseApiPort5001
+  .\stop-apptest-services.ps1 -ReleaseApiPort5001 -ReleasePorts "5002,5173"
 #>
 [CmdletBinding()]
 param(
@@ -43,7 +44,7 @@ param(
     [switch]$StopScheduledTasks,
     [switch]$StopWindowsServices,
     [switch]$ReleaseApiPort5001,
-    [int[]]$ReleasePorts = @(),
+    [string]$ReleasePorts = "",
     [int]$WaitSeconds = 2
 )
 
@@ -161,10 +162,10 @@ if ($ReleaseApiPort5001) {
     Stop-NodeListenersOnPort -Port 5001
 }
 
-foreach ($port in @($ReleasePorts | Sort-Object -Unique)) {
-    if ($port -gt 0) {
-        Stop-NodeListenersOnPort -Port $port
-    }
+foreach ($portToken in @(($ReleasePorts -split '[,;\s]+') | Where-Object { $_ })) {
+    $port = 0
+    if (-not [int]::TryParse($portToken, [ref]$port) -or $port -le 0) { continue }
+    Stop-NodeListenersOnPort -Port $port
 }
 
 # 3) Optional: stop known scheduled tasks for this client.

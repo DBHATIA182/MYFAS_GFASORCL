@@ -28,7 +28,7 @@ echo APP_ROOT=%APP_ROOT% BRANCH=%BRANCH%>> "%LOG_FILE%"
 echo.
 echo [1/3] Stopping APPTEST services...
 echo [1/3] Stopping APPTEST services...>> "%LOG_FILE%"
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_ROOT%\stop-apptest-services.ps1" -AppRoot "%APP_ROOT%" -ReleaseApiPort5001 -ReleasePorts 5002 -ReleasePorts 5173 >> "%LOG_FILE%" 2>&1
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_ROOT%\stop-apptest-services.ps1" -AppRoot "%APP_ROOT%" -ReleaseApiPort5001 -ReleasePorts "5002,5173" >> "%LOG_FILE%" 2>&1
 if errorlevel 1 (
   echo [ERROR] stop-apptest-services failed. Check "%LOG_FILE%"
   echo [ERROR] stop-apptest-services failed.>> "%LOG_FILE%"
