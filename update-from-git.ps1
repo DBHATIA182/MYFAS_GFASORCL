@@ -48,14 +48,77 @@ function Invoke-Npm([string[]]$npmArgs) {
     }
 }
 
+function Stop-AppNodeLocks {
+    Write-Host '==> Releasing Node locks on this app folder...' -ForegroundColor Cyan
+    $likeRoot = '*' + $AppRoot + '*'
+    $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -eq 'node.exe' -and
+            $_.CommandLine -and
+            $_.CommandLine -like $likeRoot
+        }
+    foreach ($p in $procs) {
+        try {
+            Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop
+            Write-Host ("Stopped node.exe (PID {0})" -f $p.ProcessId) -ForegroundColor Green
+        } catch {
+            Write-Host ("Could not stop node.exe PID {0}: {1}" -f $p.ProcessId, $_.Exception.Message) -ForegroundColor Yellow
+        }
+    }
+    foreach ($port in @(5002, 5173, 5001)) {
+        try {
+            Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty OwningProcess -Unique |
+                ForEach-Object {
+                    $owningPid = [int]$_
+                    if ($owningPid -le 0) { return }
+                    $proc = Get-Process -Id $owningPid -ErrorAction SilentlyContinue
+                    if ($proc -and $proc.ProcessName -eq 'node') {
+                        Stop-Process -Id $owningPid -Force -ErrorAction SilentlyContinue
+                        Write-Host ("Stopped node.exe on port {0} (PID {1})" -f $port, $owningPid) -ForegroundColor Green
+                    }
+                }
+        } catch { }
+    }
+    Start-Sleep -Seconds 2
+}
+
+function Clear-NodeModulesForInstall {
+    $nm = Join-Path $AppRoot 'node_modules'
+    if (-not (Test-Path -LiteralPath $nm)) { return }
+    Write-Host '==> Removing node_modules (unlocks oracledb .node for npm ci)...' -ForegroundColor Yellow
+    $stamp = Get-Date -Format 'yyyyMMddHHmmss'
+    $trash = Join-Path $AppRoot ("node_modules.__trash_$stamp")
+    try {
+        Move-Item -LiteralPath $nm -Destination $trash -Force -ErrorAction Stop
+    } catch {
+        Write-Host ("Move failed ({0}); trying Remove-Item..." -f $_.Exception.Message) -ForegroundColor Yellow
+        Remove-Item -LiteralPath $nm -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $nm) {
+            throw @'
+Could not remove node_modules (file locked). Close all GRAINFAS windows, run:
+  taskkill /F /IM node.exe /T
+Then delete node_modules and run Update-APPTEST-From-Desktop.cmd again.
+'@
+        }
+        return
+    }
+    Start-Job -ScriptBlock {
+        param($path)
+        Start-Sleep -Seconds 1
+        Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
+    } -ArgumentList $trash | Out-Null
+}
+
 if (-not $SkipProcessStop) {
     $stopScript = Join-Path $AppRoot 'stop-apptest-services.ps1'
     if (Test-Path -LiteralPath $stopScript) {
         Write-Host ''
         Write-Host '==> Ensuring no GFASORCL processes lock files...' -ForegroundColor Cyan
-        & $stopScript -AppRoot $AppRoot -ReleaseApiPort5001 -WaitSeconds 2
+        & $stopScript -AppRoot $AppRoot -ReleaseApiPort5001 -ReleasePorts 5002,5173 -WaitSeconds 2
     }
 }
+Stop-AppNodeLocks
 
 Write-Host ''
 Write-Host "==> GFASORCL update-from-git ($Branch)" -ForegroundColor Cyan
@@ -97,8 +160,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Drop untracked copies that are not ignored (e.g. docs pasted beside a clone).
-# Does NOT delete ignored files: connection.config.json, config.yml, tunnel creds, node_modules.
-git clean -fd
+# Keep runtime invoice PDFs and logs. Ignored client config is never cleaned.
+git clean -fd -e "public/invoices" -e "logs" -e "APPTEST.rar"
 if ($LASTEXITCODE -ne 0) {
     Write-Host 'Warning: git clean reported an error; continuing.' -ForegroundColor Yellow
 }
@@ -117,7 +180,15 @@ foreach ($name in $vfpSkipDirs) {
 
 Write-Host ''
 Write-Host '==> npm ci' -ForegroundColor Cyan
-Invoke-Npm @('ci')
+Stop-AppNodeLocks
+try {
+    Invoke-Npm @('ci')
+} catch {
+    Write-Host 'npm ci failed (often oracledb .node file lock). Retrying after clearing node_modules...' -ForegroundColor Yellow
+    Stop-AppNodeLocks
+    Clear-NodeModulesForInstall
+    Invoke-Npm @('ci')
+}
 
 Write-Host ''
 Write-Host '==> npm run build' -ForegroundColor Cyan
