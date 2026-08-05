@@ -1,7 +1,0 @@
-
-vtp=THISFORM.TYPE.VALUE
-vdt=thisform.R_date.Value
-vno=thisform.R_no.Value
-XTP=''
-DO FORM DCNOTE_CHK WITH THISFORM.TYPE.VALUE
-

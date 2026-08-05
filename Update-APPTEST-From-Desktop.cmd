@@ -2,11 +2,10 @@
 setlocal EnableExtensions EnableDelayedExpansion
 title APPTEST One-Click Update
 
-REM ------------------------------------------------------------
-REM Edit APP_ROOT only if your app folder is different.
-REM Keep quotes because path may contain spaces.
-REM ------------------------------------------------------------
-set "APP_ROOT=E:\GFASORCL\APPTEST"
+REM APP_ROOT = this .cmd file's folder (D:\GFASORCL\APPTEST, E:\..., etc.).
+REM Optional override example: set "APP_ROOT=D:\GFASORCL\APPTEST"
+set "APP_ROOT=%~dp0"
+set "APP_ROOT=%APP_ROOT:~0,-1%"
 set "BRANCH=main"
 
 if not exist "%APP_ROOT%" (
@@ -40,7 +39,7 @@ if errorlevel 1 (
 echo.
 echo [2/3] Updating from Git and rebuilding...
 echo [2/3] Updating from Git and rebuilding...>> "%LOG_FILE%"
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_ROOT%\update-from-git.ps1" -Branch "%BRANCH%" >> "%LOG_FILE%" 2>&1
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_ROOT%\update-from-git.ps1" -Branch "%BRANCH%" -AppRoot "%APP_ROOT%" -SkipProcessStop >> "%LOG_FILE%" 2>&1
 if errorlevel 1 (
   echo [ERROR] update-from-git failed. Check "%LOG_FILE%"
   echo [ERROR] update-from-git failed.>> "%LOG_FILE%"

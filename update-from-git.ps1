@@ -81,11 +81,38 @@ if ($LASTEXITCODE -ne 0) { throw 'git fetch failed.' }
 git checkout $Branch
 if ($LASTEXITCODE -ne 0) { throw "git checkout $Branch failed." }
 
-git pull origin $Branch --autostash
+# Client PCs often have leftover copy files / local edits that block `git pull`.
+# Match GitHub exactly for tracked files. Ignored client files stay
+# (connection.config.json, config.yml, tunnel UUID.json, node_modules, etc.).
+Write-Host '==> Syncing tracked files to origin/' -NoNewline -ForegroundColor Cyan
+Write-Host $Branch -ForegroundColor Cyan
+
+git reset --hard "origin/$Branch"
 if ($LASTEXITCODE -ne 0) {
-    throw @'
-git pull failed. Resolve conflicts, then run this script again.
-'@
+    Write-Host 'reset blocked; removing untracked files that conflict (keeps gitignored client config)...' -ForegroundColor Yellow
+    git clean -fd
+    if ($LASTEXITCODE -ne 0) { throw 'git clean failed.' }
+    git reset --hard "origin/$Branch"
+    if ($LASTEXITCODE -ne 0) { throw 'git reset --hard failed after clean.' }
+}
+
+# Drop untracked copies that are not ignored (e.g. docs pasted beside a clone).
+# Does NOT delete ignored files: connection.config.json, config.yml, tunnel creds, node_modules.
+git clean -fd
+if ($LASTEXITCODE -ne 0) {
+    Write-Host 'Warning: git clean reported an error; continuing.' -ForegroundColor Yellow
+}
+
+# VFP reference trees are master/dev only — never keep them on client installs.
+$vfpSkipDirs = @('vfp', 'VFP', 'VFP-EXPORT', 'VFP-IMPORT', 'vfp-export', 'vfp-import')
+$removedVfp = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($name in $vfpSkipDirs) {
+    $dir = Join-Path $AppRoot $name
+    if (-not (Test-Path -LiteralPath $dir)) { continue }
+    $resolved = (Resolve-Path -LiteralPath $dir).Path
+    if (-not $removedVfp.Add($resolved)) { continue }
+    Write-Host "==> Removing client-unneeded folder: $name" -ForegroundColor Yellow
+    Remove-Item -LiteralPath $resolved -Recurse -Force -ErrorAction Stop
 }
 
 Write-Host ''
