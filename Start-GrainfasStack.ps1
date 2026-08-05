@@ -176,8 +176,7 @@ if (-not (Test-Path -LiteralPath $freeScript)) {
 $stopScript = Join-Path $AppRoot 'stop-apptest-services.ps1'
 if (Test-Path -LiteralPath $stopScript) {
     Write-StackLog 'Stopping existing APPTEST processes for this folder'
-    # Call in-process so -ReleasePorts @(…) binds as int[]; -File + "5002,5173" becomes "50025173".
-    & $stopScript -AppRoot $AppRoot -ReleasePorts @(5002, 5173) -WaitSeconds 1 2>&1 |
+    & $stopScript -AppRoot $AppRoot -ReleasePorts '5002,5173' -WaitSeconds 1 2>&1 |
         ForEach-Object { Write-StackLog $_ }
 }
 
@@ -232,6 +231,24 @@ if (-not $npmCmd) {
     exit 1
 }
 Write-StackLog "Using node: $nodeExe"
+
+# Ensure dependencies exist (broken node_modules → 'vite' not recognized / Cannot find module 'express')
+$viteCmd = Join-Path $AppRoot 'node_modules\.bin\vite.cmd'
+$expressDir = Join-Path $AppRoot 'node_modules\express'
+if (-not (Test-Path -LiteralPath $viteCmd) -or -not (Test-Path -LiteralPath $expressDir)) {
+    Write-StackLog 'node_modules incomplete — running npm ci before build'
+    $ciLog = Join-Path $logsDir 'npm-ci.log'
+    $ciCmd = "cd /d `"$AppRoot`" & $npmQ ci >> `"$ciLog`" 2>&1"
+    $cip = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', $ciCmd) -WorkingDirectory $AppRoot -WindowStyle Hidden -Wait -PassThru
+    if ($cip.ExitCode -ne 0) {
+        Write-StackLog "ERROR: npm ci failed (exit $($cip.ExitCode)). See $ciLog"
+        exit $cip.ExitCode
+    }
+    if (-not (Test-Path -LiteralPath $viteCmd)) {
+        Write-StackLog "ERROR: vite still missing after npm ci ($viteCmd)"
+        exit 1
+    }
+}
 
 # Clear Vite cache so stale modules do not stick after restart
 $viteCache = Join-Path $AppRoot 'node_modules\.vite'
